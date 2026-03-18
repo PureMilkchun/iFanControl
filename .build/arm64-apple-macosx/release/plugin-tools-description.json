@@ -1,0 +1,398 @@
+{
+  "builtTestProducts" : [
+
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.FanCurveEditor-arm64-apple-macosx26.0-release.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/sources",
+      "importPath" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/FanCurveView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/FanCurveWindow.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "FanCurveEditor",
+      "moduleOutputPath" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/Modules/FanCurveEditor.swiftmodule",
+      "objects" : [
+        "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/FanCurveView.swift.o",
+        "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/FanCurveWindow.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx13.0",
+        "-whole-module-optimization",
+        "-num-threads",
+        "10",
+        "-serialize-diagnostics",
+        "-O",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/include/FanCurveEditor-Swift.h",
+        "-swift-version",
+        "5",
+        "-I",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-L",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-plugin-path",
+        "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "fan_control_launch"
+      ],
+      "outputFileMapPath" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/FanCurveView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/FanCurveWindow.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/Modules/FanCurveEditor.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/FanCurveView.swift",
+        "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/FanCurveWindow.swift"
+      ],
+      "tempsPath" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build",
+      "wholeModuleOptimization" : true
+    },
+    "C.MacFanControl-arm64-apple-macosx26.0-release.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.build/sources",
+      "importPath" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/MacFanControl/main.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/Modules/FanCurveEditor.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "MacFanControl",
+      "moduleOutputPath" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/Modules/MacFanControl.swiftmodule",
+      "objects" : [
+        "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.build/main.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx13.0",
+        "-whole-module-optimization",
+        "-num-threads",
+        "10",
+        "-serialize-diagnostics",
+        "-O",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "MacFanControl_main",
+        "-parse-as-library",
+        "-swift-version",
+        "5",
+        "-I",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-L",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-plugin-path",
+        "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "fan_control_launch"
+      ],
+      "outputFileMapPath" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/Modules/MacFanControl.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/MacFanControl/main.swift"
+      ],
+      "tempsPath" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.build",
+      "wholeModuleOptimization" : true
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "FanCurveEditor" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "FanCurveEditor",
+      "-package-name",
+      "fan_control_launch",
+      "-c",
+      "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/FanCurveView.swift",
+      "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/FanCurveWindow.swift",
+      "-I",
+      "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/Modules",
+      "-target",
+      "arm64-apple-macosx13.0",
+      "-whole-module-optimization",
+      "-num-threads",
+      "10",
+      "-serialize-diagnostics",
+      "-O",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/include/FanCurveEditor-Swift.h",
+      "-swift-version",
+      "5",
+      "-I",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-L",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-plugin-path",
+      "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "fan_control_launch",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ],
+    "MacFanControl" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "MacFanControl",
+      "-package-name",
+      "fan_control_launch",
+      "-c",
+      "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/MacFanControl/main.swift",
+      "-I",
+      "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/Modules",
+      "-target",
+      "arm64-apple-macosx13.0",
+      "-whole-module-optimization",
+      "-num-threads",
+      "10",
+      "-serialize-diagnostics",
+      "-O",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "MacFanControl_main",
+      "-parse-as-library",
+      "-swift-version",
+      "5",
+      "-I",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-L",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-plugin-path",
+      "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "fan_control_launch",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "FanCurveEditor" : [
+
+    ],
+    "MacFanControl" : [
+      "FanCurveEditor"
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/FanCurveView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/FanCurveWindow.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/sources"
+    },
+    "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/MacFanControl/main.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.build/sources"
+    },
+    "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/FanCurveView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/FanCurveWindow.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.build/main.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.product/Objects.LinkFileList"
+    },
+    "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/swift-version--1AB21518FC5DEDBE.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/swift-version--1AB21518FC5DEDBE.txt"
+    }
+  }
+}

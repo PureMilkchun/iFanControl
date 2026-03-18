@@ -1,0 +1,19 @@
+{
+  "": {
+    "dependencies": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/FanCurveEditor.d",
+    "object": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/FanCurveEditor.o",
+    "swift-dependencies": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/master.swiftdeps"
+  },
+  "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/FanCurveView.swift": {
+    "object": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/FanCurveView.swift.o",
+    "swiftmodule": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/FanCurveView~partial.swiftmodule",
+    "swift-dependencies": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/FanCurveView.swiftdeps",
+    "diagnostics": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/FanCurveView.dia"
+  },
+  "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/FanCurveWindow.swift": {
+    "object": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/FanCurveWindow.swift.o",
+    "swiftmodule": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/FanCurveWindow~partial.swiftmodule",
+    "swift-dependencies": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/FanCurveWindow.swiftdeps",
+    "diagnostics": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/FanCurveWindow.dia"
+  }
+}

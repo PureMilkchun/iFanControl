@@ -1,0 +1,19 @@
+{
+  "": {
+    "swift-dependencies": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/master.swiftdeps"
+  },
+  "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/FanCurveView.swift": {
+    "dependencies": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/FanCurveView.d",
+    "object": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/FanCurveView.swift.o",
+    "swiftmodule": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/FanCurveView~partial.swiftmodule",
+    "swift-dependencies": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/FanCurveView.swiftdeps",
+    "diagnostics": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/FanCurveView.dia"
+  },
+  "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/FanCurveWindow.swift": {
+    "dependencies": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/FanCurveWindow.d",
+    "object": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/FanCurveWindow.swift.o",
+    "swiftmodule": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/FanCurveWindow~partial.swiftmodule",
+    "swift-dependencies": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/FanCurveWindow.swiftdeps",
+    "diagnostics": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/FanCurveWindow.dia"
+  }
+}

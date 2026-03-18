@@ -1,0 +1,13 @@
+{
+  "": {
+    "dependencies": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.build/MacFanControl.d",
+    "object": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.build/MacFanControl.o",
+    "swift-dependencies": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.build/master.swiftdeps"
+  },
+  "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/MacFanControl/main.swift": {
+    "object": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.build/main.swift.o",
+    "swiftmodule": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.build/main.swiftdeps",
+    "diagnostics": "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/MacFanControl.build/main.dia"
+  }
+}

@@ -1,0 +1,3 @@
+module FanCurveEditor {
+    header "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/arm64-apple-macosx/release/FanCurveEditor.build/include/FanCurveEditor-Swift.h"
+}

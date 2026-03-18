@@ -1,0 +1,69 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "FanCurveEditor-arm64-apple-macosx26.0-debug.module": ["<FanCurveEditor-arm64-apple-macosx26.0-debug.module>"]
+  "MacFanControl-arm64-apple-macosx26.0-debug.module": ["<MacFanControl-arm64-apple-macosx26.0-debug.module>"]
+  "PackageStructure": ["<PackageStructure>"]
+  "main": ["<FanCurveEditor-arm64-apple-macosx26.0-debug.module>","<MacFanControl-arm64-apple-macosx26.0-debug.module>"]
+  "test": ["<FanCurveEditor-arm64-apple-macosx26.0-debug.module>","<MacFanControl-arm64-apple-macosx26.0-debug.module>"]
+default: "main"
+nodes:
+  "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/MacFanControl/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+commands:
+  "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/FanCurveView.swift","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/FanCurveWindow.swift"]
+    outputs: ["/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/sources"]
+    description: "Write auxiliary file /Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/sources"
+
+  "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/MacFanControl.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/MacFanControl/main.swift"]
+    outputs: ["/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/MacFanControl.build/sources"]
+    description: "Write auxiliary file /Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/MacFanControl.build/sources"
+
+  "/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Library/Developer/CommandLineTools/usr/bin/swiftc"]
+    outputs: ["/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+
+  "<FanCurveEditor-arm64-apple-macosx26.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/Modules/FanCurveEditor.swiftmodule"]
+    outputs: ["<FanCurveEditor-arm64-apple-macosx26.0-debug.module>"]
+
+  "<MacFanControl-arm64-apple-macosx26.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/Modules/MacFanControl.swiftmodule"]
+    outputs: ["<MacFanControl-arm64-apple-macosx26.0-debug.module>"]
+
+  "C.FanCurveEditor-arm64-apple-macosx26.0-debug.module":
+    tool: shell
+    inputs: ["/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/FanCurveView.swift","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/FanCurveWindow.swift","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/sources"]
+    outputs: ["/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/Modules/FanCurveEditor.swiftmodule"]
+    description: "Compiling Swift Module 'FanCurveEditor' (2 sources)"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-module-name","FanCurveEditor","-emit-dependencies","-emit-module","-emit-module-path","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/Modules/FanCurveEditor.swiftmodule","-output-file-map","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/output-file-map.json","-parse-as-library","-incremental","@/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/sources","-I","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx13.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-Onone","-enable-testing","-j10","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-emit-objc-header","-emit-objc-header-path","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/FanCurveEditor.build/include/FanCurveEditor-Swift.h","-swift-version","5","-Xfrontend","-experimental-lazy-typecheck","-Xfrontend","-experimental-skip-all-function-bodies","-Xfrontend","-experimental-allow-module-with-compiler-errors","-Xfrontend","-empty-abi-descriptor","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g","-Xcc","-isysroot","-Xcc","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-Xcc","-fPIC","-Xcc","-g","-package-name","fan_control_launch"]
+
+  "C.MacFanControl-arm64-apple-macosx26.0-debug.module":
+    tool: shell
+    inputs: ["/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/MacFanControl/main.swift","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/Modules/FanCurveEditor.swiftmodule","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/MacFanControl.build/sources"]
+    outputs: ["/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/Modules/MacFanControl.swiftmodule"]
+    description: "Compiling Swift Module 'MacFanControl' (1 sources)"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-module-name","MacFanControl","-emit-dependencies","-emit-module","-emit-module-path","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/Modules/MacFanControl.swiftmodule","-output-file-map","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/MacFanControl.build/output-file-map.json","-incremental","@/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/MacFanControl.build/sources","-I","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx13.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-Onone","-enable-testing","-j10","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/.build/index-build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","MacFanControl_main","-parse-as-library","-swift-version","5","-Xfrontend","-experimental-lazy-typecheck","-Xfrontend","-experimental-skip-all-function-bodies","-Xfrontend","-experimental-allow-module-with-compiler-errors","-Xfrontend","-empty-abi-descriptor","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g","-Xcc","-isysroot","-Xcc","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-Xcc","-fPIC","-Xcc","-g","-package-name","fan_control_launch"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/FanCurveEditor/","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Sources/MacFanControl/","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Package.swift","/Users/puremilk/Documents/mac fancontrol/fan-control-launch/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+
