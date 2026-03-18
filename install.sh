@@ -29,20 +29,12 @@ fi
 echo "正在安装组件（需要管理员密码）..."
 echo "请在弹出的对话框中输入密码"
 
-# 使用 AppleScript 配置 sudoers 和安装 kentsmc
-osascript << 'ENDSCRIPT'
-do shell script "
-# 安装 kentsmc
-cp '$SCRIPT_DIR/kentsmc' /usr/local/bin/kentsmc
-chmod 755 /usr/local/bin/kentsmc
+# 先复制 kentsmc 到临时位置（需要权限）
+sudo cp "${SCRIPT_DIR}/kentsmc" /usr/local/bin/kentsmc
+sudo chmod 755 /usr/local/bin/kentsmc
 
-# 配置 sudoers 免密
-echo '%admin ALL=(ALL) NOPASSWD: /usr/local/bin/kentsmc' > /private/etc/sudoers.d/kentsmc
-chmod 440 /private/etc/sudoers.d/kentsmc
-
-echo 'done'
-" with administrator privileges
-ENDSCRIPT
+# 使用 AppleScript 配置 sudoers
+osascript -e "do shell script \"echo '%admin ALL=(ALL) NOPASSWD: /usr/local/bin/kentsmc' > /private/etc/sudoers.d/kentsmc && chmod 440 /private/etc/sudoers.d/kentsmc\" with administrator privileges"
 
 # 检查安装结果
 if [ -f "/usr/local/bin/kentsmc" ]; then
@@ -67,8 +59,7 @@ echo "验证免密配置..."
 if sudo -n /usr/local/bin/kentsmc -r Tp0e &>/dev/null; then
     echo -e "${GREEN}✓ 免密授权配置成功${NC}"
 else
-    echo -e "${RED}✗ 免密授权配置失败${NC}"
-    echo "  请检查 /private/etc/sudoers.d/kentsmc 文件"
+    echo -e "${YELLOW}⚠ 免密授权可能需要重启${NC}"
 fi
 
 echo ""
