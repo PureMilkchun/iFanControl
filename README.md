@@ -68,11 +68,9 @@
 4. 输入管理员密码（仅需这一次）
 5. 完成！之后运行应用永久免密
 
-### 安装演示视频
+### 安装指南
 
-> 完整安装过程演示见 [v2.0 Release](https://github.com/PureMilkchun/mac-fan-control/releases/tag/v2.0) 附件中的视频文件
-
-> 解压后可打开 `index.html` 查看图文安装指南
+> 解压后可打开 `安装说明.html` 查看图文安装指南
 
 ## Usage / 使用方法
 
@@ -122,13 +120,10 @@ MacFanControl 使用 [kentsmc](https://github.com/exelban/kentsmc) 来：
 
 ## Uninstall / 卸载
 
-双击 `uninstall.command` 或运行以下命令：
+在解压目录中运行 `./uninstall.sh` 或执行以下命令：
 
 ```bash
-sudo rm /usr/local/bin/kentsmc
-sudo rm /private/etc/sudoers.d/kentsmc
-rm -rf /Applications/MacFanControl.app
-rm -rf ~/Library/Application\ Support/MacFanControl
+cd ~/Downloads/MacFanControl-2.0 && ./uninstall.sh
 ```
 
 ## License / 许可证
