@@ -10,6 +10,9 @@ NC='\033[0m'
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# 清除 quarantine 属性（可选，防止权限问题）
+xattr -dr com.apple.quarantine "$SCRIPT_DIR" 2>/dev/null || true
+
 echo ""
 echo "============================================"
 echo "   MacFanControl 安装程序"
@@ -28,22 +31,20 @@ fi
 
 echo "正在安装组件..."
 echo ""
-echo "即将弹出密码对话框，请输入密码（仅需一次）"
+echo "请输入管理员密码："
 echo ""
 
 # 将 kentsmc 先复制到临时位置
 cp "${SCRIPT_DIR}/kentsmc" /tmp/kentsmc_temp
 
-# 一次完成：复制 kentsmc + 配置 sudoers
-osascript -e "
-do shell script \"
-cp /tmp/kentsmc_temp /usr/local/bin/kentsmc
-chmod 755 /usr/local/bin/kentsmc
+# 使用 sudo 直接执行（sudo 会缓存密码，后续命令无需再次输入）
+sudo cp /tmp/kentsmc_temp /usr/local/bin/kentsmc
+sudo chmod 755 /usr/local/bin/kentsmc
 rm -f /tmp/kentsmc_temp
-echo '%admin ALL=(ALL) NOPASSWD: /usr/local/bin/kentsmc' > /private/etc/sudoers.d/kentsmc
-chmod 440 /private/etc/sudoers.d/kentsmc
-\" with administrator privileges
-"
+
+# 配置 sudoers 免密授权
+echo '%admin ALL=(ALL) NOPASSWD: /usr/local/bin/kentsmc' | sudo tee /private/etc/sudoers.d/kentsmc > /dev/null
+sudo chmod 440 /private/etc/sudoers.d/kentsmc
 
 # 检查安装结果
 if [ -f "/usr/local/bin/kentsmc" ]; then
@@ -60,6 +61,12 @@ if [ -d "/Applications/MacFanControl.app" ]; then
     rm -rf /Applications/MacFanControl.app
 fi
 cp -R "${SCRIPT_DIR}/MacFanControl.app" /Applications/
+
+# 关键：清除复制后 app 的所有隔离属性，防止"应用已损坏"错误
+sudo xattr -cr /Applications/MacFanControl.app 2>/dev/null || true
+# 再次确认清除 quarantine
+sudo xattr -d com.apple.quarantine /Applications/MacFanControl.app 2>/dev/null || true
+
 echo -e "${GREEN}✓ MacFanControl.app 安装成功${NC}"
 
 # 验证免密配置

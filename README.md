@@ -31,31 +31,47 @@
 | Safe mode - Auto-recovery on failures | 安全模式 - 异常时自动恢复 |
 | Exit recovery - Restores auto mode when quitting | 退出恢复 - 退出时自动恢复自动模式 |
 
+## What's New in v2.0 / v2.0 新特性
+
+### v1.0 问题
+- 每次重启电脑后都需要重新输入密码才能控制风扇
+- 使用 osascript 方式导致权限问题不稳定
+
+### v2.0 改进
+- **一次性授权**：安装时只需输入一次密码，之后永久免密运行
+- **修复"应用已损坏"**：自动处理 quarantine 属性
+- **更稳定的安装**：使用 sudo 直接执行，不再依赖 osascript
+
+---
+
 ## Quick Install / 快速安装
 
 ### English
 
-1. Download `MacFanControl-2.0.dmg` from [Releases](https://github.com/PureMilkchun/mac-fan-control/releases)
+1. Download `MacFanControl-2.0.dmg` from [Releases](https://github.com/PureMilkchun/mac-fan-control/releases/tag/v2.0)
 2. Open the DMG
 3. Double-click `install.command`
-4. Enter your admin password (only once, just click OK in the popup)
-5. Done!
+4. Enter your admin password in Terminal (only once)
+5. Done! The app runs without requiring passwords anymore
 
 ### 中文
 
-1. 从 [Releases](https://github.com/PureMilkchun/mac-fan-control/releases) 下载 `MacFanControl-2.0.dmg`
+1. 从 [Releases](https://github.com/PureMilkchun/mac-fan-control/releases/tag/v2.0) 下载 `MacFanControl-2.0.dmg`
 2. 打开 DMG 文件
 3. 双击 `install.command`
-4. 在弹出的密码对话框中输入密码（仅需一次，点击确定即可）
-5. 完成！之后运行应用不再需要输入密码
+4. 在终端中输入管理员密码（仅需这一次）
+5. 完成！之后运行应用永久免密
+
+### 安装演示视频
+
+> 完整安装过程演示见 [v2.0 Release](https://github.com/PureMilkchun/mac-fan-control/releases/tag/v2.0) 附件中的视频文件
 
 ## Usage / 使用方法
 
 ### English
 
 1. Open `/Applications/MacFanControl.app`
-2. Enter your password when prompted
-3. The app appears in your menu bar showing temperature and fan speed
+2. The app appears in your menu bar showing temperature and fan speed
 
 **Menu Options:**
 - **Fan Curve Editor** - Customize the temperature-to-RPM curve
@@ -66,8 +82,7 @@
 ### 中文
 
 1. 打开 `/Applications/MacFanControl.app`
-2. 根据提示输入密码
-3. 应用会出现在菜单栏，显示温度和风扇转速
+2. 应用会出现在菜单栏，显示温度和风扇转速
 
 **菜单选项：**
 - **风扇曲线编辑器** - 自定义温度到转速的曲线
