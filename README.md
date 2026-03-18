@@ -35,19 +35,19 @@
 
 ### English
 
-1. Download `MacFanControl-1.0.dmg` from [Releases](https://github.com/PureMilkchun/mac-fan-control/releases)
+1. Download `MacFanControl-2.0.dmg` from [Releases](https://github.com/PureMilkchun/mac-fan-control/releases)
 2. Open the DMG
 3. Double-click `install.command`
-4. Enter your admin password
+4. Enter your admin password (only once, just click OK in the popup)
 5. Done!
 
 ### 中文
 
-1. 从 [Releases](https://github.com/PureMilkchun/mac-fan-control/releases) 下载 `MacFanControl-1.0.dmg`
+1. 从 [Releases](https://github.com/PureMilkchun/mac-fan-control/releases) 下载 `MacFanControl-2.0.dmg`
 2. 打开 DMG 文件
 3. 双击 `install.command`
-4. 输入管理员密码
-5. 完成！
+4. 在弹出的密码对话框中输入密码（仅需一次，点击确定即可）
+5. 完成！之后运行应用不再需要输入密码
 
 ## Usage / 使用方法
 
@@ -99,8 +99,11 @@ MacFanControl 使用 [kentsmc](https://github.com/exelban/kentsmc) 来：
 
 ## Uninstall / 卸载
 
+双击 `uninstall.command` 或运行以下命令：
+
 ```bash
 sudo rm /usr/local/bin/kentsmc
+sudo rm /private/etc/sudoers.d/kentsmc
 rm -rf /Applications/MacFanControl.app
 rm -rf ~/Library/Application\ Support/MacFanControl
 ```
