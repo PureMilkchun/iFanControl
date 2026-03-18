@@ -14,30 +14,37 @@ import FanCurveEditor
 typealias FanPoint = FanCurveEditor.FanPoint
 typealias Config = FanCurveEditor.Config
 
-// MARK: - CommandExecutor (使用 AppleScript 执行特权命令)
+// MARK: - CommandExecutor (使用 sudo 执行特权命令)
 @MainActor
 class CommandExecutor {
     static let shared = CommandExecutor()
     private let kentsmcPath = "/usr/local/bin/kentsmc"
     
-    // 通过 AppleScript 执行特权命令
+    // 执行特权命令
     private func executeCommand(args: [String]) -> (success: Bool, output: String, error: String) {
-        let command = "\(kentsmcPath) \(args.joined(separator: " "))"
-        let script = "do shell script \"\(command)\" with administrator privileges"
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+        task.arguments = [kentsmcPath] + args
         
-        var error: NSDictionary?
-        if let scriptObject = NSAppleScript(source: script) {
-            let result = scriptObject.executeAndReturnError(&error)
+        let outputPipe = Pipe()
+        let errorPipe = Pipe()
+        task.standardOutput = outputPipe
+        task.standardError = errorPipe
+        
+        do {
+            try task.run()
+            task.waitUntilExit()
             
-            if let error = error {
-                let errorMsg = error["NSAppleScriptErrorMessage"] as? String ?? "Unknown error"
-                return (false, "", errorMsg)
-            }
+            let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
             
-            return (true, result.stringValue ?? "", "")
+            let output = String(data: outputData, encoding: .utf8) ?? ""
+            let error = String(data: errorData, encoding: .utf8) ?? ""
+            
+            return (task.terminationStatus == 0, output, error)
+        } catch {
+            return (false, "", error.localizedDescription)
         }
-        
-        return (false, "", "Failed to create AppleScript")
     }
     
     // 设置风扇转速
