@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MacFanControl - 安装指南</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header img {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 15px;
+            border-radius: 18px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .lang-toggle {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s;
+        }
+
+        .lang-toggle:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .header-wrapper {
+            position: relative;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .section-title h2 {
+            font-size: 18px;
+            color: #333;
+        }
+
+        .section-title .subtitle {
+            font-size: 12px;
+            color: #888;
+            margin-left: 10px;
+        }
+
+        .step {
+            display: flex;
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        .step-number {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            flex-shrink: 0;
+            margin-right: 15px;
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-content h3 {
+            font-size: 15px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .step-content .en {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .code-block {
+            background: #1e1e1e;
+            border-radius: 10px;
+            padding: 15px;
+            position: relative;
+            margin-top: 10px;
+        }
+
+        .code-block code {
+            color: #d4d4d4;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            word-break: break-all;
+            white-space: pre-wrap;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #4a4a4a;
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: background 0.3s;
+        }
+
+        .copy-btn:hover {
+            background: #5a5a5a;
+        }
+
+        .copy-btn.copied {
+            background: #28a745;
+        }
+
+        .tip {
+            background: #f0f7ff;
+            border-left: 4px solid #667eea;
+            padding: 12px 15px;
+            border-radius: 0 8px 8px 0;
+            margin-top: 15px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .tip strong {
+            color: #667eea;
+        }
+
+        .video-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            text-decoration: none;
+            color: #333;
+            margin-top: 15px;
+            transition: background 0.3s;
+        }
+
+        .video-link:hover {
+            background: #e9ecef;
+        }
+
+        .video-link .play-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+        }
+
+        .video-link .text {
+            flex: 1;
+        }
+
+        .video-link .text .zh {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .video-link .text .en {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .faq {
+            margin-top: 30px;
+            border-top: 1px solid #eee;
+            padding-top: 25px;
+        }
+
+        .faq h2 {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .faq-item {
+            margin-bottom: 15px;
+        }
+
+        .faq-item summary {
+            cursor: pointer;
+            font-size: 14px;
+            color: #333;
+            padding: 10px 0;
+            font-weight: 500;
+        }
+
+        .faq-item summary::-webkit-details-marker {
+            color: #667eea;
+        }
+
+        .faq-item .answer {
+            padding: 10px 0 10px 15px;
+            font-size: 13px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-outline {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .btn-outline:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .download-section {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid #eee;
+        }
+
+        .download-section .zh {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .download-section .en {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                border-radius: 15px;
+            }
+
+            .header {
+                padding: 30px 20px;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-wrapper">
+            <button class="lang-toggle" onclick="toggleLang()">EN / 中文</button>
+            <div class="header">
+                <img src="icon.png" alt="MacFanControl Icon" onerror="this.style.display='none'">
+                <h1 class="zh">MacFanControl</h1>
+                <p class="zh">适用于 Apple Silicon Mac 的简洁风扇控制应用</p>
+                <p class="en" style="display:none">A simple fan control app for Apple Silicon Macs</p>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="section-title">
+                <h2 class="zh">安装步骤</h2>
+                <h2 class="en" style="display:none">Installation Steps</h2>
+                <span class="subtitle zh">只需 3 步</span>
+                <span class="subtitle en" style="display:none">Only 3 steps</span>
+            </div>
+
+            <!-- Step 1 -->
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <h3 class="zh">解压下载的 ZIP 文件</h3>
+                    <h3 class="en" style="display:none">Unzip the downloaded file</h3>
+                    <p class="zh">双击 ZIP 文件解压到任意位置（如 Downloads 文件夹）</p>
+                    <p class="en" style="display:none">Double-click the ZIP to extract it anywhere (e.g., Downloads folder)</p>
+                </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <h3 class="zh">打开终端</h3>
+                    <h3 class="en" style="display:none">Open Terminal</h3>
+                    <p class="zh">按 <code>⌘ + 空格</code> 搜索"终端"或"Terminal"</p>
+                    <p class="en" style="display:none">Press <code>⌘ + Space</code> and search for "Terminal"</p>
+                </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <h3 class="zh">复制并运行安装命令</h3>
+                    <h3 class="en" style="display:none">Copy and run the install command</h3>
+                    <p class="zh">粘贴以下命令到终端，按回车执行</p>
+                    <p class="en" style="display:none">Paste the command below into Terminal and press Enter</p>
+                    
+                    <div class="code-block">
+                        <button class="copy-btn" onclick="copyCode(this)">
+                            <span class="icon">📋</span>
+                            <span class="zh">复制</span>
+                            <span class="en" style="display:none">Copy</span>
+                        </button>
+                        <code>cd ~/Downloads/MacFanControl-2.0 && ./install.sh</code>
+                    </div>
+
+                    <div class="tip">
+                        <strong class="zh">💡 提示：</strong>
+                        <span class="zh">如果解压到其他位置，请修改路径。输入密码时不会显示字符，这是正常的。</span>
+                        <strong class="en" style="display:none">💡 Tip: </strong>
+                        <span class="en" style="display:none">If you extracted elsewhere, modify the path. Password won't be visible while typing - this is normal.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: First Run -->
+            <div class="step">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                    <h3 class="zh">首次打开应用</h3>
+                    <h3 class="en" style="display:none">First time opening the app</h3>
+                    <p class="zh">安装完成后，打开 <strong>/Applications/MacFanControl.app</strong></p>
+                    <p class="en" style="display:none">After installation, open <strong>/Applications/MacFanControl.app</strong></p>
+                    
+                    <a href="https://github.com/PureMilkchun/mac-fan-control/releases/tag/v2.0" target="_blank" class="video-link">
+                        <div class="play-icon">▶</div>
+                        <div class="text">
+                            <div class="zh">观看安装演示视频</div>
+                            <div class="en" style="display:none">Watch installation demo video</div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- FAQ -->
+            <div class="faq">
+                <h2>
+                    <span class="zh">常见问题</span>
+                    <span class="en" style="display:none">FAQ</span>
+                </h2>
+
+                <details class="faq-item">
+                    <summary class="zh">Q: 显示"应用已损坏"怎么办？</summary>
+                    <summary class="en" style="display:none">Q: App shows "damaged" error?</summary>
+                    <div class="answer">
+                        <span class="zh">这是 macOS 安全机制。安装脚本会自动处理，如果仍有问题，可在终端运行：</span>
+                        <span class="en" style="display:none">This is macOS security. The install script handles it automatically. If still having issues, run in Terminal:</span>
+                        <div class="code-block" style="margin-top: 10px">
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <span class="icon">📋</span>
+                                <span class="zh">复制</span>
+                                <span class="en" style="display:none">Copy</span>
+                            </button>
+                            <code>sudo xattr -cr /Applications/MacFanControl.app</code>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary class="zh">Q: 重启后需要重新输入密码？</summary>
+                    <summary class="en" style="display:none">Q: Need to re-enter password after restart?</summary>
+                    <div class="answer">
+                        <span class="zh">v2.0 已修复此问题。安装时只需输入一次密码，之后永久免密。</span>
+                        <span class="en" style="display:none">v2.0 fixed this. You only need to enter password once during installation.</span>
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary class="zh">Q: 如何卸载？</summary>
+                    <summary class="en" style="display:none">Q: How to uninstall?</summary>
+                    <div class="answer">
+                        <span class="zh">运行解压目录中的 <code>uninstall.sh</code>，或在终端执行：</span>
+                        <span class="en" style="display:none">Run <code>uninstall.sh</code> from the extracted folder, or execute in Terminal:</span>
+                        <div class="code-block" style="margin-top: 10px">
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <span class="icon">📋</span>
+                                <span class="zh">复制</span>
+                                <span class="en" style="display:none">Copy</span>
+                            </button>
+                            <code>cd ~/Downloads/MacFanControl-2.0 && ./uninstall.sh</code>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </div>
+
+        <div class="download-section">
+            <p class="zh">尚未下载？前往 GitHub Releases 获取最新版本</p>
+            <p class="en" style="display:none">Not downloaded yet? Get the latest version from GitHub Releases</p>
+            <a href="https://github.com/PureMilkchun/mac-fan-control/releases/tag/v2.0" target="_blank" class="btn">
+                <span class="zh">下载 MacFanControl</span>
+                <span class="en" style="display:none">Download MacFanControl</span>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        let isChinese = true;
+
+        function toggleLang() {
+            isChinese = !isChinese;
+            document.querySelectorAll('.zh').forEach(el => {
+                el.style.display = isChinese ? '' : 'none';
+            });
+            document.querySelectorAll('.en').forEach(el => {
+                el.style.display = isChinese ? 'none' : '';
+            });
+        }
+
+        function copyCode(btn) {
+            const codeBlock = btn.closest('.code-block');
+            const code = codeBlock.querySelector('code').textContent;
+            
+            navigator.clipboard.writeText(code).then(() => {
+                btn.classList.add('copied');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<span class="icon">✓</span> Copied';
+                
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.innerHTML = originalText;
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>

@@ -48,23 +48,31 @@
 
 ### English
 
-1. Download `MacFanControl-2.0.dmg` from [Releases](https://github.com/PureMilkchun/mac-fan-control/releases/tag/v2.0)
-2. Open the DMG
-3. Double-click `install.command`
-4. Enter your admin password in Terminal (only once)
+1. Download `MacFanControl-2.0.zip` from [Releases](https://github.com/PureMilkchun/mac-fan-control/releases/tag/v2.0)
+2. Unzip the file
+3. Open Terminal and run:
+   ```bash
+   cd ~/Downloads/MacFanControl-2.0 && ./install.sh
+   ```
+4. Enter your admin password (only once)
 5. Done! The app runs without requiring passwords anymore
 
 ### 中文
 
-1. 从 [Releases](https://github.com/PureMilkchun/mac-fan-control/releases/tag/v2.0) 下载 `MacFanControl-2.0.dmg`
-2. 打开 DMG 文件
-3. 双击 `install.command`
-4. 在终端中输入管理员密码（仅需这一次）
+1. 从 [Releases](https://github.com/PureMilkchun/mac-fan-control/releases/tag/v2.0) 下载 `MacFanControl-2.0.zip`
+2. 解压 ZIP 文件
+3. 打开终端，运行以下命令：
+   ```bash
+   cd ~/Downloads/MacFanControl-2.0 && ./install.sh
+   ```
+4. 输入管理员密码（仅需这一次）
 5. 完成！之后运行应用永久免密
 
 ### 安装演示视频
 
 > 完整安装过程演示见 [v2.0 Release](https://github.com/PureMilkchun/mac-fan-control/releases/tag/v2.0) 附件中的视频文件
+
+> 解压后可打开 `index.html` 查看图文安装指南
 
 ## Usage / 使用方法
 
