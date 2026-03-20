@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# MacFanControl 卸载脚本
+# iFanControl 卸载脚本
 
 echo "============================================"
-echo "   MacFanControl 卸载程序"
+echo "   iFanControl 卸载程序"
 echo "============================================"
 echo ""
 
@@ -31,21 +31,21 @@ else
     echo "sudoers 配置不存在，跳过"
 fi
 
-# 步骤 3: 删除 MacFanControl.app
+# 步骤 3: 删除 iFanControl.app
 echo ""
-echo "步骤 3/4: 删除 MacFanControl.app..."
-if [ -d "/Applications/MacFanControl.app" ]; then
-    rm -rf /Applications/MacFanControl.app
-    echo "✓ MacFanControl.app 已删除"
+echo "步骤 3/4: 删除 iFanControl.app..."
+if [ -d "/Applications/iFanControl.app" ]; then
+    rm -rf /Applications/iFanControl.app
+    echo "✓ iFanControl.app 已删除"
 else
-    echo "MacFanControl.app 未安装，跳过"
+    echo "iFanControl.app 未安装，跳过"
 fi
 
 # 步骤 4: 删除配置文件
 echo ""
 echo "步骤 4/4: 删除配置文件..."
-if [ -d "$HOME/Library/Application Support/MacFanControl" ]; then
-    rm -rf "$HOME/Library/Application Support/MacFanControl"
+if [ -d "$HOME/Library/Application Support/iFanControl" ]; then
+    rm -rf "$HOME/Library/Application Support/iFanControl"
     echo "✓ 配置文件已删除"
 else
     echo "配置文件不存在，跳过"

@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="icon.png" width="128" height="128" alt="MacFanControl Icon">
+  <img src="icon.png" width="128" height="128" alt="iFanControl Icon">
 </p>
 
-<h1 align="center">MacFanControl</h1>
+<h1 align="center">iFanControl</h1>
 
 <p align="center">
   A simple fan control app for Apple Silicon Macs
@@ -31,11 +31,11 @@
 | Safe mode - Auto-recovery on failures | 安全模式 - 异常时自动恢复 |
 | Exit recovery - Restores auto mode when quitting | 退出恢复 - 退出时自动恢复自动模式 |
 
-## What's New in v2.0 / v2.0 新特性
+## What's New in v2.1 / v2.1 新特性
 
-### v1.0 问题
-- 每次重启电脑后都需要重新输入密码才能控制风扇
-- 使用 osascript 方式导致权限问题不稳定
+### v2.1 变更
+- **品牌更新**：软件名称由 MacFanControl 更名为 iFanControl
+- **版本号更新**：v2.0 → v2.1
 
 ### v2.0 改进
 - **一次性授权**：安装时只需输入一次密码，之后永久免密运行
@@ -48,22 +48,22 @@
 
 ### English
 
-1. Download `MacFanControl-2.0.zip` from [Releases](https://github.com/PureMilkchun/mac-fan-control/releases/tag/v2.0)
+1. Download `iFanControl-2.1.zip` from [Releases](https://github.com/PureMilkchun/mac-fan-control/releases/tag/v2.1)
 2. Unzip the file
 3. Open Terminal and run:
    ```bash
-   cd ~/Downloads/MacFanControl-2.0 && ./install.sh
+   cd ~/Downloads/iFanControl-2.1 && ./install.sh
    ```
 4. Enter your admin password (only once)
 5. Done! The app runs without requiring passwords anymore
 
 ### 中文
 
-1. 从 [Releases](https://github.com/PureMilkchun/mac-fan-control/releases/tag/v2.0) 下载 `MacFanControl-2.0.zip`
+1. 从 [Releases](https://github.com/PureMilkchun/mac-fan-control/releases/tag/v2.1) 下载 `iFanControl-2.1.zip`
 2. 解压 ZIP 文件
 3. 打开终端，运行以下命令：
    ```bash
-   cd ~/Downloads/MacFanControl-2.0 && ./install.sh
+   cd ~/Downloads/iFanControl-2.1 && ./install.sh
    ```
 4. 输入管理员密码（仅需这一次）
 5. 完成！之后运行应用永久免密
@@ -76,7 +76,7 @@
 
 ### English
 
-1. Open `/Applications/MacFanControl.app`
+1. Open `/Applications/iFanControl.app`
 2. The app appears in your menu bar showing temperature and fan speed
 
 **Menu Options:**
@@ -87,7 +87,7 @@
 
 ### 中文
 
-1. 打开 `/Applications/MacFanControl.app`
+1. 打开 `/Applications/iFanControl.app`
 2. 应用会出现在菜单栏，显示温度和风扇转速
 
 **菜单选项：**
@@ -100,14 +100,14 @@
 
 ### English
 
-MacFanControl uses [kentsmc](https://github.com/exelban/kentsmc) to:
+iFanControl uses [kentsmc](https://github.com/exelban/kentsmc) to:
 - Read CPU temperature from SMC sensors
 - Control fan speed via SMC writes
 - Run as a normal macOS app with `sudo -S` for privileged operations
 
 ### 中文
 
-MacFanControl 使用 [kentsmc](https://github.com/exelban/kentsmc) 来：
+iFanControl 使用 [kentsmc](https://github.com/exelban/kentsmc) 来：
 - 从 SMC 传感器读取 CPU 温度
 - 通过 SMC 写入控制风扇转速
 - 以普通 macOS 应用运行，使用 `sudo -S` 执行特权操作
@@ -123,7 +123,7 @@ MacFanControl 使用 [kentsmc](https://github.com/exelban/kentsmc) 来：
 在解压目录中运行 `./uninstall.sh` 或执行以下命令：
 
 ```bash
-cd ~/Downloads/MacFanControl-2.0 && ./uninstall.sh
+cd ~/Downloads/iFanControl-2.1 && ./uninstall.sh
 ```
 
 ## License / 许可证
