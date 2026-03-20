@@ -48,7 +48,7 @@
 
 ### English
 
-1. Download `iFanControl-2.1.zip` from [Releases](https://github.com/PureMilkchun/mac-fan-control/releases/tag/v2.1)
+1. Download `iFanControl-2.1.zip` from [Releases](https://github.com/PureMilkchun/iFanControl/releases/tag/v2.1)
 2. Unzip the file
 3. Open Terminal and run:
    ```bash
@@ -59,7 +59,7 @@
 
 ### 中文
 
-1. 从 [Releases](https://github.com/PureMilkchun/mac-fan-control/releases/tag/v2.1) 下载 `iFanControl-2.1.zip`
+1. 从 [Releases](https://github.com/PureMilkchun/iFanControl/releases/tag/v2.1) 下载 `iFanControl-2.1.zip`
 2. 解压 ZIP 文件
 3. 打开终端，运行以下命令：
    ```bash
