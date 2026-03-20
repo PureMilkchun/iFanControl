@@ -46,6 +46,9 @@ echo -e "${YELLOW}[2/4]${NC} 安装 kentsmc 工具..."
 echo -e "      ${BLUE}需要输入管理员密码（仅需这一次）${NC}"
 echo ""
 
+# 确保 /usr/local/bin 目录存在（部分新系统可能没有此目录）
+sudo mkdir -p /usr/local/bin
+
 # 将 kentsmc 先复制到临时位置
 cp "${SCRIPT_DIR}/kentsmc" /tmp/kentsmc_temp
 
