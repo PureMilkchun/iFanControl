@@ -86,8 +86,9 @@ if [ ${#MISSING_FILES[@]} -gt 0 ]; then
     echo ""
     echo -e "${YELLOW}请确保你在解压后的文件夹内运行此脚本。${NC}"
     echo -e "${YELLOW}正确的做法：${NC}"
-    echo -e "    1. 双击解压后的文件夹进入"
-    echo -e "    2. 双击 Install.command 文件"
+    echo -e "    1. 打开终端"
+    echo -e "    2. 将 install.sh 拖入终端"
+    echo -e "    3. 按回车执行"
     echo ""
     echo -e "${CYAN}当前目录内容：${NC}"
     ls -la "$SCRIPT_DIR" 2>/dev/null | head -20

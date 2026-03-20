@@ -133,8 +133,7 @@ else
     echo -e "  ${RED}✗ 安装状态：安装未完成。${NC}"
     echo ""
     echo -e "  请重新运行安装："
-    echo -e "  • 双击 ${CYAN}Install.command${NC}"
-    echo -e "  • 或在终端运行: ${CYAN}./install.sh${NC}"
+    echo -e "  • 打开终端，将 ${CYAN}install.sh${NC} 拖入终端，按回车"
 fi
 
 echo ""
