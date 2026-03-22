@@ -420,7 +420,67 @@ class MenuBarManager {
         var newConfig = config
         newConfig.autoStart = autoStartEnabled
         ConfigManager.shared.saveConfig(newConfig)
+        
+        // 实际启用/禁用开机自启动
+        if autoStartEnabled {
+            enableAutoStart()
+        } else {
+            disableAutoStart()
+        }
+        
         updateMenu()
+    }
+    
+    // 启用开机自启动（创建 LaunchAgent）
+    private func enableAutoStart() {
+        let plistContent = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>Label</key>
+            <string>com.ifancontrol.app</string>
+            <key>ProgramArguments</key>
+            <array>
+                <string>/Applications/iFanControl.app/Contents/MacOS/iFanControl</string>
+            </array>
+            <key>RunAtLoad</key>
+            <true/>
+            <key>KeepAlive</key>
+            <false/>
+        </dict>
+        </plist>
+        """
+        
+        let launchAgentsDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library")
+            .appendingPathComponent("LaunchAgents")
+        
+        let plistPath = launchAgentsDir.appendingPathComponent("com.ifancontrol.app.plist")
+        
+        // 创建目录（如果不存在）
+        try? FileManager.default.createDirectory(at: launchAgentsDir, withIntermediateDirectories: true)
+        
+        // 写入 plist 文件
+        do {
+            try plistContent.write(to: plistPath, atomically: true, encoding: .utf8)
+            print("LaunchAgent plist created at: \(plistPath.path)")
+        } catch {
+            print("Failed to create LaunchAgent plist: \(error)")
+        }
+    }
+    
+    // 禁用开机自启动（删除 LaunchAgent）
+    private func disableAutoStart() {
+        let launchAgentsDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library")
+            .appendingPathComponent("LaunchAgents")
+        
+        let plistPath = launchAgentsDir.appendingPathComponent("com.ifancontrol.app.plist")
+        
+        // 删除 plist 文件
+        try? FileManager.default.removeItem(at: plistPath)
+        print("LaunchAgent plist removed")
     }
     
     @objc func showSpeedSetting() {
