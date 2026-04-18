@@ -330,6 +330,7 @@ class MenuBarManager {
         updateMenu()
         
         NotificationCenter.default.addObserver(self, selector: #selector(handleCurveSaved), name: NSNotification.Name("FanCurveDidSave"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleLanguageChanged), name: .appLanguageDidChange, object: nil)
         
         Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             Task { @MainActor in
@@ -343,6 +344,10 @@ class MenuBarManager {
             fanCurve = curve
         }
     }
+
+    @objc private func handleLanguageChanged(_ notification: Notification) {
+        updateMenu()
+    }
     
     func updateMenu() {
         guard let statusItem = statusItem else { return }
@@ -355,9 +360,10 @@ class MenuBarManager {
             currentFanRPM = rpm
         }
         
+        let localization = LocalizationManager.shared
         let temperatureText = String(format: "%.0f℃", currentTemperature)
         let fanText = "\(currentFanRPM) RPM"
-        let modeText = isAutoMode ? "[Auto]" : "[Manual]"
+        let modeText = isAutoMode ? localization.text(.autoModeShort) : localization.text(.manualModeShort)
         
         var statusIcon = ""
         if currentTemperature >= 90.0 {
@@ -370,30 +376,48 @@ class MenuBarManager {
         
         let menu = NSMenu()
         
-        let curveItem = NSMenuItem(title: "风扇曲线编辑器...", action: #selector(showFanCurveEditor), keyEquivalent: "c")
+        let curveItem = NSMenuItem(title: localization.text(.fanCurveEditor), action: #selector(showFanCurveEditor), keyEquivalent: "c")
         curveItem.target = self
         menu.addItem(curveItem)
         
         menu.addItem(NSMenuItem.separator())
         
-        let modeItem = NSMenuItem(title: isAutoMode ? "手动模式" : "自动模式", action: #selector(toggleMode), keyEquivalent: "m")
+        let modeItem = NSMenuItem(
+            title: isAutoMode ? localization.text(.manualMode) : localization.text(.automaticMode),
+            action: #selector(toggleMode),
+            keyEquivalent: "m"
+        )
         modeItem.target = self
         menu.addItem(modeItem)
         
         if !isAutoMode {
-            let speedItem = NSMenuItem(title: "设置转速...", action: #selector(showSpeedSetting), keyEquivalent: "")
+            let speedItem = NSMenuItem(title: localization.text(.setSpeed), action: #selector(showSpeedSetting), keyEquivalent: "")
             speedItem.target = self
             menu.addItem(speedItem)
         }
         
-        let autoStartItem = NSMenuItem(title: "开机自启动", action: #selector(toggleAutoStart), keyEquivalent: "")
+        let autoStartItem = NSMenuItem(title: localization.text(.launchAtLogin), action: #selector(toggleAutoStart), keyEquivalent: "")
         autoStartItem.target = self
         autoStartItem.state = autoStartEnabled ? .on : .off
         menu.addItem(autoStartItem)
+
+        let languageMenuItem = NSMenuItem(title: localization.text(.appLanguage), action: nil, keyEquivalent: "")
+        let languageMenu = NSMenu()
+
+        for language in AppLanguage.allCases {
+            let languageItem = NSMenuItem(title: language.menuTitle, action: #selector(changeLanguage(_:)), keyEquivalent: "")
+            languageItem.target = self
+            languageItem.representedObject = language.rawValue
+            languageItem.state = language == localization.currentLanguage ? .on : .off
+            languageMenu.addItem(languageItem)
+        }
+
+        menu.addItem(languageMenuItem)
+        menu.setSubmenu(languageMenu, for: languageMenuItem)
         
         menu.addItem(NSMenuItem.separator())
         
-        let quitItem = NSMenuItem(title: "退出", action: #selector(quitApp), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: localization.text(.quit), action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
         
@@ -428,6 +452,23 @@ class MenuBarManager {
             disableAutoStart()
         }
         
+        updateMenu()
+    }
+
+    @objc func changeLanguage(_ sender: NSMenuItem) {
+        guard
+            let languageCode = sender.representedObject as? String,
+            let language = AppLanguage(rawValue: languageCode)
+        else {
+            return
+        }
+
+        let config = ConfigManager.shared.loadConfig()
+        var newConfig = config
+        newConfig.language = language.rawValue
+        ConfigManager.shared.saveConfig(newConfig)
+
+        LocalizationManager.shared.setLanguage(language)
         updateMenu()
     }
     
@@ -513,6 +554,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         let config = ConfigManager.shared.loadConfig()
+        LocalizationManager.shared.configure(savedLanguageCode: config.language)
         MenuBarManager.shared.setFanCurve(config.curve)
         MenuBarManager.shared.setIsAutoMode(config.mode == "auto")
         MenuBarManager.shared.setAutoStartEnabled(config.autoStart)
@@ -559,6 +601,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 @MainActor
 class SpeedSettingWindowController: NSWindowController {
     private var currentRPM: Int = 0
+    private var titleLabel: NSTextField?
+    private var applyButton: NSButton?
+    private var cancelButton: NSButton?
     
     init(initialRPM: Int) {
         self.currentRPM = initialRPM
@@ -570,12 +615,19 @@ class SpeedSettingWindowController: NSWindowController {
             defer: false
         )
         
-        window.title = "设置风扇转速"
+        window.title = LocalizationManager.shared.text(.speedWindowTitle)
         window.center()
         
         super.init(window: window)
         
         setupUI()
+        applyLocalizedStrings()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleLanguageChanged),
+            name: .appLanguageDidChange,
+            object: nil
+        )
     }
     
     required init?(coder: NSCoder) {
@@ -585,7 +637,7 @@ class SpeedSettingWindowController: NSWindowController {
     private func setupUI() {
         guard let contentView = window?.contentView else { return }
         
-        let titleLabel = NSTextField(labelWithString: "手动模式目标转速:")
+        let titleLabel = NSTextField(labelWithString: "")
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(titleLabel)
         
@@ -602,11 +654,11 @@ class SpeedSettingWindowController: NSWindowController {
         rpmLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(rpmLabel)
         
-        let applyButton = NSButton(title: "应用", target: self, action: #selector(applySpeed))
+        let applyButton = NSButton(title: "", target: self, action: #selector(applySpeed))
         applyButton.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(applyButton)
         
-        let cancelButton = NSButton(title: "取消", target: self, action: #selector(cancel))
+        let cancelButton = NSButton(title: "", target: self, action: #selector(cancel))
         cancelButton.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(cancelButton)
         
@@ -630,10 +682,25 @@ class SpeedSettingWindowController: NSWindowController {
         
         self.rpmSlider = rpmSlider
         self.rpmLabel = rpmLabel
+        self.titleLabel = titleLabel
+        self.applyButton = applyButton
+        self.cancelButton = cancelButton
     }
-    
+
     private var rpmSlider: NSSlider?
     private var rpmLabel: NSTextField?
+
+    private func applyLocalizedStrings() {
+        let localization = LocalizationManager.shared
+        window?.title = localization.text(.speedWindowTitle)
+        titleLabel?.stringValue = localization.text(.manualTargetRPM)
+        applyButton?.title = localization.text(.apply)
+        cancelButton?.title = localization.text(.cancel)
+    }
+
+    @objc private func handleLanguageChanged() {
+        applyLocalizedStrings()
+    }
     
     @objc func sliderChanged() {
         guard let slider = rpmSlider, let label = rpmLabel else { return }
@@ -653,9 +720,9 @@ class SpeedSettingWindowController: NSWindowController {
         MenuBarManager.shared.setFanCurve(newConfig.curve)
         
         let alert = NSAlert()
-        alert.messageText = "设置成功"
-        alert.informativeText = "目标转速已设置为 \(rpm) RPM"
-        alert.addButton(withTitle: "确定")
+        alert.messageText = LocalizationManager.shared.text(.speedSetSuccessTitle)
+        alert.informativeText = LocalizationManager.shared.text(.speedSetSuccessMessage, rpm)
+        alert.addButton(withTitle: LocalizationManager.shared.text(.ok))
         alert.runModal()
         
         window?.close()
