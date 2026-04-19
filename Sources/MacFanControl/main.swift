@@ -319,8 +319,9 @@ class ConfigManager {
 class UpdateService {
     static let shared = UpdateService()
 
-    private let manifestURL = URL(string: "https://ifancontrol.puremilkchun.top/update-manifest.json")!
-    private let fallbackZipURL = URL(string: "https://ifancontrol.puremilkchun.top/iFanControl-macOS.zip")!
+    private let manifestURL = URL(string: "https://ifan-59w.pages.dev/update-manifest.json")!
+    private let fallbackZipURL = URL(string: "https://ifan-59w.pages.dev/iFanControl-macOS.zip")!
+    private let releasesHomeURL = URL(string: "https://github.com/PureMilkchun/iFanControl/releases")!
     private let lastCheckKey = "ifancontrol.update.last_check"
     private let checkInterval: TimeInterval = 24 * 60 * 60
     private var isChecking = false
@@ -394,7 +395,7 @@ class UpdateService {
                 presentUpdatePrompt(manifest: manifest)
             } catch {
                 if triggeredByUser {
-                    showErrorAlert(title: "检查更新失败", message: error.localizedDescription)
+                    showUpdateFailureAlert(title: "检查更新失败", message: error.localizedDescription, releaseURL: releasesHomeURL)
                 } else {
                     print("Update check failed: \(error)")
                 }
@@ -462,7 +463,11 @@ class UpdateService {
                 try runInstallScriptInTerminal(scriptURL: installScript)
                 showInfoAlert(title: "下载完成", message: "安装脚本已在终端打开，请按提示完成升级。")
             } catch {
-                showErrorAlert(title: "更新失败", message: error.localizedDescription)
+                showUpdateFailureAlert(
+                    title: "更新失败",
+                    message: error.localizedDescription,
+                    releaseURL: githubReleaseURL(for: manifest.latestVersion)
+                )
             }
         }
     }
@@ -551,6 +556,13 @@ class UpdateService {
         "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
+    private func githubReleaseURL(for version: String?) -> URL {
+        guard let version, !version.isEmpty else {
+            return releasesHomeURL
+        }
+        return URL(string: "https://github.com/PureMilkchun/iFanControl/releases/tag/v\(version)") ?? releasesHomeURL
+    }
+
     private func showInfoAlert(title: String, message: String) {
         let alert = NSAlert()
         alert.messageText = title
@@ -567,6 +579,19 @@ class UpdateService {
         alert.alertStyle = .warning
         alert.addButton(withTitle: "关闭")
         alert.runModal()
+    }
+
+    private func showUpdateFailureAlert(title: String, message: String, releaseURL: URL) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = "\(message)\n\n如需手动更新，可前往 GitHub Releases 下载最新版本。"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "前往 GitHub")
+        alert.addButton(withTitle: "关闭")
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            NSWorkspace.shared.open(releaseURL)
+        }
     }
 }
 
