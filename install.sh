@@ -179,6 +179,15 @@ echo ""
 # ============================================
 echo -e "${YELLOW}[5/5]${NC} 安装 iFanControl.app..."
 
+WAS_RUNNING=false
+if pgrep -f "/Applications/iFanControl.app/Contents/MacOS/iFanControl" >/dev/null 2>&1; then
+    WAS_RUNNING=true
+    echo -e "  ${BLUE}→${NC} 检测到 iFanControl 正在运行，准备自动重启..."
+    osascript -e 'tell application id "com.ifancontrol.app" to quit' >/dev/null 2>&1 || true
+    pkill -f "/Applications/iFanControl.app/Contents/MacOS/iFanControl" >/dev/null 2>&1 || true
+    sleep 1
+fi
+
 if [ -d "/Applications/iFanControl.app" ]; then
     echo -e "  ${BLUE}→${NC} 移除旧版本..."
     rm -rf /Applications/iFanControl.app
@@ -195,10 +204,16 @@ sudo xattr -cr /Applications/iFanControl.app 2>/dev/null || true
 
 if [ -d "/Applications/iFanControl.app" ]; then
     APP_SUCCESS=true
-    echo -e "${GREEN}✓${NC} 应用安装成功"
+echo -e "${GREEN}✓${NC} 应用安装成功"
 else
     echo -e "${RED}✗ 应用安装验证失败${NC}"
     exit 1
+fi
+
+if [ "$WAS_RUNNING" = true ]; then
+    echo -e "  ${BLUE}→${NC} 正在重新启动 iFanControl..."
+    open -n /Applications/iFanControl.app 2>/dev/null || true
+    sleep 1
 fi
 echo ""
 
