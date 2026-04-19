@@ -784,6 +784,8 @@ class MenuBarManager {
 class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+
         let config = ConfigManager.shared.loadConfig()
         MenuBarManager.shared.setFanCurve(config.curve)
         MenuBarManager.shared.setIsAutoMode(config.mode == "auto")
