@@ -115,7 +115,7 @@ iFanControl 使用 [kentsmc](https://github.com/exelban/kentsmc) 来：
 ## Requirements / 系统要求
 
 - macOS 13.0 or later / macOS 13.0 或更高版本
-- Apple Silicon Mac (M1/M2/M3/M4)
+- Apple Silicon Mac with built-in fans (M1/M2/M3/M4/M5)
 - Admin password for initial setup / 首次设置需要管理员密码
 
 ## Uninstall / 卸载

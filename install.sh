@@ -40,7 +40,7 @@ echo -e "${CYAN}╔════════════════════�
 echo -e "${CYAN}║                                                            ║${NC}"
 echo -e "${CYAN}║            🌬️  iFanControl v2.5 安装程序                  ║${NC}"
 echo -e "${CYAN}║                                                            ║${NC}"
-echo -e "${CYAN}║       适用于 Apple Silicon Mac (M1/M2/M3/M4)              ║${NC}"
+echo -e "${CYAN}║   适用于带风扇的 Apple Silicon Mac (M1/M2/M3/M4/M5)       ║${NC}"
 echo -e "${CYAN}║                                                            ║${NC}"
 echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
@@ -225,7 +225,7 @@ echo ""
 echo -e "${YELLOW}🔍 验证安装结果...${NC}"
 echo ""
 
-sudo -n /usr/local/bin/kentsmc -r Tp0e &>/dev/null
+sudo -n /usr/local/bin/kentsmc -r FNum &>/dev/null
 if [ $? -eq 0 ]; then
     SUDO_SUCCESS=true
     echo -e "${GREEN}✓${NC} 免密授权测试成功"

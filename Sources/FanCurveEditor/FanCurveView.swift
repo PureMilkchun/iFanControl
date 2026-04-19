@@ -34,7 +34,11 @@ class FanCurveView: NSView {
         }
     }
     
-    private let maxRPM = 4900
+    var maxRPM = 4900 {
+        didSet {
+            setNeedsDisplay(bounds)
+        }
+    }
     private let minTemp = 20.0
     private let maxTemp = 100.0
     private let padding = 40.0

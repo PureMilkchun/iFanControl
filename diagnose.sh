@@ -70,7 +70,7 @@ echo ""
 # 检查 4: 温度读取测试
 echo -e "${YELLOW}[4/5]${NC} 测试温度读取功能..."
 if [ -f "/usr/local/bin/kentsmc" ]; then
-    TEMP_OUTPUT=$(/usr/local/bin/kentsmc -r Tp0e 2>/dev/null)
+    TEMP_OUTPUT=$(/usr/local/bin/kentsmc -r FNum 2>/dev/null)
     if [ $? -eq 0 ] && [ -n "$TEMP_OUTPUT" ]; then
         echo -e "  ${GREEN}✓${NC} 温度读取成功"
         echo -e "    当前温度: ${CYAN}$TEMP_OUTPUT${NC}"
@@ -89,7 +89,7 @@ echo ""
 # 检查 5: 免密执行测试
 echo -e "${YELLOW}[5/5]${NC} 测试免密执行..."
 if [ -f "/usr/local/bin/kentsmc" ] && [ -f "/private/etc/sudoers.d/kentsmc" ]; then
-    sudo -n /usr/local/bin/kentsmc -r Tp0e &>/dev/null
+    sudo -n /usr/local/bin/kentsmc -r FNum &>/dev/null
     if [ $? -eq 0 ]; then
         echo -e "  ${GREEN}✓${NC} 免密执行成功"
         echo -e "    安装已完成，以后运行无需输入密码"

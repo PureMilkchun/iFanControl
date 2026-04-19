@@ -17,14 +17,30 @@ public struct Config: Codable {
     public var autoStart: Bool
     public var maxRPM: Int
     public var manualRPM: Int
+    public var safetyFloorRPM: Int?
+    public var temperatureSourceMode: String?
+    public var selectedTemperatureSensorKey: String?
     
-    public init(version: String, curve: [FanPoint], mode: String, autoStart: Bool, maxRPM: Int, manualRPM: Int = 2000) {
+    public init(
+        version: String,
+        curve: [FanPoint],
+        mode: String,
+        autoStart: Bool,
+        maxRPM: Int,
+        manualRPM: Int = 2000,
+        safetyFloorRPM: Int? = nil,
+        temperatureSourceMode: String? = nil,
+        selectedTemperatureSensorKey: String? = nil
+    ) {
         self.version = version
         self.curve = curve
         self.mode = mode
         self.autoStart = autoStart
         self.maxRPM = maxRPM
         self.manualRPM = manualRPM
+        self.safetyFloorRPM = safetyFloorRPM
+        self.temperatureSourceMode = temperatureSourceMode
+        self.selectedTemperatureSensorKey = selectedTemperatureSensorKey
     }
 }
 
@@ -33,9 +49,11 @@ public struct Config: Codable {
 public class FanCurveWindowController: NSWindowController {
     private let fanCurveView = FanCurveView()
     private var fanCurve: [FanPoint] = []
+    private let maxRPM: Int
     
-    public init(fanCurve: [FanPoint]) {
+    public init(fanCurve: [FanPoint], maxRPM: Int) {
         self.fanCurve = fanCurve
+        self.maxRPM = maxRPM
         
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 800, height: 500),
@@ -61,6 +79,7 @@ public class FanCurveWindowController: NSWindowController {
         
         // 设置曲线视图
         fanCurveView.fanCurve = fanCurve
+        fanCurveView.maxRPM = maxRPM
         fanCurveView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(fanCurveView)
         
@@ -97,12 +116,13 @@ public class FanCurveWindowController: NSWindowController {
     }
     
     @objc private func resetCurve() {
+        let quarter = max(1, maxRPM / 4)
         fanCurve = [
             FanPoint(temperature: 20, rpm: 0),
-            FanPoint(temperature: 40, rpm: 1225),
-            FanPoint(temperature: 60, rpm: 2450),
-            FanPoint(temperature: 80, rpm: 3675),
-            FanPoint(temperature: 100, rpm: 4900)
+            FanPoint(temperature: 40, rpm: quarter),
+            FanPoint(temperature: 60, rpm: quarter * 2),
+            FanPoint(temperature: 80, rpm: quarter * 3),
+            FanPoint(temperature: 100, rpm: maxRPM)
         ]
         fanCurveView.fanCurve = fanCurve
     }
@@ -121,12 +141,18 @@ public class FanCurveWindowController: NSWindowController {
         var existingMode = "auto"
         var existingAutoStart = true
         var existingManualRPM = 2000
+        var existingSafetyFloorRPM: Int?
+        var existingTemperatureSourceMode: String?
+        var existingSelectedTemperatureSensorKey: String?
         
         if let existingData = try? Data(contentsOf: configFile),
            let existingConfig = try? JSONDecoder().decode(Config.self, from: existingData) {
             existingMode = existingConfig.mode
             existingAutoStart = existingConfig.autoStart
             existingManualRPM = existingConfig.manualRPM
+            existingSafetyFloorRPM = existingConfig.safetyFloorRPM
+            existingTemperatureSourceMode = existingConfig.temperatureSourceMode
+            existingSelectedTemperatureSensorKey = existingConfig.selectedTemperatureSensorKey
         }
         
         do {
@@ -135,8 +161,11 @@ public class FanCurveWindowController: NSWindowController {
                 curve: fanCurve,
                 mode: existingMode,
                 autoStart: existingAutoStart,
-                maxRPM: 4900,
-                manualRPM: existingManualRPM
+                maxRPM: maxRPM,
+                manualRPM: existingManualRPM,
+                safetyFloorRPM: existingSafetyFloorRPM,
+                temperatureSourceMode: existingTemperatureSourceMode,
+                selectedTemperatureSensorKey: existingSelectedTemperatureSensorKey
             )
             let data = try JSONEncoder().encode(config)
             try data.write(to: configFile)
@@ -165,5 +194,3 @@ public class FanCurveWindowController: NSWindowController {
         window?.close()
     }
 }
-
-
