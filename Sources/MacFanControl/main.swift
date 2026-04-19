@@ -7,6 +7,7 @@
 //
 
 import AppKit
+import CryptoKit
 import Foundation
 import FanCurveEditor
 
@@ -73,6 +74,7 @@ class FanManager {
     private let kentsmcPath = "/usr/local/bin/kentsmc"
     private let temperatureKey = "Tp0e" // M4 CPU Performance core 8
     private let maxRPM = 4900
+    private let safetyRPM = 3500
     
     // 稳定性控制参数
     private var lastSetRPM: Int = 0
@@ -197,14 +199,7 @@ class FanManager {
     
     func calculateFanRPM(temperature: Double, curve: [FanPoint]) -> Int {
         guard !curve.isEmpty else { return 0 }
-        
-        // 危险温度保护
-        if temperature >= 95.0 {
-            print("WARNING: Critical temperature (\(temperature)°C)")
-            temperatureReadFailureCount = 0
-            return Int(4900 * 0.95)
-        }
-        
+
         // 温度读取失败处理
         if temperature.isNaN || temperature < 0 {
             temperatureReadFailureCount += 1
@@ -252,8 +247,16 @@ class FanManager {
         
         let ratio = (temperature - lowerPoint.temperature) / (upperPoint.temperature - lowerPoint.temperature)
         let rpm = Int(Double(lowerPoint.rpm) + ratio * Double(upperPoint.rpm - lowerPoint.rpm))
-        
-        return max(0, min(maxRPM, rpm))
+        let clampedRPM = max(0, min(maxRPM, rpm))
+
+        // 危险温度保护只做托底，不压低用户曲线已经给出的更高转速。
+        if temperature >= criticalTemp {
+            print("WARNING: Critical temperature (\(temperature)°C)")
+            temperatureReadFailureCount = 0
+            return max(clampedRPM, safetyRPM)
+        }
+
+        return clampedRPM
     }
 }
 
@@ -308,6 +311,262 @@ class ConfigManager {
         } catch {
             print("Error saving config: \(error)")
         }
+    }
+}
+
+// 自动更新服务
+@MainActor
+class UpdateService {
+    static let shared = UpdateService()
+
+    private let manifestURL = URL(string: "https://ifancontrol.puremilkchun.top/update-manifest.json")!
+    private let fallbackZipURL = URL(string: "https://ifancontrol.puremilkchun.top/iFanControl-macOS.zip")!
+    private let lastCheckKey = "ifancontrol.update.last_check"
+    private let checkInterval: TimeInterval = 24 * 60 * 60
+    private var isChecking = false
+
+    private var currentShortVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "未知版本"
+    }
+
+    private var currentBuild: Int {
+        Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0") ?? 0
+    }
+
+    var currentVersionDisplay: String {
+        "\(currentShortVersion) (\(currentBuild))"
+    }
+
+    private struct UpdateManifest: Decodable {
+        let latestVersion: String
+        let latestBuild: Int
+        let publishedAt: String?
+        let notes: String?
+        let mandatory: Bool?
+        let assets: Assets?
+
+        enum CodingKeys: String, CodingKey {
+            case latestVersion = "latest_version"
+            case latestBuild = "latest_build"
+            case publishedAt = "published_at"
+            case notes
+            case mandatory
+            case assets
+        }
+    }
+
+    private struct Assets: Decodable {
+        let zipURL: String?
+        let sha256: String?
+        let size: Int?
+
+        enum CodingKeys: String, CodingKey {
+            case zipURL = "macos_arm64_zip_url"
+            case sha256
+            case size
+        }
+    }
+
+    func checkForUpdates(triggeredByUser: Bool) {
+        if isChecking { return }
+        if !triggeredByUser && !shouldRunScheduledCheck() { return }
+
+        isChecking = true
+
+        Task {
+            defer { isChecking = false }
+
+            do {
+                let (data, _) = try await URLSession.shared.data(from: manifestURL)
+                let manifest = try JSONDecoder().decode(UpdateManifest.self, from: data)
+                recordLastCheckNow()
+
+                if manifest.latestBuild <= currentBuild {
+                    if triggeredByUser {
+                        showInfoAlert(
+                            title: "已是最新版本",
+                            message: "当前版本：\(currentVersionDisplay)\n远端版本：\(manifest.latestVersion) (\(manifest.latestBuild))"
+                        )
+                    }
+                    return
+                }
+
+                presentUpdatePrompt(manifest: manifest)
+            } catch {
+                if triggeredByUser {
+                    showErrorAlert(title: "检查更新失败", message: error.localizedDescription)
+                } else {
+                    print("Update check failed: \(error)")
+                }
+            }
+        }
+    }
+
+    private func shouldRunScheduledCheck() -> Bool {
+        guard let last = UserDefaults.standard.object(forKey: lastCheckKey) as? Date else {
+            return true
+        }
+        return Date().timeIntervalSince(last) >= checkInterval
+    }
+
+    private func recordLastCheckNow() {
+        UserDefaults.standard.set(Date(), forKey: lastCheckKey)
+    }
+
+    private func presentUpdatePrompt(manifest: UpdateManifest) {
+        let notes = manifest.notes?.isEmpty == false ? manifest.notes! : "包含稳定性与功能改进。"
+        let alert = NSAlert()
+        alert.messageText = "发现新版本 \(manifest.latestVersion)"
+        alert.informativeText = "当前版本：\(currentVersionDisplay)\n远端版本：\(manifest.latestVersion) (\(manifest.latestBuild))\n\n\(notes)"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "立即更新")
+        alert.addButton(withTitle: "稍后")
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            startDownloadAndInstall(manifest: manifest)
+        }
+    }
+
+    private func startDownloadAndInstall(manifest: UpdateManifest) {
+        Task {
+            do {
+                let zipURL = URL(string: manifest.assets?.zipURL ?? "") ?? fallbackZipURL
+                let (data, _) = try await URLSession.shared.data(from: zipURL)
+
+                if let expectedSize = manifest.assets?.size, data.count != expectedSize {
+                    throw NSError(domain: "UpdateService", code: 1001, userInfo: [NSLocalizedDescriptionKey: "安装包大小校验失败。"])
+                }
+
+                if let expectedSHA = manifest.assets?.sha256?.lowercased(), !expectedSHA.isEmpty {
+                    let actualSHA = sha256Hex(data)
+                    if expectedSHA != actualSHA {
+                        throw NSError(domain: "UpdateService", code: 1002, userInfo: [NSLocalizedDescriptionKey: "安装包哈希校验失败。"])
+                    }
+                }
+
+                let stagingDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("iFanControlUpdate", isDirectory: true)
+                try? FileManager.default.removeItem(at: stagingDir)
+                try FileManager.default.createDirectory(at: stagingDir, withIntermediateDirectories: true)
+
+                let zipPath = stagingDir.appendingPathComponent("iFanControl-macOS.zip")
+                try data.write(to: zipPath, options: .atomic)
+
+                let extractDir = stagingDir.appendingPathComponent("extracted", isDirectory: true)
+                try FileManager.default.createDirectory(at: extractDir, withIntermediateDirectories: true)
+                try unzip(zipPath: zipPath, to: extractDir)
+
+                guard let installScript = findInstallScript(in: extractDir) else {
+                    throw NSError(domain: "UpdateService", code: 1003, userInfo: [NSLocalizedDescriptionKey: "未找到 install.sh。"])
+                }
+
+                try runInstallScriptInTerminal(scriptURL: installScript)
+                showInfoAlert(title: "下载完成", message: "安装脚本已在终端打开，请按提示完成升级。")
+            } catch {
+                showErrorAlert(title: "更新失败", message: error.localizedDescription)
+            }
+        }
+    }
+
+    private func sha256Hex(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func unzip(zipPath: URL, to outputDir: URL) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        process.arguments = ["-o", zipPath.path, "-d", outputDir.path]
+        try process.run()
+        process.waitUntilExit()
+        if process.terminationStatus != 0 {
+            throw NSError(domain: "UpdateService", code: 1004, userInfo: [NSLocalizedDescriptionKey: "解压安装包失败。"])
+        }
+    }
+
+    private func findInstallScript(in root: URL) -> URL? {
+        let fm = FileManager.default
+        let commandURL = root.appendingPathComponent("Install.command")
+        if fm.fileExists(atPath: commandURL.path) {
+            return commandURL
+        }
+        if fm.fileExists(atPath: root.appendingPathComponent("install.sh").path) {
+            return root.appendingPathComponent("install.sh")
+        }
+        if let e = fm.enumerator(at: root, includingPropertiesForKeys: nil) {
+            for case let file as URL in e {
+                if file.lastPathComponent == "Install.command" {
+                    return file
+                }
+                if file.lastPathComponent == "install.sh" {
+                    return file
+                }
+            }
+        }
+        return nil
+    }
+
+    private func runInstallScriptInTerminal(scriptURL: URL) throws {
+        let launcherURL = try prepareInstallLauncher(for: scriptURL)
+
+        if NSWorkspace.shared.open(launcherURL) {
+            return
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = ["-a", "Terminal", launcherURL.path]
+        try process.run()
+        process.waitUntilExit()
+
+        if process.terminationStatus != 0 {
+            throw NSError(
+                domain: "UpdateService",
+                code: 1005,
+                userInfo: [NSLocalizedDescriptionKey: "无法启动安装终端。请手动打开 \(launcherURL.lastPathComponent) 完成升级。"]
+            )
+        }
+    }
+
+    private func prepareInstallLauncher(for scriptURL: URL) throws -> URL {
+        let fm = FileManager.default
+        if scriptURL.lastPathComponent == "Install.command" {
+            try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
+            return scriptURL
+        }
+
+        let launcherURL = scriptURL.deletingLastPathComponent().appendingPathComponent("Install.command")
+        let escapedDir = shellQuoted(scriptURL.deletingLastPathComponent().path)
+        let escapedScript = shellQuoted(scriptURL.path)
+        let launcher = """
+        #!/bin/bash
+        cd \(escapedDir)
+        chmod +x \(escapedScript)
+        exec \(escapedScript)
+        """
+        try launcher.write(to: launcherURL, atomically: true, encoding: .utf8)
+        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: launcherURL.path)
+        return launcherURL
+    }
+
+    private func shellQuoted(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    private func showInfoAlert(title: String, message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "好的")
+        alert.runModal()
+    }
+
+    private func showErrorAlert(title: String, message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "关闭")
+        alert.runModal()
     }
 }
 
@@ -369,6 +628,11 @@ class MenuBarManager {
         statusItem.button?.title = "\(temperatureText) | \(fanText) \(modeText)\(statusIcon)"
         
         let menu = NSMenu()
+
+        let versionItem = NSMenuItem(title: "当前版本 \(UpdateService.shared.currentVersionDisplay)", action: nil, keyEquivalent: "")
+        versionItem.isEnabled = false
+        menu.addItem(versionItem)
+        menu.addItem(NSMenuItem.separator())
         
         let curveItem = NSMenuItem(title: "风扇曲线编辑器...", action: #selector(showFanCurveEditor), keyEquivalent: "c")
         curveItem.target = self
@@ -390,7 +654,11 @@ class MenuBarManager {
         autoStartItem.target = self
         autoStartItem.state = autoStartEnabled ? .on : .off
         menu.addItem(autoStartItem)
-        
+
+        let updateItem = NSMenuItem(title: "检查更新...", action: #selector(checkForUpdates), keyEquivalent: "u")
+        updateItem.target = self
+        menu.addItem(updateItem)
+
         menu.addItem(NSMenuItem.separator())
         
         let quitItem = NSMenuItem(title: "退出", action: #selector(quitApp), keyEquivalent: "q")
@@ -493,6 +761,10 @@ class MenuBarManager {
     @objc func quitApp() {
         NSApp.terminate(nil)
     }
+
+    @objc func checkForUpdates() {
+        UpdateService.shared.checkForUpdates(triggeredByUser: true)
+    }
     
     func setFanCurve(_ curve: [FanPoint]) {
         fanCurve = curve
@@ -524,6 +796,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // 启动控制循环
         startAutoControlLoop()
+
+        // 启动后延迟进行后台更新检查
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
+            UpdateService.shared.checkForUpdates(triggeredByUser: false)
+        }
     }
     
     func applicationWillTerminate(_ notification: Notification) {
