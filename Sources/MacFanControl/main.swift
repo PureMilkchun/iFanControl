@@ -29,6 +29,16 @@ struct FanInfo {
 }
 
 private let appSubsystem = Bundle.main.bundleIdentifier ?? "com.ifancontrol.app"
+private let defaultManualRPMStep = 500
+
+enum ManualRPMControlMode: String {
+    case continuous
+    case stepped
+
+    init(storedValue: String?) {
+        self = ManualRPMControlMode(rawValue: storedValue ?? "") ?? .continuous
+    }
+}
 
 @MainActor
 private func presentWindowFront(_ window: NSWindow?) {
@@ -53,10 +63,10 @@ private func applyWindowMaterialStyle(_ window: NSWindow?) {
 }
 
 // MARK: - CommandExecutor (使用 sudo 执行特权命令)
-@MainActor
-class CommandExecutor {
+final class CommandExecutor: @unchecked Sendable {
     static let shared = CommandExecutor()
     private let kentsmcPath = "/usr/local/bin/kentsmc"
+    private let commandQueue = DispatchQueue(label: "com.ifancontrol.command-executor")
     
     // 执行特权命令
     private func executeCommand(args: [String]) -> (success: Bool, output: String, error: String) {
@@ -90,6 +100,18 @@ class CommandExecutor {
         let result = executeCommand(args: ["--fan-rpm", "\(rpm)"])
         return (result.success, result.success ? nil : result.error)
     }
+
+    func setFanRPMAsync(
+        rpm: Int,
+        completion: @MainActor @escaping (_ success: Bool, _ error: String?) -> Void
+    ) {
+        commandQueue.async {
+            let result = self.setFanRPM(rpm: rpm)
+            Task { @MainActor in
+                completion(result.success, result.error)
+            }
+        }
+    }
     
     // 设置自动模式
     func setFanAuto() -> (success: Bool, error: String?) {
@@ -111,7 +133,7 @@ class FanManager {
     private let kentsmcPath = "/usr/local/bin/kentsmc"
     let defaultSafetyRPM = 3500
     private let fallbackMaxRPM = 4900
-    private let telemetryRefreshInterval: TimeInterval = 1.0
+    private let telemetryRefreshInterval: TimeInterval = 2.0
     private let validTemperatureRange = 0.0...120.0
     
     private(set) var fanCount: Int = 0
@@ -129,6 +151,7 @@ class FanManager {
     private var lastSetRPM: Int = 0
     private var lastExecutionTime: Date?
     private let minExecutionInterval: TimeInterval = 2.0
+    private var fanCommandInFlight = false
     
     // 温度历史记录
     private var temperatureHistory: [Double] = []
@@ -332,12 +355,18 @@ class FanManager {
         return readings.max(by: { $0.value < $1.value })
     }
 
-    func readPrimaryFanRPM() -> Int? {
-        refreshTelemetry()
+    func readPrimaryFanRPM(refresh: Bool = true) -> Int? {
+        if refresh {
+            refreshTelemetry()
+        }
         return cachedFanRPMs.values.max()
     }
     
     func setFanRPM(rpm: Int) {
+        if fanCommandInFlight {
+            return
+        }
+
         let boundedTarget = max(0, min(currentMaxRPM, rpm))
 
         // 检查时间间隔
@@ -356,14 +385,18 @@ class FanManager {
         // 平滑滤波
         let smoothingFactor: Double = 0.3
         let smoothedRPM = Int(Double(lastSetRPM) * (1.0 - smoothingFactor) + Double(boundedTarget) * smoothingFactor)
-        
-        let result = CommandExecutor.shared.setFanRPM(rpm: smoothedRPM)
-        
-        if result.success {
-            lastSetRPM = smoothedRPM
-            lastExecutionTime = Date()
-        } else {
-            print("Error setting fan RPM: \(result.error ?? "Unknown error")")
+        fanCommandInFlight = true
+
+        CommandExecutor.shared.setFanRPMAsync(rpm: smoothedRPM) { [weak self] success, error in
+            guard let self else { return }
+            self.fanCommandInFlight = false
+
+            if success {
+                self.lastSetRPM = smoothedRPM
+                self.lastExecutionTime = Date()
+            } else {
+                print("Error setting fan RPM: \(error ?? "Unknown error")")
+            }
         }
     }
     
@@ -485,6 +518,8 @@ class ConfigManager {
             autoStart: true,
             maxRPM: FanManager.shared.currentMaxRPM,
             manualRPM: min(2168, FanManager.shared.currentMaxRPM),
+            manualRPMControlMode: ManualRPMControlMode.continuous.rawValue,
+            manualRPMStep: defaultManualRPMStep,
             safetyFloorRPM: min(FanManager.shared.defaultSafetyRPM, FanManager.shared.currentMaxRPM),
             temperatureSourceMode: "hottest",
             selectedTemperatureSensorKey: nil
@@ -504,6 +539,10 @@ class ConfigManager {
         var config = loadConfig()
         config.maxRPM = maxRPM
         config.manualRPM = min(config.manualRPM, maxRPM)
+        if config.manualRPMControlMode == nil {
+            config.manualRPMControlMode = ManualRPMControlMode.continuous.rawValue
+        }
+        config.manualRPMStep = max(config.manualRPMStep ?? defaultManualRPMStep, 1)
         let boundedDefaultSafety = min(FanManager.shared.defaultSafetyRPM, maxRPM)
         config.safetyFloorRPM = min(max(config.safetyFloorRPM ?? boundedDefaultSafety, 2000), maxRPM)
 
@@ -875,7 +914,7 @@ class MenuBarManager {
         
         NotificationCenter.default.addObserver(self, selector: #selector(handleCurveSaved), name: NSNotification.Name("FanCurveDidSave"), object: nil)
         
-        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
             Task { @MainActor in
                 self.updateMenu()
             }
@@ -894,15 +933,22 @@ class MenuBarManager {
         guard let statusItem = statusItem else { return }
 
         let config = ConfigManager.shared.loadConfig()
-        FanManager.shared.refreshTelemetry()
         let readings = FanManager.shared.availableTemperatureReadings()
 
-        if let reading = FanManager.shared.currentTemperatureReading(using: config) {
+        let selectedReading: TemperatureReading?
+        if config.temperatureSourceMode == "manual",
+           let selectedKey = config.selectedTemperatureSensorKey {
+            selectedReading = readings.first(where: { $0.sensor.key == selectedKey })
+        } else {
+            selectedReading = readings.max(by: { $0.value < $1.value })
+        }
+
+        if let reading = selectedReading {
             currentTemperature = reading.value
             currentTemperatureSensorName = selectionSummary(for: reading, in: readings, automatic: config.temperatureSourceMode != "manual")
         }
 
-        if let rpm = FanManager.shared.readPrimaryFanRPM() {
+        if let rpm = FanManager.shared.readPrimaryFanRPM(refresh: false) {
             currentFanRPM = rpm
         }
         
@@ -1112,7 +1158,14 @@ class MenuBarManager {
     @objc func showSpeedSetting() {
         let config = ConfigManager.shared.loadConfig()
         let currentRPM = min(config.manualRPM, FanManager.shared.currentMaxRPM)
-        speedSettingWindowController = SpeedSettingWindowController(initialRPM: currentRPM, maxRPM: FanManager.shared.currentMaxRPM)
+        let controlMode = ManualRPMControlMode(storedValue: config.manualRPMControlMode)
+        let stepRPM = max(config.manualRPMStep ?? defaultManualRPMStep, 1)
+        speedSettingWindowController = SpeedSettingWindowController(
+            initialRPM: currentRPM,
+            maxRPM: FanManager.shared.currentMaxRPM,
+            controlMode: controlMode,
+            stepRPM: stepRPM
+        )
         speedSettingWindowController?.showWindow(nil)
         presentWindowFront(speedSettingWindowController?.window)
     }
@@ -1295,13 +1348,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 class SpeedSettingWindowController: NSWindowController {
     private var currentRPM: Int = 0
     private let maxRPM: Int
-    
-    init(initialRPM: Int, maxRPM: Int) {
-        self.currentRPM = initialRPM
+    private var controlMode: ManualRPMControlMode
+    private let stepRPM: Int
+    private var rpmSlider: NSSlider?
+    private var rpmLabel: NSTextField?
+    private var controlModeSegmentedControl: NSSegmentedControl?
+    private var stepHintLabel: NSTextField?
+    private var applyStatusLabel: NSTextField?
+    private var applyStatusResetWorkItem: DispatchWorkItem?
+
+    init(initialRPM: Int, maxRPM: Int, controlMode: ManualRPMControlMode, stepRPM: Int) {
         self.maxRPM = maxRPM
-        
+        self.controlMode = controlMode
+        self.stepRPM = max(stepRPM, 1)
+        self.currentRPM = initialRPM
+
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 150),
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 210),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -1314,6 +1377,7 @@ class SpeedSettingWindowController: NSWindowController {
 
         applyWindowMaterialStyle(window)
         setupUI()
+        updateSliderDisplay()
     }
     
     required init?(coder: NSCoder) {
@@ -1326,11 +1390,19 @@ class SpeedSettingWindowController: NSWindowController {
         let titleLabel = NSTextField(labelWithString: "手动模式目标转速:")
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(titleLabel)
+
+        let modeLabel = NSTextField(labelWithString: "调节方式")
+        modeLabel.textColor = .secondaryLabelColor
+        modeLabel.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(modeLabel)
+
+        let controlModeSegmentedControl = NSSegmentedControl(labels: ["连续", "档位"], trackingMode: .selectOne, target: self, action: #selector(controlModeChanged))
+        controlModeSegmentedControl.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(controlModeSegmentedControl)
         
         let rpmSlider = NSSlider()
         rpmSlider.minValue = 0
         rpmSlider.maxValue = Double(maxRPM)
-        rpmSlider.doubleValue = Double(currentRPM)
         rpmSlider.target = self
         rpmSlider.action = #selector(sliderChanged)
         rpmSlider.translatesAutoresizingMaskIntoConstraints = false
@@ -1339,6 +1411,20 @@ class SpeedSettingWindowController: NSWindowController {
         let rpmLabel = NSTextField(labelWithString: "\(currentRPM) RPM")
         rpmLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(rpmLabel)
+
+        let stepHintLabel = NSTextField(labelWithString: "")
+        stepHintLabel.textColor = .secondaryLabelColor
+        stepHintLabel.alignment = .center
+        stepHintLabel.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(stepHintLabel)
+
+        let applyStatusLabel = NSTextField(labelWithString: "✓ 已应用")
+        applyStatusLabel.textColor = .systemGreen
+        applyStatusLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        applyStatusLabel.alignment = .center
+        applyStatusLabel.alphaValue = 0
+        applyStatusLabel.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(applyStatusLabel)
         
         let applyButton = NSButton(title: "应用", target: self, action: #selector(applySpeed))
         applyButton.translatesAutoresizingMaskIntoConstraints = false
@@ -1351,56 +1437,133 @@ class SpeedSettingWindowController: NSWindowController {
         NSLayoutConstraint.activate([
             titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
             titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            
-            rpmSlider.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 10),
+
+            modeLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12),
+            modeLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+
+            controlModeSegmentedControl.centerYAnchor.constraint(equalTo: modeLabel.centerYAnchor),
+            controlModeSegmentedControl.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+
+            rpmSlider.topAnchor.constraint(equalTo: modeLabel.bottomAnchor, constant: 14),
             rpmSlider.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             rpmSlider.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             
             rpmLabel.topAnchor.constraint(equalTo: rpmSlider.bottomAnchor, constant: 10),
             rpmLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+
+            stepHintLabel.topAnchor.constraint(equalTo: rpmLabel.bottomAnchor, constant: 6),
+            stepHintLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+
+            applyStatusLabel.topAnchor.constraint(equalTo: stepHintLabel.bottomAnchor, constant: 6),
+            applyStatusLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             
-            applyButton.topAnchor.constraint(equalTo: rpmLabel.bottomAnchor, constant: 20),
+            applyButton.topAnchor.constraint(equalTo: applyStatusLabel.bottomAnchor, constant: 12),
             applyButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor, constant: -50),
             
-            cancelButton.topAnchor.constraint(equalTo: rpmLabel.bottomAnchor, constant: 20),
+            cancelButton.topAnchor.constraint(equalTo: applyStatusLabel.bottomAnchor, constant: 12),
             cancelButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor, constant: 50)
         ])
-        
+
         self.rpmSlider = rpmSlider
         self.rpmLabel = rpmLabel
+        self.controlModeSegmentedControl = controlModeSegmentedControl
+        self.stepHintLabel = stepHintLabel
+        self.applyStatusLabel = applyStatusLabel
     }
-    
-    private var rpmSlider: NSSlider?
-    private var rpmLabel: NSTextField?
-    
+
+    private func boundedRPM(_ rpm: Int) -> Int {
+        min(max(rpm, 0), maxRPM)
+    }
+
+    private func snappedRPM(for rpm: Int) -> Int {
+        let bounded = boundedRPM(rpm)
+        guard stepRPM > 1 else { return bounded }
+
+        let lower = Int(floor(Double(bounded) / Double(stepRPM))) * stepRPM
+        let upper = Int(ceil(Double(bounded) / Double(stepRPM))) * stepRPM
+        let candidates = Array(Set([
+            boundedRPM(lower),
+            boundedRPM(upper),
+            maxRPM
+        ]))
+
+        return candidates.min { lhs, rhs in
+            let lhsDistance = abs(lhs - bounded)
+            let rhsDistance = abs(rhs - bounded)
+            if lhsDistance == rhsDistance {
+                return lhs < rhs
+            }
+            return lhsDistance < rhsDistance
+        } ?? bounded
+    }
+
+    private func effectiveRPM(for sliderValue: Double) -> Int {
+        let rawRPM = boundedRPM(Int(sliderValue.rounded()))
+        if controlMode == .stepped {
+            return snappedRPM(for: rawRPM)
+        }
+        return rawRPM
+    }
+
+    private func updateModeUI() {
+        controlModeSegmentedControl?.selectedSegment = (controlMode == .continuous) ? 0 : 1
+        let isStepped = (controlMode == .stepped)
+        stepHintLabel?.stringValue = isStepped ? "步进：\(stepRPM) RPM" : ""
+        stepHintLabel?.isHidden = !isStepped
+    }
+
+    private func updateSliderDisplay() {
+        let effectiveRPM = (controlMode == .stepped) ? snappedRPM(for: currentRPM) : boundedRPM(currentRPM)
+        currentRPM = effectiveRPM
+        rpmSlider?.doubleValue = Double(effectiveRPM)
+        rpmLabel?.stringValue = "\(effectiveRPM) RPM"
+        updateModeUI()
+    }
+
     @objc func sliderChanged() {
-        guard let slider = rpmSlider, let label = rpmLabel else { return }
-        let rpm = Int(slider.doubleValue)
-        label.stringValue = "\(rpm) RPM"
-    }
-    
-    @objc func applySpeed() {
         guard let slider = rpmSlider else { return }
-        let rpm = min(Int(slider.doubleValue), maxRPM)
-        
+        let rpm = effectiveRPM(for: slider.doubleValue)
+        currentRPM = rpm
+        slider.doubleValue = Double(rpm)
+        rpmLabel?.stringValue = "\(rpm) RPM"
+    }
+
+    @objc private func controlModeChanged() {
+        controlMode = (controlModeSegmentedControl?.selectedSegment == 1) ? .stepped : .continuous
+        updateSliderDisplay()
+    }
+
+    @objc func applySpeed() {
         let config = ConfigManager.shared.loadConfig()
         var newConfig = config
-        newConfig.manualRPM = rpm
+        newConfig.manualRPM = currentRPM
+        newConfig.manualRPMControlMode = controlMode.rawValue
+        newConfig.manualRPMStep = stepRPM
         ConfigManager.shared.saveConfig(newConfig)
         
         MenuBarManager.shared.setFanCurve(newConfig.curve)
-        
-        let alert = NSAlert()
-        alert.messageText = "设置成功"
-        alert.informativeText = "目标转速已设置为 \(rpm) RPM"
-        alert.addButton(withTitle: "确定")
-        alert.runModal()
-        
-        window?.close()
+        showApplyFeedback()
     }
     
     @objc func cancel() {
         window?.close()
+    }
+
+    private func showApplyFeedback() {
+        applyStatusResetWorkItem?.cancel()
+        guard let label = applyStatusLabel else { return }
+
+        label.alphaValue = 1.0
+
+        let workItem = DispatchWorkItem { [weak label] in
+            guard let label else { return }
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.25
+                label.animator().alphaValue = 0
+            }
+        }
+        applyStatusResetWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: workItem)
     }
 }
 
@@ -1411,6 +1574,8 @@ class SafetyFloorWindowController: NSWindowController {
     private let maxRPM: Int
     private var rpmSlider: NSSlider?
     private var rpmLabel: NSTextField?
+    private var applyStatusLabel: NSTextField?
+    private var applyStatusResetWorkItem: DispatchWorkItem?
 
     init(initialRPM: Int, maxRPM: Int) {
         self.currentRPM = initialRPM
@@ -1463,6 +1628,14 @@ class SafetyFloorWindowController: NSWindowController {
         rpmLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(rpmLabel)
 
+        let applyStatusLabel = NSTextField(labelWithString: "✓ 已应用")
+        applyStatusLabel.textColor = .systemGreen
+        applyStatusLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        applyStatusLabel.alignment = .center
+        applyStatusLabel.alphaValue = 0
+        applyStatusLabel.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(applyStatusLabel)
+
         let applyButton = NSButton(title: "应用", target: self, action: #selector(applyValue))
         applyButton.bezelStyle = .rounded
         applyButton.translatesAutoresizingMaskIntoConstraints = false
@@ -1486,7 +1659,10 @@ class SafetyFloorWindowController: NSWindowController {
             rpmLabel.topAnchor.constraint(equalTo: rpmSlider.bottomAnchor, constant: 10),
             rpmLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
 
-            applyButton.topAnchor.constraint(equalTo: rpmLabel.bottomAnchor, constant: 18),
+            applyStatusLabel.topAnchor.constraint(equalTo: rpmLabel.bottomAnchor, constant: 6),
+            applyStatusLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+
+            applyButton.topAnchor.constraint(equalTo: applyStatusLabel.bottomAnchor, constant: 12),
             applyButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor, constant: -44),
 
             cancelButton.centerYAnchor.constraint(equalTo: applyButton.centerYAnchor),
@@ -1495,6 +1671,7 @@ class SafetyFloorWindowController: NSWindowController {
 
         self.rpmSlider = rpmSlider
         self.rpmLabel = rpmLabel
+        self.applyStatusLabel = applyStatusLabel
     }
 
     @objc private func sliderChanged() {
@@ -1511,18 +1688,28 @@ class SafetyFloorWindowController: NSWindowController {
         var newConfig = config
         newConfig.safetyFloorRPM = rpm
         ConfigManager.shared.saveConfig(newConfig)
-
-        let alert = NSAlert()
-        alert.messageText = "设置成功"
-        alert.informativeText = "安全兜底转速已设置为 \(rpm) RPM"
-        alert.addButton(withTitle: "确定")
-        alert.runModal()
-
-        window?.close()
+        showApplyFeedback()
     }
 
     @objc private func cancel() {
         window?.close()
+    }
+
+    private func showApplyFeedback() {
+        applyStatusResetWorkItem?.cancel()
+        guard let label = applyStatusLabel else { return }
+
+        label.alphaValue = 1.0
+
+        let workItem = DispatchWorkItem { [weak label] in
+            guard let label else { return }
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.25
+                label.animator().alphaValue = 0
+            }
+        }
+        applyStatusResetWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: workItem)
     }
 }
 
