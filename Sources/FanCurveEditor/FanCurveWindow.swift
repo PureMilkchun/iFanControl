@@ -17,6 +17,8 @@ public struct Config: Codable {
     public var autoStart: Bool
     public var maxRPM: Int
     public var manualRPM: Int
+    public var manualRPMControlMode: String?
+    public var manualRPMStep: Int?
     public var safetyFloorRPM: Int?
     public var temperatureSourceMode: String?
     public var selectedTemperatureSensorKey: String?
@@ -28,6 +30,8 @@ public struct Config: Codable {
         autoStart: Bool,
         maxRPM: Int,
         manualRPM: Int = 2000,
+        manualRPMControlMode: String? = nil,
+        manualRPMStep: Int? = nil,
         safetyFloorRPM: Int? = nil,
         temperatureSourceMode: String? = nil,
         selectedTemperatureSensorKey: String? = nil
@@ -38,6 +42,8 @@ public struct Config: Codable {
         self.autoStart = autoStart
         self.maxRPM = maxRPM
         self.manualRPM = manualRPM
+        self.manualRPMControlMode = manualRPMControlMode
+        self.manualRPMStep = manualRPMStep
         self.safetyFloorRPM = safetyFloorRPM
         self.temperatureSourceMode = temperatureSourceMode
         self.selectedTemperatureSensorKey = selectedTemperatureSensorKey
@@ -141,6 +147,8 @@ public class FanCurveWindowController: NSWindowController {
         var existingMode = "auto"
         var existingAutoStart = true
         var existingManualRPM = 2000
+        var existingManualRPMControlMode: String?
+        var existingManualRPMStep: Int?
         var existingSafetyFloorRPM: Int?
         var existingTemperatureSourceMode: String?
         var existingSelectedTemperatureSensorKey: String?
@@ -150,6 +158,8 @@ public class FanCurveWindowController: NSWindowController {
             existingMode = existingConfig.mode
             existingAutoStart = existingConfig.autoStart
             existingManualRPM = existingConfig.manualRPM
+            existingManualRPMControlMode = existingConfig.manualRPMControlMode
+            existingManualRPMStep = existingConfig.manualRPMStep
             existingSafetyFloorRPM = existingConfig.safetyFloorRPM
             existingTemperatureSourceMode = existingConfig.temperatureSourceMode
             existingSelectedTemperatureSensorKey = existingConfig.selectedTemperatureSensorKey
@@ -163,6 +173,8 @@ public class FanCurveWindowController: NSWindowController {
                 autoStart: existingAutoStart,
                 maxRPM: maxRPM,
                 manualRPM: existingManualRPM,
+                manualRPMControlMode: existingManualRPMControlMode,
+                manualRPMStep: existingManualRPMStep,
                 safetyFloorRPM: existingSafetyFloorRPM,
                 temperatureSourceMode: existingTemperatureSourceMode,
                 selectedTemperatureSensorKey: existingSelectedTemperatureSensorKey
