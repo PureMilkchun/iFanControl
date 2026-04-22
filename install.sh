@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# iFanControl 一键安装脚本 v2.5
+# iFanControl 一键安装脚本 v2.8.8
 # 用户友好版本 - 拖拽安装
 
 # ============================================
@@ -38,9 +38,9 @@ clear 2>/dev/null || true
 echo ""
 echo -e "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${CYAN}║                                                            ║${NC}"
-echo -e "${CYAN}║            🌬️  iFanControl v2.5 安装程序                  ║${NC}"
+echo -e "${CYAN}║           🌬️  iFanControl v2.8.8 安装程序                 ║${NC}"
 echo -e "${CYAN}║                                                            ║${NC}"
-echo -e "${CYAN}║       适用于 Apple Silicon Mac (M1/M2/M3/M4)              ║${NC}"
+echo -e "${CYAN}║   适用于带风扇的 Apple Silicon Mac (M1/M2/M3/M4/M5)       ║${NC}"
 echo -e "${CYAN}║                                                            ║${NC}"
 echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
@@ -225,7 +225,7 @@ echo ""
 echo -e "${YELLOW}🔍 验证安装结果...${NC}"
 echo ""
 
-sudo -n /usr/local/bin/kentsmc -r Tp0e &>/dev/null
+sudo -n /usr/local/bin/kentsmc -r FNum &>/dev/null
 if [ $? -eq 0 ]; then
     SUDO_SUCCESS=true
     echo -e "${GREEN}✓${NC} 免密授权测试成功"
