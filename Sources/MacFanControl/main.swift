@@ -1,9 +1,9 @@
 //
 //  main.swift
-//  MacFanControl
+//  iFanControl
 //
-//  Created by MacFanControl on 2026-03-17.
-//  Copyright © 2026 MacFanControl. All rights reserved.
+//  Created by iFanControl on 2026-03-17.
+//  Copyright © 2026 iFanControl. All rights reserved.
 //
 
 import AppKit

@@ -9,6 +9,10 @@
 </p>
 
 <p align="center">
+  A menu bar fan control utility for Apple Silicon Macs with built-in fans
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/macOS-13.0+-black" alt="Platform">
   <img src="https://img.shields.io/badge/Apple%20Silicon-M%20Series-black" alt="Architecture">
   <img src="https://img.shields.io/badge/license-MIT-black" alt="License">
@@ -21,6 +25,8 @@
 iFanControl 是一个面向 Apple Silicon Mac 的原生菜单栏应用，提供实时温度与转速查看、自动/手动风扇控制、5 点风扇曲线、应用内更新，以及面向带风扇 M 系列设备的更稳健传感器探测。
 
 当前仓库只保留源码、安装脚本和必要资源。历史发布包不再提交到仓库，统一通过 GitHub Releases 和官网分发。
+
+English readers can use [README_EN.md](README_EN.md).
 
 ## 当前能力
 
