@@ -43,28 +43,13 @@ private func presentWindowFront(_ window: NSWindow?) {
 private func applyWindowMaterialStyle(_ window: NSWindow?) {
     guard let window, let contentView = window.contentView else { return }
 
-    window.titlebarAppearsTransparent = true
-    window.isMovableByWindowBackground = true
-    window.backgroundColor = .clear
+    window.titlebarAppearsTransparent = false
+    window.isMovableByWindowBackground = false
+    window.backgroundColor = .windowBackgroundColor
 
-    if contentView.subviews.contains(where: { $0.identifier?.rawValue == "ifancontrol.material" }) {
-        return
+    for subview in contentView.subviews where subview.identifier?.rawValue == "ifancontrol.material" {
+        subview.removeFromSuperview()
     }
-
-    let materialView = NSVisualEffectView(frame: contentView.bounds)
-    materialView.identifier = NSUserInterfaceItemIdentifier("ifancontrol.material")
-    materialView.material = .hudWindow
-    materialView.state = .active
-    materialView.blendingMode = .behindWindow
-    materialView.autoresizingMask = [.width, .height]
-
-    let tintView = NSView(frame: contentView.bounds)
-    tintView.wantsLayer = true
-    tintView.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.08).cgColor
-    tintView.autoresizingMask = [.width, .height]
-
-    materialView.addSubview(tintView)
-    contentView.addSubview(materialView, positioned: .below, relativeTo: nil)
 }
 
 // MARK: - CommandExecutor (使用 sudo 执行特权命令)
@@ -541,6 +526,7 @@ class UpdateService {
     private let fallbackZipURL = URL(string: "https://ifan-59w.pages.dev/iFanControl-macOS.zip")!
     private let releasesHomeURL = URL(string: "https://github.com/PureMilkchun/iFanControl/releases")!
     private let lastCheckKey = "ifancontrol.update.last_check"
+    private let automaticCheckEnabledKey = "ifancontrol.update.automatic_check_enabled"
     private let checkInterval: TimeInterval = 24 * 60 * 60
     private var isChecking = false
 
@@ -554,6 +540,23 @@ class UpdateService {
 
     var currentVersionDisplay: String {
         "\(currentShortVersion) (\(currentBuild))"
+    }
+
+    var releasesURL: URL {
+        releasesHomeURL
+    }
+
+    var automaticChecksEnabled: Bool {
+        get {
+            if UserDefaults.standard.object(forKey: automaticCheckEnabledKey) == nil {
+                return true
+            }
+            return UserDefaults.standard.bool(forKey: automaticCheckEnabledKey)
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: automaticCheckEnabledKey)
+            logger.info("Automatic update checks toggled. enabled=\(newValue, privacy: .public)")
+        }
     }
 
     private struct UpdateManifest: Decodable {
@@ -626,6 +629,9 @@ class UpdateService {
     }
 
     private func shouldRunScheduledCheck() -> Bool {
+        guard automaticChecksEnabled else {
+            return false
+        }
         guard let last = UserDefaults.standard.object(forKey: lastCheckKey) as? Date else {
             return true
         }
@@ -915,10 +921,6 @@ class MenuBarManager {
         
         let menu = NSMenu()
 
-        let versionItem = NSMenuItem(title: "当前版本 \(UpdateService.shared.currentVersionDisplay)", action: nil, keyEquivalent: "")
-        versionItem.isEnabled = false
-        menu.addItem(versionItem)
-
         let hardwareItem = NSMenuItem(
             title: FanManager.shared.fanCount > 0 ?
                 "风扇 \(FanManager.shared.fanCount) | 上限 \(FanManager.shared.currentMaxRPM)" :
@@ -1004,15 +1006,15 @@ class MenuBarManager {
         safetyFloorItem.target = self
         menu.addItem(safetyFloorItem)
 
-        let updateItem = NSMenuItem(title: "检查更新...", action: #selector(checkForUpdates), keyEquivalent: "u")
-        updateItem.target = self
-        menu.addItem(updateItem)
-
-        let helpItem = NSMenuItem(title: "帮助...", action: #selector(showHelp), keyEquivalent: "")
-        helpItem.target = self
-        menu.addItem(helpItem)
+        let aboutItem = NSMenuItem(title: "关于 iFanControl...", action: #selector(showHelp), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
 
         menu.addItem(NSMenuItem.separator())
+
+        let restartItem = NSMenuItem(title: "重新启动", action: #selector(restartApp), keyEquivalent: "r")
+        restartItem.target = self
+        menu.addItem(restartItem)
         
         let quitItem = NSMenuItem(title: "退出", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
@@ -1179,6 +1181,29 @@ class MenuBarManager {
         }
         helpWindowController?.showWindow(nil)
         presentWindowFront(helpWindowController?.window)
+    }
+
+    @objc func restartApp() {
+        let bundleURL = Bundle.main.bundleURL
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = ["-n", bundleURL.path]
+
+        do {
+            try process.run()
+            logger.info("Application restart requested")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NSApp.terminate(nil)
+            }
+        } catch {
+            logger.error("Failed to restart app: \(error.localizedDescription, privacy: .public)")
+            let alert = NSAlert()
+            alert.messageText = "无法重新启动"
+            alert.informativeText = "请手动重新打开 iFanControl。\n\n\(error.localizedDescription)"
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "关闭")
+            alert.runModal()
+        }
     }
     
     @objc func quitApp() {
@@ -1503,14 +1528,17 @@ class SafetyFloorWindowController: NSWindowController {
 
 @MainActor
 class HelpWindowController: NSWindowController {
+    private var versionLabel: NSTextField?
+    private var automaticUpdateCheckbox: NSButton?
+
     init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 420),
+            contentRect: NSRect(x: 0, y: 0, width: 580, height: 520),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
-        window.title = "iFanControl 帮助"
+        window.title = "关于 iFanControl"
         window.center()
 
         super.init(window: window)
@@ -1525,46 +1553,149 @@ class HelpWindowController: NSWindowController {
     private func setupUI() {
         guard let contentView = window?.contentView else { return }
 
+        let iconView = NSImageView()
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.imageScaling = .scaleProportionallyUpOrDown
+        iconView.image = NSApp.applicationIconImage
+        iconView.wantsLayer = true
+        iconView.layer?.cornerRadius = 18
+        iconView.layer?.masksToBounds = true
+        contentView.addSubview(iconView)
+
+        let headerStack = NSStackView()
+        headerStack.orientation = .vertical
+        headerStack.spacing = 6
+        headerStack.translatesAutoresizingMaskIntoConstraints = false
+
+        let titleLabel = NSTextField(labelWithString: "iFanControl")
+        titleLabel.font = .systemFont(ofSize: 24, weight: .semibold)
+
+        let versionLabel = NSTextField(labelWithString: "版本 \(UpdateService.shared.currentVersionDisplay)")
+        versionLabel.textColor = .secondaryLabelColor
+        versionLabel.font = .systemFont(ofSize: 13)
+
+        headerStack.addArrangedSubview(titleLabel)
+        headerStack.addArrangedSubview(versionLabel)
+        contentView.addSubview(headerStack)
+
+        let buttonStack = NSStackView()
+        buttonStack.orientation = .horizontal
+        buttonStack.spacing = 10
+        buttonStack.translatesAutoresizingMaskIntoConstraints = false
+
+        let restartButton = NSButton(title: "重新启动", target: self, action: #selector(restartApp))
+        restartButton.bezelStyle = .rounded
+
+        let updateButton = NSButton(title: "检查更新", target: self, action: #selector(checkUpdates))
+        updateButton.bezelStyle = .rounded
+
+        let githubButton = NSButton(title: "GitHub", target: self, action: #selector(openGitHub))
+        githubButton.bezelStyle = .rounded
+
+        buttonStack.addArrangedSubview(restartButton)
+        buttonStack.addArrangedSubview(updateButton)
+        buttonStack.addArrangedSubview(githubButton)
+        contentView.addSubview(buttonStack)
+
+        let automaticUpdateCheckbox = NSButton(checkboxWithTitle: "自动检查更新", target: self, action: #selector(toggleAutomaticChecks(_:)))
+        automaticUpdateCheckbox.state = UpdateService.shared.automaticChecksEnabled ? .on : .off
+        automaticUpdateCheckbox.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(automaticUpdateCheckbox)
+
+        let separator = NSBox()
+        separator.boxType = .separator
+        separator.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(separator)
+
         let scrollView = NSScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.hasVerticalScroller = true
         scrollView.borderType = .noBorder
+        scrollView.drawsBackground = false
 
-        let textView = NSTextView()
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 520, height: 560))
         textView.isEditable = false
         textView.isSelectable = true
         textView.drawsBackground = false
-        textView.textContainerInset = NSSize(width: 12, height: 12)
+        textView.textContainerInset = NSSize(width: 8, height: 8)
+        textView.font = .systemFont(ofSize: 13)
         textView.string = """
         常见问题
 
         1. 温度源默认怎么选？
         默认使用当前最热的温度传感器。你也可以在菜单栏的“选择温度源”里手动指定。
 
-        说明：这里显示的是 Apple Silicon 暴露出来的温度传感器，不一定与 CPU 或 GPU 核心数量一一对应。
+        2. 为什么温度源数量和 CPU / GPU 核心数对不上？
+        这里显示的是 Apple Silicon 实际暴露出来的温度传感器，不一定与 CPU 或 GPU 核心数量一一对应。
 
-        2. 如果没有检测到风扇怎么办？
+        3. 如果没有检测到风扇怎么办？
         这通常意味着设备是无风扇机型，或者当前硬件暂不支持手动风扇控制。
 
-        3. 自动更新失败怎么办？
-        可以在“检查更新”失败后直接打开 GitHub Releases，手动下载并覆盖安装。
+        4. 自动更新失败怎么办？
+        可以在“检查更新”失败后打开 GitHub Releases，手动下载并覆盖安装。
 
-        4. 手动模式和自动模式有什么区别？
+        5. 手动模式和自动模式有什么区别？
         自动模式会根据风扇曲线调速；手动模式会固定使用你设置的目标转速。
 
-        5. 软件窗口为什么会弹出来？
-        风扇曲线、手动转速和帮助都会以独立窗口显示，便于操作后立即关闭。
+        6. 安全兜底转速是什么？
+        当温度达到 95℃ 时，系统会保证风扇至少达到你设置的兜底转速，但不会压低用户曲线已经给出的更高转速。
         """
-
+        textView.textContainer?.containerSize = NSSize(width: 520, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainer?.widthTracksTextView = true
+        textView.minSize = NSSize(width: 0, height: 520)
         scrollView.documentView = textView
         contentView.addSubview(scrollView)
 
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
-            scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
-            scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
-            scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
+            iconView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 18),
+            iconView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 18),
+            iconView.widthAnchor.constraint(equalToConstant: 72),
+            iconView.heightAnchor.constraint(equalToConstant: 72),
+
+            headerStack.topAnchor.constraint(equalTo: iconView.topAnchor, constant: 4),
+            headerStack.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 14),
+            headerStack.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -18),
+
+            buttonStack.topAnchor.constraint(equalTo: headerStack.bottomAnchor, constant: 12),
+            buttonStack.leadingAnchor.constraint(equalTo: headerStack.leadingAnchor),
+
+            automaticUpdateCheckbox.topAnchor.constraint(equalTo: buttonStack.bottomAnchor, constant: 12),
+            automaticUpdateCheckbox.leadingAnchor.constraint(equalTo: headerStack.leadingAnchor),
+
+            separator.topAnchor.constraint(equalTo: automaticUpdateCheckbox.bottomAnchor, constant: 16),
+            separator.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 18),
+            separator.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -18),
+
+            scrollView.topAnchor.constraint(equalTo: separator.bottomAnchor, constant: 12),
+            scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 18),
+            scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -18),
+            scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -18)
         ])
+
+        self.versionLabel = versionLabel
+        self.automaticUpdateCheckbox = automaticUpdateCheckbox
+    }
+
+    override func showWindow(_ sender: Any?) {
+        versionLabel?.stringValue = "版本 \(UpdateService.shared.currentVersionDisplay)"
+        automaticUpdateCheckbox?.state = UpdateService.shared.automaticChecksEnabled ? .on : .off
+        super.showWindow(sender)
+    }
+
+    @objc private func checkUpdates() {
+        UpdateService.shared.checkForUpdates(triggeredByUser: true)
+    }
+
+    @objc private func openGitHub() {
+        NSWorkspace.shared.open(UpdateService.shared.releasesURL)
+    }
+
+    @objc private func restartApp() {
+        MenuBarManager.shared.restartApp()
+    }
+
+    @objc private func toggleAutomaticChecks(_ sender: NSButton) {
+        UpdateService.shared.automaticChecksEnabled = (sender.state == .on)
     }
 }
 
