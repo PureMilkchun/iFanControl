@@ -46,6 +46,9 @@ Download the latest ZIP from [Releases](https://github.com/PureMilkchun/iFanCont
 cd ~/Downloads/iFanControl-* && ./install.sh
 ```
 
+Recommended method: open Terminal, drag `install.sh` into the window, then press Enter.  
+Note: after downloading from the internet, `.command` files may be repeatedly blocked by macOS, so do not rely on double-clicking `.command` for installation.
+
 ### From the official website
 
 - Website: [ifancontrol.puremilkchun.top](https://ifancontrol.puremilkchun.top)

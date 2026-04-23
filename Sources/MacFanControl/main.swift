@@ -1216,19 +1216,19 @@ class UpdateService {
 
     private func findInstallScript(in root: URL) -> URL? {
         let fm = FileManager.default
+        if fm.fileExists(atPath: root.appendingPathComponent("install.sh").path) {
+            return root.appendingPathComponent("install.sh")
+        }
         let commandURL = root.appendingPathComponent("Install.command")
         if fm.fileExists(atPath: commandURL.path) {
             return commandURL
         }
-        if fm.fileExists(atPath: root.appendingPathComponent("install.sh").path) {
-            return root.appendingPathComponent("install.sh")
-        }
         if let e = fm.enumerator(at: root, includingPropertiesForKeys: nil) {
             for case let file as URL in e {
-                if file.lastPathComponent == "Install.command" {
+                if file.lastPathComponent == "install.sh" {
                     return file
                 }
-                if file.lastPathComponent == "install.sh" {
+                if file.lastPathComponent == "Install.command" {
                     return file
                 }
             }
@@ -1237,15 +1237,20 @@ class UpdateService {
     }
 
     private func runInstallScriptInTerminal(scriptURL: URL) throws {
-        let launcherURL = try prepareInstallLauncher(for: scriptURL)
-
-        if NSWorkspace.shared.open(launcherURL) {
-            return
+        let fm = FileManager.default
+        let preferredScriptURL: URL
+        if scriptURL.lastPathComponent == "Install.command" {
+            let siblingInstall = scriptURL.deletingLastPathComponent().appendingPathComponent("install.sh")
+            preferredScriptURL = fm.fileExists(atPath: siblingInstall.path) ? siblingInstall : scriptURL
+        } else {
+            preferredScriptURL = scriptURL
         }
+
+        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: preferredScriptURL.path)
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        process.arguments = ["-a", "Terminal", launcherURL.path]
+        process.arguments = ["-a", "Terminal", preferredScriptURL.path]
         try process.run()
         process.waitUntilExit()
 
@@ -1253,34 +1258,9 @@ class UpdateService {
             throw NSError(
                 domain: "UpdateService",
                 code: 1005,
-                userInfo: [NSLocalizedDescriptionKey: appL10n("无法启动安装终端。请手动打开 \(launcherURL.lastPathComponent) 完成升级。", "Failed to launch installer terminal. Please open \(launcherURL.lastPathComponent) manually.")]
+                userInfo: [NSLocalizedDescriptionKey: appL10n("无法启动安装终端。请手动将 install.sh 拖入终端执行。", "Failed to launch installer terminal. Please drag install.sh into Terminal and run it manually.")]
             )
         }
-    }
-
-    private func prepareInstallLauncher(for scriptURL: URL) throws -> URL {
-        let fm = FileManager.default
-        if scriptURL.lastPathComponent == "Install.command" {
-            try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
-            return scriptURL
-        }
-
-        let launcherURL = scriptURL.deletingLastPathComponent().appendingPathComponent("Install.command")
-        let escapedDir = shellQuoted(scriptURL.deletingLastPathComponent().path)
-        let escapedScript = shellQuoted(scriptURL.path)
-        let launcher = """
-        #!/bin/bash
-        cd \(escapedDir)
-        chmod +x \(escapedScript)
-        exec \(escapedScript)
-        """
-        try launcher.write(to: launcherURL, atomically: true, encoding: .utf8)
-        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: launcherURL.path)
-        return launcherURL
-    }
-
-    private func shellQuoted(_ value: String) -> String {
-        "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
     private func githubReleaseURL(for version: String?) -> URL {

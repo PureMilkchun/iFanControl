@@ -362,8 +362,8 @@
             <div class="section-title">
                 <h2 class="zh">安装步骤</h2>
                 <h2 class="en" style="display:none">Installation Steps</h2>
-                <span class="subtitle zh">只需 2 步</span>
-                <span class="subtitle en" style="display:none">Only 2 steps</span>
+                <span class="subtitle zh">共 3 步</span>
+                <span class="subtitle en" style="display:none">3 steps total</span>
             </div>
 
             <!-- Step 1 -->
@@ -417,6 +417,13 @@
                         <strong class="en" style="display:none">💡 Password tip: </strong>
                         <span class="en" style="display:none">During installation, you'll be asked for your password. Nothing will appear on screen when typing (not even asterisks) - this is normal! Just type your password and press Enter.</span>
                     </div>
+
+                    <div class="warning">
+                        <strong class="zh">⚠ 请不要双击 Install.command：</strong>
+                        <span class="zh">从网络下载后，`.command` 文件可能被 macOS 持续拦截。请始终使用“拖拽 install.sh 到终端”的方式安装。</span>
+                        <strong class="en" style="display:none">⚠ Avoid double-clicking Install.command: </strong>
+                        <span class="en" style="display:none">After downloading from the internet, `.command` files may be repeatedly blocked by macOS. Always install by dragging `install.sh` into Terminal.</span>
+                    </div>
                 </div>
             </div>
 
@@ -460,6 +467,15 @@
                     <div class="answer">
                         <span class="zh">这是 macOS 安全机制。安装脚本会自动处理。如果仍有问题，可运行诊断工具 diagnose.sh 检查。</span>
                         <span class="en" style="display:none">This is macOS security. The install script handles it automatically. If issues persist, run diagnose.sh to check.</span>
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary class="zh">Q: 为什么双击 Install.command 一直被拦截？</summary>
+                    <summary class="en" style="display:none">Q: Why is Install.command repeatedly blocked?</summary>
+                    <div class="answer">
+                        <span class="zh">这是下载来源触发的 Gatekeeper 行为。请改用推荐路径：打开终端，拖入 <code>install.sh</code>，按回车执行。</span>
+                        <span class="en" style="display:none">This is expected Gatekeeper behavior for internet downloads. Use the recommended path: open Terminal, drag <code>install.sh</code> in, and press Enter.</span>
                     </div>
                 </details>
 

@@ -58,6 +58,9 @@ English readers can use [README_EN.md](README_EN.md).
 cd ~/Downloads/iFanControl-* && ./install.sh
 ```
 
+推荐方式：打开终端后，将 `install.sh` 直接拖入终端并按回车。  
+说明：从网络下载后，`.command` 文件可能被 macOS 持续拦截，因此不建议依赖双击 `.command` 进行安装。
+
 解压后可打开 `安装说明.html` 查看图文安装指南。
 
 ### 方式二：从官网下载安装
