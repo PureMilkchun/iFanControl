@@ -260,6 +260,140 @@ final class AppLog: @unchecked Sendable {
     }
 }
 
+@MainActor
+final class InstallationCoordinator {
+    static let shared = InstallationCoordinator()
+
+    private let kentsmcPath = "/usr/local/bin/kentsmc"
+    private let sudoersPath = "/private/etc/sudoers.d/kentsmc"
+    private let launchAgentPath = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library")
+        .appendingPathComponent("LaunchAgents")
+        .appendingPathComponent("com.ifancontrol.app.plist")
+    private let configPath = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library")
+        .appendingPathComponent("Application Support")
+        .appendingPathComponent("MacFanControl")
+    private let logPath = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library")
+        .appendingPathComponent("Logs")
+        .appendingPathComponent("iFanControl")
+
+    func launchSelfContainedUninstaller() -> Bool {
+        do {
+            let scriptURL = try createTemporaryFullUninstallScript()
+            return launchInTerminal(url: scriptURL)
+        } catch {
+            AppLog.shared.error("failed to create temporary uninstaller error=\(error.localizedDescription)")
+            return false
+        }
+    }
+
+    private func launchInTerminal(url: URL) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = ["-a", "Terminal", url.path]
+
+        do {
+            try process.run()
+            return true
+        } catch {
+            AppLog.shared.error("failed to open uninstaller script path=\(url.path) error=\(error.localizedDescription)")
+            return false
+        }
+    }
+
+    private func shellQuoted(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\"'\"'") + "'"
+    }
+
+    private func createTemporaryFullUninstallScript() throws -> URL {
+        let fm = FileManager.default
+        let tempDir = fm.temporaryDirectory.appendingPathComponent("iFanControl-Uninstall", isDirectory: true)
+        try? fm.removeItem(at: tempDir)
+        try fm.createDirectory(at: tempDir, withIntermediateDirectories: true)
+
+        let scriptURL = tempDir.appendingPathComponent("run-uninstall.command")
+        let appPath = Bundle.main.bundleURL.path
+        let executablePath = Bundle.main.executableURL?.path ?? ""
+
+        let script = """
+        #!/bin/bash
+        set -u
+
+        APP_PATH=\(shellQuoted(appPath))
+        EXECUTABLE_PATH=\(shellQuoted(executablePath))
+        KENTSMC_PATH=\(shellQuoted(kentsmcPath))
+        SUDOERS_PATH=\(shellQuoted(sudoersPath))
+        CONFIG_PATH=\(shellQuoted(configPath.path))
+        LOG_PATH=\(shellQuoted(logPath.path))
+        LAUNCH_AGENT=\(shellQuoted(launchAgentPath.path))
+
+        echo "============================================"
+        echo "  iFanControl 完整卸载"
+        echo "============================================"
+        echo ""
+        echo "正在等待 iFanControl 退出..."
+        for _ in $(seq 1 40); do
+          if [ -n "$EXECUTABLE_PATH" ] && pgrep -f "$EXECUTABLE_PATH" >/dev/null 2>&1; then
+            sleep 0.5
+          else
+            break
+          fi
+        done
+
+        echo ""
+        echo "步骤 1/6: 删除 App..."
+        rm -rf "$APP_PATH"
+        echo "✓ App 已删除"
+
+        echo ""
+        echo "步骤 2/6: 删除 kentsmc..."
+        if [ -f "$KENTSMC_PATH" ]; then
+          sudo rm -f "$KENTSMC_PATH"
+          echo "✓ kentsmc 已删除"
+        else
+          echo "kentsmc 不存在，跳过"
+        fi
+
+        echo ""
+        echo "步骤 3/6: 删除 sudoers 规则..."
+        if [ -f "$SUDOERS_PATH" ]; then
+          sudo rm -f "$SUDOERS_PATH"
+          echo "✓ sudoers 规则已删除"
+        else
+          echo "sudoers 规则不存在，跳过"
+        fi
+
+        echo ""
+        echo "步骤 4/6: 删除配置..."
+        rm -rf "$CONFIG_PATH"
+        echo "✓ 配置已删除"
+
+        echo ""
+        echo "步骤 5/6: 删除日志..."
+        rm -rf "$LOG_PATH"
+        echo "✓ 日志已删除"
+
+        echo ""
+        echo "步骤 6/6: 删除开机自启动项..."
+        rm -f "$LAUNCH_AGENT"
+        echo "✓ LaunchAgent 已删除"
+
+        echo ""
+        echo "============================================"
+        echo "  卸载完成"
+        echo "============================================"
+        echo ""
+        read -p "按回车键关闭窗口..."
+        """
+
+        try script.write(to: scriptURL, atomically: true, encoding: .utf8)
+        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
+        return scriptURL
+    }
+}
+
 enum ManualRPMControlMode: String {
     case continuous
     case stepped
@@ -1650,10 +1784,12 @@ class MenuBarManager {
 // 应用委托
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
+    static weak var shared: AppDelegate?
     private var lastControlLoopLogTime: Date?
     private let controlLoopLogInterval: TimeInterval = 10.0
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Self.shared = self
         NSApp.setActivationPolicy(.accessory)
         AppLog.shared.bootstrapSession()
         AppLog.shared.info("application did finish launching")
@@ -1681,6 +1817,40 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         AppLog.shared.info("application will terminate")
         _ = CommandExecutor.shared.setFanAuto()
+    }
+
+    func beginUninstallFlow() {
+        let alert = NSAlert()
+        alert.messageText = appL10n("确认完整卸载", "Confirm Full Uninstall")
+        alert.informativeText = appL10n(
+            "这会删除 iFanControl.app、本地控制组件、sudoers 规则、配置、日志和开机自启动项。卸载脚本会在终端里继续执行，应用会随后退出。",
+            "This will remove iFanControl.app, local control components, sudoers rule, config, logs, and launch-at-login item. The uninstall script will continue in Terminal and the app will then quit."
+        )
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: appL10n("开始卸载", "Start Uninstall"))
+        alert.addButton(withTitle: appL10n("取消", "Cancel"))
+
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            return
+        }
+
+        let launched = InstallationCoordinator.shared.launchSelfContainedUninstaller()
+        if launched {
+            AppLog.shared.info("self-contained full uninstall launched")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                NSApp.terminate(nil)
+            }
+        } else {
+            let errorAlert = NSAlert()
+            errorAlert.messageText = appL10n("无法打开卸载脚本", "Unable to Open Uninstaller")
+            errorAlert.informativeText = appL10n(
+                "无法创建或启动应用内卸载脚本。请稍后重试，或使用安装包中的卸载脚本。",
+                "Unable to create or launch the internal uninstall script. Please try again later, or use the uninstall script from the installer package."
+            )
+            errorAlert.alertStyle = .warning
+            errorAlert.addButton(withTitle: appL10n("关闭", "Close"))
+            errorAlert.runModal()
+        }
     }
     
     func startAutoControlLoop() {
@@ -2524,8 +2694,11 @@ class HelpWindowController: NSWindowController {
         exportButton.bezelStyle = .rounded
         let contactButton = NSButton(title: appL10n("联系支持", "Contact Support"), target: self, action: #selector(contactSupport))
         contactButton.bezelStyle = .rounded
+        let uninstallButton = NSButton(title: appL10n("完整卸载", "Full Uninstall"), target: self, action: #selector(uninstallControlComponents))
+        uninstallButton.bezelStyle = .rounded
         primaryButtons.addArrangedSubview(exportButton)
         primaryButtons.addArrangedSubview(contactButton)
+        primaryButtons.addArrangedSubview(uninstallButton)
         supportStack.addArrangedSubview(primaryButtons)
 
         let helperHint = NSTextField(labelWithString: appL10n("也可以先做这两步快速自检：", "You can also try these quick checks first:"))
@@ -2769,6 +2942,10 @@ class HelpWindowController: NSWindowController {
 
     @objc private func exportDiagnostics() {
         MenuBarManager.shared.exportDiagnosticArchive()
+    }
+
+    @objc private func uninstallControlComponents() {
+        AppDelegate.shared?.beginUninstallFlow()
     }
 
     @objc private func toggleAutomaticChecks(_ sender: NSButton) {
