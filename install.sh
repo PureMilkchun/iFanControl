@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# iFanControl 一键安装脚本 v2.8.9
+# iFanControl 一键安装脚本 v2.8.20
 # 用户友好版本 - 拖拽安装
 
 # ============================================
@@ -38,7 +38,7 @@ clear 2>/dev/null || true
 echo ""
 echo -e "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${CYAN}║                                                            ║${NC}"
-echo -e "${CYAN}║           🌬️  iFanControl v2.8.9 安装程序                 ║${NC}"
+echo -e "${CYAN}║          🌬️  iFanControl v2.8.20 安装程序                 ║${NC}"
 echo -e "${CYAN}║                                                            ║${NC}"
 echo -e "${CYAN}║   适用于带风扇的 Apple Silicon Mac (M1/M2/M3/M4/M5)       ║${NC}"
 echo -e "${CYAN}║                                                            ║${NC}"

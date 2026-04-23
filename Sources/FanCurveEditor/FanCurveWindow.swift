@@ -9,6 +9,11 @@
 import AppKit
 import Foundation
 
+private let usesEnglishInFanCurveEditor = Locale.preferredLanguages.first?.lowercased().hasPrefix("en") ?? false
+private func fanCurveL10n(_ zh: String, _ en: String) -> String {
+    usesEnglishInFanCurveEditor ? en : zh
+}
+
 // 配置结构（与主应用一致）
 public struct Config: Codable {
     public var version: String
@@ -68,7 +73,7 @@ public class FanCurveWindowController: NSWindowController {
             defer: false
         )
         
-        window.title = "风扇曲线编辑器"
+        window.title = fanCurveL10n("风扇曲线编辑器", "Fan Curve Editor")
         window.center()
         
         super.init(window: window)
@@ -97,15 +102,15 @@ public class FanCurveWindowController: NSWindowController {
         ])
         
         // 添加按钮
-        let resetButton = NSButton(title: "重置", target: self, action: #selector(resetCurve))
+        let resetButton = NSButton(title: fanCurveL10n("重置", "Reset"), target: self, action: #selector(resetCurve))
         resetButton.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(resetButton)
         
-        let saveButton = NSButton(title: "保存", target: self, action: #selector(saveCurve))
+        let saveButton = NSButton(title: fanCurveL10n("保存", "Save"), target: self, action: #selector(saveCurve))
         saveButton.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(saveButton)
         
-        let closeButton = NSButton(title: "关闭", target: self, action: #selector(closeWindow))
+        let closeButton = NSButton(title: fanCurveL10n("关闭", "Close"), target: self, action: #selector(closeWindow))
         closeButton.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(closeButton)
         
@@ -188,16 +193,16 @@ public class FanCurveWindowController: NSWindowController {
             NotificationCenter.default.post(name: NSNotification.Name("FanCurveDidSave"), object: nil, userInfo: ["curve": fanCurve])
             
             let alert = NSAlert()
-            alert.messageText = "保存成功"
-            alert.informativeText = "风扇曲线已保存"
-            alert.addButton(withTitle: "确定")
+            alert.messageText = fanCurveL10n("保存成功", "Saved")
+            alert.informativeText = fanCurveL10n("风扇曲线已保存", "Fan curve has been saved.")
+            alert.addButton(withTitle: fanCurveL10n("确定", "OK"))
             alert.runModal()
         } catch {
             print("DEBUG: Save failed: \(error)")
             let alert = NSAlert()
-            alert.messageText = "保存失败"
+            alert.messageText = fanCurveL10n("保存失败", "Save Failed")
             alert.informativeText = error.localizedDescription
-            alert.addButton(withTitle: "确定")
+            alert.addButton(withTitle: fanCurveL10n("确定", "OK"))
             alert.runModal()
         }
     }

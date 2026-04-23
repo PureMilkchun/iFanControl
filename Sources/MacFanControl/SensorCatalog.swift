@@ -1,5 +1,10 @@
 import Foundation
 
+private let usesEnglishInSensors = Locale.preferredLanguages.first?.lowercased().hasPrefix("en") ?? false
+private func sensorL10n(_ zh: String, _ en: String) -> String {
+    usesEnglishInSensors ? en : zh
+}
+
 enum TemperatureSensorCategory: Int, CaseIterable {
     case cpu
     case gpu
@@ -13,11 +18,11 @@ enum TemperatureSensorCategory: Int, CaseIterable {
         switch self {
         case .cpu: return "CPU"
         case .gpu: return "GPU"
-        case .memory: return "内存"
-        case .airflow: return "气流"
-        case .storage: return "存储"
-        case .power: return "电源/电池"
-        case .other: return "其他"
+        case .memory: return sensorL10n("内存", "Memory")
+        case .airflow: return sensorL10n("气流", "Airflow")
+        case .storage: return sensorL10n("存储", "Storage")
+        case .power: return sensorL10n("电源/电池", "Power/Battery")
+        case .other: return sensorL10n("其他", "Other")
         }
     }
 }
@@ -53,11 +58,11 @@ struct TemperatureSensorDefinition: Hashable {
         switch category {
         case .cpu: return "CPU"
         case .gpu: return "GPU"
-        case .memory: return "内存"
-        case .airflow: return "气流"
-        case .storage: return "存储"
-        case .power: return "系统"
-        case .other: return "其他"
+        case .memory: return sensorL10n("内存", "Memory")
+        case .airflow: return sensorL10n("气流", "Airflow")
+        case .storage: return sensorL10n("存储", "Storage")
+        case .power: return sensorL10n("系统", "System")
+        case .other: return sensorL10n("其他", "Other")
         }
     }
 

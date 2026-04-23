@@ -96,6 +96,28 @@
 - **自动模式** - 根据温度曲线调节（默认）
 - **开机自启动** - 登录时自动启动
 
+## Support & Logs / 反馈与日志
+
+### English
+
+- Support email: `puremilkchun@foxmail.com`
+- Open `About / Help...` from the app menu, then use:
+  - `Export Diagnostics`
+  - `Open Log Folder`
+  - `Contact Support`
+- Exported diagnostics package: `~/Desktop/iFanControl-Diagnostics-*.zip`
+- Manual log path (advanced): `~/Library/Logs/iFanControl/ifancontrol.log`
+
+### 中文
+
+- 支持邮箱：`puremilkchun@foxmail.com`
+- 在应用菜单打开 `关于/帮助...` 后使用：
+  - `导出诊断包`
+  - `打开日志目录`
+  - `联系支持`
+- 导出的诊断包位置：`~/Desktop/iFanControl-Diagnostics-*.zip`
+- 日志原始路径（高级排查）：`~/Library/Logs/iFanControl/ifancontrol.log`
+
 ## How It Works / 工作原理
 
 ### English
