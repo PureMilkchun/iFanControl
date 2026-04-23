@@ -7,6 +7,7 @@
 //
 
 import AppKit
+import CoreImage
 import CryptoKit
 import Foundation
 import FanCurveEditor
@@ -30,6 +31,234 @@ struct FanInfo {
 
 private let appSubsystem = Bundle.main.bundleIdentifier ?? "com.ifancontrol.app"
 private let defaultManualRPMStep = 500
+private let supportEmailAddress = "puremilkchun@foxmail.com"
+private let wechatDonatePayload = "wxp://f2f0rVY6iLnpjTqEKL4HKTHRw3Ej81vNbWU9UUXk4msd30ehG7Xh9NwXEyNsZaTn5gZE"
+private let alipayDonatePayload = "https://qr.alipay.com/fkx16601ptfadpsxd3mfpf6"
+private let appUsesEnglish = Locale.preferredLanguages.first?.lowercased().hasPrefix("en") ?? false
+private func appL10n(_ zh: String, _ en: String) -> String {
+    appUsesEnglish ? en : zh
+}
+
+final class AppLog: @unchecked Sendable {
+    static let shared = AppLog()
+
+    private let queue = DispatchQueue(label: "com.ifancontrol.diagnostic-log")
+    private let formatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private let maxLogSizeBytes = 2 * 1024 * 1024
+    private let maxMessageLength = 3000
+
+    private let logsDirectoryURL: URL
+    private let logFileURL: URL
+    private let archivedLogFileURL: URL
+
+    private init() {
+        let base = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library")
+            .appendingPathComponent("Logs")
+            .appendingPathComponent("iFanControl")
+        self.logsDirectoryURL = base
+        self.logFileURL = base.appendingPathComponent("ifancontrol.log")
+        self.archivedLogFileURL = base.appendingPathComponent("ifancontrol.log.1")
+        prepareLogDirectory()
+    }
+
+    var currentLogPath: String {
+        logFileURL.path
+    }
+
+    func bootstrapSession() {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
+        info("Session started version=\(shortVersion) (\(buildVersion)) os=\(osVersion) pid=\(ProcessInfo.processInfo.processIdentifier)")
+    }
+
+    func debug(_ message: String) { write(level: "DEBUG", message: message) }
+    func info(_ message: String) { write(level: "INFO", message: message) }
+    func warning(_ message: String) { write(level: "WARN", message: message) }
+    func error(_ message: String) { write(level: "ERROR", message: message) }
+
+    func openLogDirectoryInFinder() -> Bool {
+        prepareLogDirectory()
+        NSWorkspace.shared.open(logsDirectoryURL)
+        return true
+    }
+
+    func composeSupportEmail(archiveURL: URL? = nil) {
+        let subject = appL10n("iFanControl 日志反馈", "iFanControl Diagnostic Report")
+        let archiveLine = archiveURL.map {
+            appL10n("诊断包：\n\($0.path)\n\n请将该 ZIP 文件作为附件发送。",
+                    "Diagnostic package:\n\($0.path)\n\nPlease attach this ZIP file.")
+        } ?? appL10n("请先在应用菜单中导出诊断包，再将 ZIP 作为附件发送。",
+                     "Please export a diagnostic package from the app menu, then attach the ZIP.")
+
+        let body = appL10n(
+            """
+            你好，我遇到了 iFanControl 使用问题。
+
+            \(archiveLine)
+
+            请在这封邮件中描述：
+            1) 机型与 macOS 版本
+            2) 触发问题的步骤
+            3) 预期结果与实际结果
+            """,
+            """
+            Hi, I encountered an iFanControl issue.
+
+            \(archiveLine)
+
+            Please include:
+            1) Mac model and macOS version
+            2) Steps to reproduce
+            3) Expected vs actual result
+            """
+        )
+
+        let encodedSubject = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? subject
+        let encodedBody = body.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? body
+        let mailto = "mailto:\(supportEmailAddress)?subject=\(encodedSubject)&body=\(encodedBody)"
+        if let url = URL(string: mailto) {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    func createDiagnosticArchive() throws -> URL {
+        prepareLogDirectory()
+
+        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .replacingOccurrences(of: " ", with: "_")
+        let packageName = "iFanControl-Diagnostics-\(timestamp)"
+
+        let tempRoot = FileManager.default.temporaryDirectory.appendingPathComponent(packageName, isDirectory: true)
+        try? FileManager.default.removeItem(at: tempRoot)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+
+        var included: [String] = []
+
+        let logsFolder = tempRoot.appendingPathComponent("logs", isDirectory: true)
+        try FileManager.default.createDirectory(at: logsFolder, withIntermediateDirectories: true)
+        if FileManager.default.fileExists(atPath: logFileURL.path) {
+            try FileManager.default.copyItem(at: logFileURL, to: logsFolder.appendingPathComponent("ifancontrol.log"))
+            included.append("logs/ifancontrol.log")
+        }
+        if FileManager.default.fileExists(atPath: archivedLogFileURL.path) {
+            try FileManager.default.copyItem(at: archivedLogFileURL, to: logsFolder.appendingPathComponent("ifancontrol.log.1"))
+            included.append("logs/ifancontrol.log.1")
+        }
+
+        let configSource = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library")
+            .appendingPathComponent("Application Support")
+            .appendingPathComponent("MacFanControl")
+            .appendingPathComponent("config.json")
+        if FileManager.default.fileExists(atPath: configSource.path) {
+            let configFolder = tempRoot.appendingPathComponent("config", isDirectory: true)
+            try FileManager.default.createDirectory(at: configFolder, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: configSource, to: configFolder.appendingPathComponent("config.json"))
+            included.append("config/config.json")
+        }
+
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
+        let locale = Locale.current.identifier
+        let summary = """
+        generated_at=\(formatter.string(from: Date()))
+        app_version=\(shortVersion) (\(buildVersion))
+        os=\(osVersion)
+        locale=\(locale)
+        support_email=\(supportEmailAddress)
+        log_directory=\(logsDirectoryURL.path)
+        included_files=\(included.joined(separator: ","))
+        """
+        try summary.write(to: tempRoot.appendingPathComponent("summary.txt"), atomically: true, encoding: .utf8)
+
+        let exportBase = preferredExportDirectory()
+        try FileManager.default.createDirectory(at: exportBase, withIntermediateDirectories: true)
+        let zipURL = exportBase.appendingPathComponent("\(packageName).zip")
+        try? FileManager.default.removeItem(at: zipURL)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        process.arguments = ["-c", "-k", "--sequesterRsrc", "--keepParent", tempRoot.path, zipURL.path]
+        try process.run()
+        process.waitUntilExit()
+        try? FileManager.default.removeItem(at: tempRoot)
+
+        if process.terminationStatus != 0 || !FileManager.default.fileExists(atPath: zipURL.path) {
+            throw NSError(domain: "AppLog", code: 4001, userInfo: [NSLocalizedDescriptionKey: appL10n("导出诊断包失败。", "Failed to export diagnostic package.")])
+        }
+
+        info("diagnostic package exported path=\(zipURL.path)")
+        return zipURL
+    }
+
+    private func preferredExportDirectory() -> URL {
+        let desktop = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop", isDirectory: true)
+        if (try? FileManager.default.createDirectory(at: desktop, withIntermediateDirectories: true)) != nil {
+            return desktop
+        }
+        return logsDirectoryURL
+    }
+
+    private func prepareLogDirectory() {
+        try? FileManager.default.createDirectory(at: logsDirectoryURL, withIntermediateDirectories: true)
+    }
+
+    private func write(level: String, message: String) {
+        queue.async {
+            self.prepareLogDirectory()
+            self.rotateIfNeeded()
+
+            let timestamp = self.formatter.string(from: Date())
+            let sanitized = self.sanitize(message)
+            let line = "[\(timestamp)] [\(level)] \(sanitized)\n"
+            guard let data = line.data(using: .utf8) else { return }
+
+            if FileManager.default.fileExists(atPath: self.logFileURL.path) {
+                if let handle = try? FileHandle(forWritingTo: self.logFileURL) {
+                    do {
+                        try handle.seekToEnd()
+                        try handle.write(contentsOf: data)
+                        try handle.close()
+                    } catch {
+                        try? handle.close()
+                    }
+                }
+            } else {
+                try? data.write(to: self.logFileURL, options: .atomic)
+            }
+        }
+    }
+
+    private func sanitize(_ message: String) -> String {
+        let normalized = message.replacingOccurrences(of: "\n", with: "\\n")
+        if normalized.count <= maxMessageLength {
+            return normalized
+        }
+        let index = normalized.index(normalized.startIndex, offsetBy: maxMessageLength)
+        return "\(normalized[..<index])...(truncated)"
+    }
+
+    private func rotateIfNeeded() {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: logFileURL.path),
+              let size = attributes[.size] as? NSNumber,
+              size.intValue >= maxLogSizeBytes else {
+            return
+        }
+
+        try? FileManager.default.removeItem(at: archivedLogFileURL)
+        try? FileManager.default.moveItem(at: logFileURL, to: archivedLogFileURL)
+    }
+}
 
 enum ManualRPMControlMode: String {
     case continuous
@@ -67,9 +296,22 @@ final class CommandExecutor: @unchecked Sendable {
     static let shared = CommandExecutor()
     private let kentsmcPath = "/usr/local/bin/kentsmc"
     private let commandQueue = DispatchQueue(label: "com.ifancontrol.command-executor")
+    private let logger = Logger(subsystem: appSubsystem, category: "CommandExecutor")
+
+    private func compact(_ text: String, limit: Int = 1200) -> String {
+        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard cleaned.count > limit else { return cleaned }
+        let index = cleaned.index(cleaned.startIndex, offsetBy: limit)
+        return "\(cleaned[..<index])...(truncated)"
+    }
     
     // 执行特权命令
     private func executeCommand(args: [String]) -> (success: Bool, output: String, error: String) {
+        let startedAt = Date()
+        let commandLabel = "\(kentsmcPath) \(args.joined(separator: " "))"
+        logger.info("Executing privileged command: \(commandLabel, privacy: .public)")
+        AppLog.shared.debug("run sudo \(commandLabel)")
+
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
         task.arguments = [kentsmcPath] + args
@@ -88,9 +330,20 @@ final class CommandExecutor: @unchecked Sendable {
             
             let output = String(data: outputData, encoding: .utf8) ?? ""
             let error = String(data: errorData, encoding: .utf8) ?? ""
-            
-            return (task.terminationStatus == 0, output, error)
+            let success = (task.terminationStatus == 0)
+            let elapsed = Date().timeIntervalSince(startedAt)
+
+            AppLog.shared.info("sudo command finished success=\(success) exit=\(task.terminationStatus) duration=\(String(format: "%.3f", elapsed))s args=\(args.joined(separator: " "))")
+            if !output.isEmpty {
+                AppLog.shared.debug("sudo stdout: \(compact(output))")
+            }
+            if !error.isEmpty {
+                AppLog.shared.warning("sudo stderr: \(compact(error))")
+            }
+
+            return (success, output, error)
         } catch {
+            AppLog.shared.error("sudo command failed to run args=\(args.joined(separator: " ")) error=\(error.localizedDescription)")
             return (false, "", error.localizedDescription)
         }
     }
@@ -98,6 +351,11 @@ final class CommandExecutor: @unchecked Sendable {
     // 设置风扇转速
     func setFanRPM(rpm: Int) -> (success: Bool, error: String?) {
         let result = executeCommand(args: ["--fan-rpm", "\(rpm)"])
+        if result.success {
+            AppLog.shared.info("setFanRPM succeeded rpm=\(rpm)")
+        } else {
+            AppLog.shared.error("setFanRPM failed rpm=\(rpm) error=\(result.error)")
+        }
         return (result.success, result.success ? nil : result.error)
     }
 
@@ -116,12 +374,22 @@ final class CommandExecutor: @unchecked Sendable {
     // 设置自动模式
     func setFanAuto() -> (success: Bool, error: String?) {
         let result = executeCommand(args: ["--fan-auto"])
+        if result.success {
+            AppLog.shared.info("setFanAuto succeeded")
+        } else {
+            AppLog.shared.error("setFanAuto failed error=\(result.error)")
+        }
         return (result.success, result.success ? nil : result.error)
     }
     
     // 解锁风扇
     func unlockFans() -> (success: Bool, error: String?) {
         let result = executeCommand(args: ["--unlock-fans"])
+        if result.success {
+            AppLog.shared.info("unlockFans succeeded")
+        } else {
+            AppLog.shared.error("unlockFans failed error=\(result.error)")
+        }
         return (result.success, result.success ? nil : result.error)
     }
 }
@@ -144,8 +412,10 @@ class FanManager {
     private var cachedTemperatures: [String: Double] = [:]
     private var cachedFanRPMs: [Int: Int] = [:]
     private var lastTelemetryRefresh: Date?
+    private var lastTelemetryLogTimestamp: Date?
     private var hasProbedHardware = false
     private let logger = Logger(subsystem: appSubsystem, category: "Hardware")
+    private let telemetryDetailLogInterval: TimeInterval = 10.0
     
     // 稳定性控制参数
     private var lastSetRPM: Int = 0
@@ -181,14 +451,26 @@ class FanManager {
         task.standardError = errorPipe
         
         do {
+            let startedAt = Date()
             try task.run()
             task.waitUntilExit()
+            let elapsed = Date().timeIntervalSince(startedAt)
+
+            let outputData = pipe.fileHandleForReading.readDataToEndOfFile()
+            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            let outputText = String(data: outputData, encoding: .utf8) ?? ""
+            let errorText = String(data: errorData, encoding: .utf8) ?? ""
+
             if task.terminationStatus == 0 {
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                if elapsed > 0.4 {
+                    AppLog.shared.debug("slow read command args=\(args.joined(separator: " ")) duration=\(String(format: "%.3f", elapsed))s")
+                }
+                return outputText.trimmingCharacters(in: .whitespacesAndNewlines)
             }
+            AppLog.shared.warning("read command failed exit=\(task.terminationStatus) args=\(args.joined(separator: " ")) stderr=\(errorText)")
         } catch {
             print("Error executing kentsmc read command: \(error)")
+            AppLog.shared.error("read command execution error args=\(args.joined(separator: " ")) error=\(error.localizedDescription)")
         }
         return nil
     }
@@ -289,6 +571,8 @@ class FanManager {
         }
 
         logger.info("Hardware profile refreshed: fans=\(self.fanCount, privacy: .public) sensors=\(self.availableTemperatureSensors.count, privacy: .public) maxRPM=\(self.currentMaxRPM, privacy: .public)")
+        let sensorKeys = availableTemperatureSensors.map(\.key).joined(separator: ",")
+        AppLog.shared.info("hardware profile refreshed fans=\(fanCount) maxRPM=\(currentMaxRPM) sensors=\(availableTemperatureSensors.count) keys=[\(sensorKeys)]")
 
         refreshTelemetry(force: true)
     }
@@ -323,6 +607,7 @@ class FanManager {
         }
 
         lastTelemetryRefresh = Date()
+        maybeLogTelemetrySnapshot()
     }
 
     func availableTemperatureReadings() -> [TemperatureReading] {
@@ -364,6 +649,7 @@ class FanManager {
     
     func setFanRPM(rpm: Int) {
         if fanCommandInFlight {
+            AppLog.shared.debug("setFanRPM skipped reason=in_flight requested=\(rpm)")
             return
         }
 
@@ -372,6 +658,7 @@ class FanManager {
         // 检查时间间隔
         if let lastTime = lastExecutionTime,
            Date().timeIntervalSince(lastTime) < minExecutionInterval {
+            AppLog.shared.debug("setFanRPM skipped reason=rate_limited requested=\(rpm) bounded=\(boundedTarget)")
             return
         }
         
@@ -379,6 +666,7 @@ class FanManager {
         let minChange = getMinRPMChange(currentRPM: lastSetRPM)
         let absChange = abs(boundedTarget - lastSetRPM)
         guard absChange >= minChange else {
+            AppLog.shared.debug("setFanRPM skipped reason=below_threshold requested=\(rpm) bounded=\(boundedTarget) last=\(lastSetRPM) minChange=\(minChange)")
             return
         }
         
@@ -386,6 +674,7 @@ class FanManager {
         let smoothingFactor: Double = 0.3
         let smoothedRPM = Int(Double(lastSetRPM) * (1.0 - smoothingFactor) + Double(boundedTarget) * smoothingFactor)
         fanCommandInFlight = true
+        AppLog.shared.info("setFanRPM dispatch requested=\(rpm) bounded=\(boundedTarget) smoothed=\(smoothedRPM) last=\(lastSetRPM)")
 
         CommandExecutor.shared.setFanRPMAsync(rpm: smoothedRPM) { [weak self] success, error in
             guard let self else { return }
@@ -394,19 +683,25 @@ class FanManager {
             if success {
                 self.lastSetRPM = smoothedRPM
                 self.lastExecutionTime = Date()
+                AppLog.shared.info("setFanRPM applied smoothed=\(smoothedRPM)")
             } else {
                 print("Error setting fan RPM: \(error ?? "Unknown error")")
+                AppLog.shared.error("setFanRPM apply failed smoothed=\(smoothedRPM) error=\(error ?? "unknown")")
             }
         }
     }
     
     func unlockFans() {
         guard fanCount > 0 else {
+            AppLog.shared.warning("unlockFans skipped because fanCount=0")
             return
         }
         let result = CommandExecutor.shared.unlockFans()
         if !result.success {
             print("Error unlocking fans: \(result.error ?? "Unknown error")")
+            AppLog.shared.error("unlockFans failed fanCount=\(fanCount) error=\(result.error ?? "unknown")")
+        } else {
+            AppLog.shared.info("unlockFans finished fanCount=\(fanCount)")
         }
     }
     
@@ -423,6 +718,7 @@ class FanManager {
             
             if temperatureReadFailureCount >= maxTemperatureFailures {
                 print("CRITICAL: Too many temperature read failures")
+                AppLog.shared.error("temperature read failed repeatedly count=\(temperatureReadFailureCount)")
                 return -1
             }
             
@@ -469,11 +765,32 @@ class FanManager {
         // 危险温度保护只做托底，不压低用户曲线已经给出的更高转速。
         if temperature >= criticalTemp {
             print("WARNING: Critical temperature (\(temperature)°C)")
+            AppLog.shared.warning("critical temperature reached temp=\(String(format: "%.2f", temperature)) floor=\(safetyFloorRPM) clamped=\(clampedRPM)")
             temperatureReadFailureCount = 0
             return max(clampedRPM, safetyFloorRPM)
         }
 
         return clampedRPM
+    }
+
+    private func maybeLogTelemetrySnapshot() {
+        let now = Date()
+        if let last = lastTelemetryLogTimestamp,
+           now.timeIntervalSince(last) < telemetryDetailLogInterval {
+            return
+        }
+        lastTelemetryLogTimestamp = now
+
+        let topTemperatures = cachedTemperatures
+            .sorted { $0.value > $1.value }
+            .prefix(5)
+            .map { "\($0.key)=\(String(format: "%.1f", $0.value))" }
+            .joined(separator: ", ")
+        let fanRpmText = cachedFanRPMs
+            .sorted { $0.key < $1.key }
+            .map { "F\($0.key)=\($0.value)" }
+            .joined(separator: ", ")
+        AppLog.shared.debug("telemetry snapshot fans=[\(fanRpmText)] topTemps=[\(topTemperatures)]")
     }
 }
 
@@ -570,7 +887,7 @@ class UpdateService {
     private var isChecking = false
 
     private var currentShortVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "未知版本"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? appL10n("未知版本", "Unknown")
     }
 
     private var currentBuild: Int {
@@ -647,8 +964,11 @@ class UpdateService {
                     self.logger.info("No update available. currentBuild=\(self.currentBuild, privacy: .public) remoteBuild=\(manifest.latestBuild, privacy: .public)")
                     if triggeredByUser {
                         showInfoAlert(
-                            title: "已是最新版本",
-                            message: "当前版本：\(currentVersionDisplay)\n远端版本：\(manifest.latestVersion) (\(manifest.latestBuild))"
+                            title: appL10n("已是最新版本", "Up to Date"),
+                            message: appL10n(
+                                "当前版本：\(currentVersionDisplay)\n远端版本：\(manifest.latestVersion) (\(manifest.latestBuild))",
+                                "Current: \(currentVersionDisplay)\nLatest: \(manifest.latestVersion) (\(manifest.latestBuild))"
+                            )
                         )
                     }
                     return
@@ -659,7 +979,7 @@ class UpdateService {
             } catch {
                 self.logger.error("Update check failed: \(error.localizedDescription, privacy: .public)")
                 if triggeredByUser {
-                    showUpdateFailureAlert(title: "检查更新失败", message: error.localizedDescription, releaseURL: releasesHomeURL)
+                    showUpdateFailureAlert(title: appL10n("检查更新失败", "Update Check Failed"), message: error.localizedDescription, releaseURL: releasesHomeURL)
                 } else {
                     print("Update check failed: \(error)")
                 }
@@ -682,13 +1002,16 @@ class UpdateService {
     }
 
     private func presentUpdatePrompt(manifest: UpdateManifest) {
-        let notes = manifest.notes?.isEmpty == false ? manifest.notes! : "包含稳定性与功能改进。"
+        let notes = manifest.notes?.isEmpty == false ? manifest.notes! : appL10n("包含稳定性与功能改进。", "Includes stability and feature improvements.")
         let alert = NSAlert()
-        alert.messageText = "发现新版本 \(manifest.latestVersion)"
-        alert.informativeText = "当前版本：\(currentVersionDisplay)\n远端版本：\(manifest.latestVersion) (\(manifest.latestBuild))\n\n\(notes)"
+        alert.messageText = appL10n("发现新版本 \(manifest.latestVersion)", "New Version Available \(manifest.latestVersion)")
+        alert.informativeText = appL10n(
+            "当前版本：\(currentVersionDisplay)\n远端版本：\(manifest.latestVersion) (\(manifest.latestBuild))\n\n\(notes)",
+            "Current: \(currentVersionDisplay)\nLatest: \(manifest.latestVersion) (\(manifest.latestBuild))\n\n\(notes)"
+        )
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "立即更新")
-        alert.addButton(withTitle: "稍后")
+        alert.addButton(withTitle: appL10n("立即更新", "Update Now"))
+        alert.addButton(withTitle: appL10n("稍后", "Later"))
 
         if alert.runModal() == .alertFirstButtonReturn {
             startDownloadAndInstall(manifest: manifest)
@@ -703,13 +1026,13 @@ class UpdateService {
                 let (data, _) = try await URLSession.shared.data(from: zipURL)
 
                 if let expectedSize = manifest.assets?.size, data.count != expectedSize {
-                    throw NSError(domain: "UpdateService", code: 1001, userInfo: [NSLocalizedDescriptionKey: "安装包大小校验失败。"])
+                    throw NSError(domain: "UpdateService", code: 1001, userInfo: [NSLocalizedDescriptionKey: appL10n("安装包大小校验失败。", "Package size verification failed.")])
                 }
 
                 if let expectedSHA = manifest.assets?.sha256?.lowercased(), !expectedSHA.isEmpty {
                     let actualSHA = sha256Hex(data)
                     if expectedSHA != actualSHA {
-                        throw NSError(domain: "UpdateService", code: 1002, userInfo: [NSLocalizedDescriptionKey: "安装包哈希校验失败。"])
+                        throw NSError(domain: "UpdateService", code: 1002, userInfo: [NSLocalizedDescriptionKey: appL10n("安装包哈希校验失败。", "Package checksum verification failed.")])
                     }
                 }
 
@@ -725,16 +1048,16 @@ class UpdateService {
                 try unzip(zipPath: zipPath, to: extractDir)
 
                 guard let installScript = findInstallScript(in: extractDir) else {
-                    throw NSError(domain: "UpdateService", code: 1003, userInfo: [NSLocalizedDescriptionKey: "未找到 install.sh。"])
+                    throw NSError(domain: "UpdateService", code: 1003, userInfo: [NSLocalizedDescriptionKey: appL10n("未找到 install.sh。", "install.sh not found.")])
                 }
 
                 try runInstallScriptInTerminal(scriptURL: installScript)
                 logger.info("Update installer launched successfully for version \(manifest.latestVersion, privacy: .public)")
-                showInfoAlert(title: "下载完成", message: "安装脚本已在终端打开，请按提示完成升级。")
+                showInfoAlert(title: appL10n("下载完成", "Download Complete"), message: appL10n("安装脚本已在终端打开，请按提示完成升级。", "Installer has opened in Terminal. Follow the prompts to finish update."))
             } catch {
                 logger.error("Update download/install failed: \(error.localizedDescription, privacy: .public)")
                 showUpdateFailureAlert(
-                    title: "更新失败",
+                    title: appL10n("更新失败", "Update Failed"),
                     message: error.localizedDescription,
                     releaseURL: githubReleaseURL(for: manifest.latestVersion)
                 )
@@ -753,7 +1076,7 @@ class UpdateService {
         try process.run()
         process.waitUntilExit()
         if process.terminationStatus != 0 {
-            throw NSError(domain: "UpdateService", code: 1004, userInfo: [NSLocalizedDescriptionKey: "解压安装包失败。"])
+            throw NSError(domain: "UpdateService", code: 1004, userInfo: [NSLocalizedDescriptionKey: appL10n("解压安装包失败。", "Failed to unzip update package.")])
         }
     }
 
@@ -796,7 +1119,7 @@ class UpdateService {
             throw NSError(
                 domain: "UpdateService",
                 code: 1005,
-                userInfo: [NSLocalizedDescriptionKey: "无法启动安装终端。请手动打开 \(launcherURL.lastPathComponent) 完成升级。"]
+                userInfo: [NSLocalizedDescriptionKey: appL10n("无法启动安装终端。请手动打开 \(launcherURL.lastPathComponent) 完成升级。", "Failed to launch installer terminal. Please open \(launcherURL.lastPathComponent) manually.")]
             )
         }
     }
@@ -838,7 +1161,7 @@ class UpdateService {
         alert.messageText = title
         alert.informativeText = message
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "好的")
+        alert.addButton(withTitle: appL10n("好的", "OK"))
         alert.runModal()
     }
 
@@ -847,17 +1170,20 @@ class UpdateService {
         alert.messageText = title
         alert.informativeText = message
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "关闭")
+        alert.addButton(withTitle: appL10n("关闭", "Close"))
         alert.runModal()
     }
 
     private func showUpdateFailureAlert(title: String, message: String, releaseURL: URL) {
         let alert = NSAlert()
         alert.messageText = title
-        alert.informativeText = "\(message)\n\n如需手动更新，可前往 GitHub Releases 下载最新版本。"
+        alert.informativeText = appL10n(
+            "\(message)\n\n如需手动更新，可前往 GitHub Releases 下载最新版本。",
+            "\(message)\n\nYou can download the latest version from GitHub Releases for manual update."
+        )
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "前往 GitHub")
-        alert.addButton(withTitle: "关闭")
+        alert.addButton(withTitle: appL10n("前往 GitHub", "Open GitHub"))
+        alert.addButton(withTitle: appL10n("关闭", "Close"))
 
         if alert.runModal() == .alertFirstButtonReturn {
             NSWorkspace.shared.open(releaseURL)
@@ -875,7 +1201,7 @@ class MenuBarManager {
     private var statusItem: NSStatusItem?
     private var currentTemperature: Double = 0
     private var currentFanRPM: Int = 0
-    private var currentTemperatureSensorName: String = "自动选择（最热）"
+    private var currentTemperatureSensorName: String = appL10n("自动选择（最热）", "Auto (Hottest)")
     private var fanCurve: [FanPoint] = []
     private var isAutoMode: Bool = true
     private var autoStartEnabled: Bool = true
@@ -902,10 +1228,10 @@ class MenuBarManager {
         for (_, sectionReadings) in grouped {
             if let index = sectionReadings.firstIndex(where: { $0.sensor.key == reading.sensor.key }) {
                 let base = "\(reading.sensor.compactName) \(String(format: "%02d", index + 1))"
-                return automatic ? "自动 / \(base)" : "手动 / \(base)"
+                return automatic ? appL10n("自动 / \(base)", "Auto / \(base)") : appL10n("手动 / \(base)", "Manual / \(base)")
             }
         }
-        return automatic ? "自动 / \(reading.sensor.key)" : "手动 / \(reading.sensor.key)"
+        return automatic ? appL10n("自动 / \(reading.sensor.key)", "Auto / \(reading.sensor.key)") : appL10n("手动 / \(reading.sensor.key)", "Manual / \(reading.sensor.key)")
     }
     
     func setupMenuBar() {
@@ -969,23 +1295,23 @@ class MenuBarManager {
 
         let hardwareItem = NSMenuItem(
             title: FanManager.shared.fanCount > 0 ?
-                "风扇 \(FanManager.shared.fanCount) | 上限 \(FanManager.shared.currentMaxRPM)" :
-                "无可控风扇",
+                appL10n("风扇 \(FanManager.shared.fanCount) | 上限 \(FanManager.shared.currentMaxRPM)", "Fans \(FanManager.shared.fanCount) | Max \(FanManager.shared.currentMaxRPM)") :
+                appL10n("无可控风扇", "No controllable fan"),
             action: nil,
             keyEquivalent: ""
         )
         hardwareItem.isEnabled = false
         menu.addItem(hardwareItem)
 
-        let currentSensorItem = NSMenuItem(title: "温度源 \(currentTemperatureSensorName)", action: nil, keyEquivalent: "")
+        let currentSensorItem = NSMenuItem(title: appL10n("温度源 \(currentTemperatureSensorName)", "Temperature Source \(currentTemperatureSensorName)"), action: nil, keyEquivalent: "")
         currentSensorItem.isEnabled = false
         menu.addItem(currentSensorItem)
         menu.addItem(NSMenuItem.separator())
 
-        let temperatureSourceItem = NSMenuItem(title: "选择温度源", action: nil, keyEquivalent: "")
+        let temperatureSourceItem = NSMenuItem(title: appL10n("选择温度源", "Select Temperature Source"), action: nil, keyEquivalent: "")
         let temperatureSourceMenu = NSMenu()
 
-        let hottestItem = NSMenuItem(title: "自动选择（最热）", action: #selector(selectAutomaticTemperatureSource), keyEquivalent: "")
+        let hottestItem = NSMenuItem(title: appL10n("自动选择（最热）", "Auto (Hottest)"), action: #selector(selectAutomaticTemperatureSource), keyEquivalent: "")
         hottestItem.target = self
         hottestItem.state = config.temperatureSourceMode == "manual" ? .off : .on
         temperatureSourceMenu.addItem(hottestItem)
@@ -1019,7 +1345,7 @@ class MenuBarManager {
         }
 
         if readings.isEmpty {
-            let emptyItem = NSMenuItem(title: "暂未探测到温度传感器", action: nil, keyEquivalent: "")
+            let emptyItem = NSMenuItem(title: appL10n("暂未探测到温度传感器", "No temperature sensor detected"), action: nil, keyEquivalent: "")
             emptyItem.isEnabled = false
             temperatureSourceMenu.addItem(emptyItem)
         }
@@ -1027,42 +1353,42 @@ class MenuBarManager {
         menu.setSubmenu(temperatureSourceMenu, for: temperatureSourceItem)
         menu.addItem(temperatureSourceItem)
         
-        let curveItem = NSMenuItem(title: "编辑曲线...", action: #selector(showFanCurveEditor), keyEquivalent: "c")
+        let curveItem = NSMenuItem(title: appL10n("编辑曲线...", "Edit Curve..."), action: #selector(showFanCurveEditor), keyEquivalent: "c")
         curveItem.target = self
         menu.addItem(curveItem)
         
         menu.addItem(NSMenuItem.separator())
         
-        let modeItem = NSMenuItem(title: isAutoMode ? "手动模式" : "自动模式", action: #selector(toggleMode), keyEquivalent: "m")
+        let modeItem = NSMenuItem(title: isAutoMode ? appL10n("手动模式", "Manual Mode") : appL10n("自动模式", "Auto Mode"), action: #selector(toggleMode), keyEquivalent: "m")
         modeItem.target = self
         menu.addItem(modeItem)
         
         if !isAutoMode {
-            let speedItem = NSMenuItem(title: "设置转速...", action: #selector(showSpeedSetting), keyEquivalent: "")
+            let speedItem = NSMenuItem(title: appL10n("设置转速...", "Set Speed..."), action: #selector(showSpeedSetting), keyEquivalent: "")
             speedItem.target = self
             menu.addItem(speedItem)
         }
         
-        let autoStartItem = NSMenuItem(title: "开机自启动", action: #selector(toggleAutoStart), keyEquivalent: "")
+        let autoStartItem = NSMenuItem(title: appL10n("开机自启动", "Launch at Login"), action: #selector(toggleAutoStart), keyEquivalent: "")
         autoStartItem.target = self
         autoStartItem.state = autoStartEnabled ? .on : .off
         menu.addItem(autoStartItem)
 
-        let safetyFloorItem = NSMenuItem(title: "安全兜底转速...", action: #selector(showSafetyFloorSetting), keyEquivalent: "")
+        let safetyFloorItem = NSMenuItem(title: appL10n("安全兜底转速...", "Safety Floor RPM..."), action: #selector(showSafetyFloorSetting), keyEquivalent: "")
         safetyFloorItem.target = self
         menu.addItem(safetyFloorItem)
 
-        let aboutItem = NSMenuItem(title: "关于 iFanControl...", action: #selector(showHelp), keyEquivalent: "")
+        let aboutItem = NSMenuItem(title: appL10n("关于/帮助...", "About / Help..."), action: #selector(showHelp), keyEquivalent: "")
         aboutItem.target = self
         menu.addItem(aboutItem)
 
         menu.addItem(NSMenuItem.separator())
 
-        let restartItem = NSMenuItem(title: "重新启动", action: #selector(restartApp), keyEquivalent: "r")
+        let restartItem = NSMenuItem(title: appL10n("重新启动", "Restart"), action: #selector(restartApp), keyEquivalent: "r")
         restartItem.target = self
         menu.addItem(restartItem)
         
-        let quitItem = NSMenuItem(title: "退出", action: #selector(quitApp), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: appL10n("退出", "Quit"), action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
         
@@ -1206,10 +1532,10 @@ class MenuBarManager {
         if FanManager.shared.fanCount == 0 && !defaults.bool(forKey: unsupportedHardwareHintKey) {
             defaults.set(true, forKey: unsupportedHardwareHintKey)
             let alert = NSAlert()
-            alert.messageText = "未检测到可控风扇"
-            alert.informativeText = "这台设备可能是无风扇机型，或当前硬件暂不支持手动风扇控制。应用会继续运行，但不会尝试强制控制风扇。"
+            alert.messageText = appL10n("未检测到可控风扇", "No Controllable Fan Detected")
+            alert.informativeText = appL10n("这台设备可能是无风扇机型，或当前硬件暂不支持手动风扇控制。应用会继续运行，但不会尝试强制控制风扇。", "This device may be fanless, or manual fan control is not supported on current hardware. The app will keep running but won't force fan control.")
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "知道了")
+            alert.addButton(withTitle: appL10n("知道了", "OK"))
             logger.warning("No controllable fans detected on startup")
             alert.runModal()
             return
@@ -1219,10 +1545,10 @@ class MenuBarManager {
         if readings.count > 1 && !defaults.bool(forKey: temperatureSourceHintKey) {
             defaults.set(true, forKey: temperatureSourceHintKey)
             let alert = NSAlert()
-            alert.messageText = "温度源已自动选择"
-            alert.informativeText = "默认会使用当前最热的温度传感器来驱动风扇曲线。这里显示的是这台机器真实可读到的温度传感器，不一定与 CPU/GPU 核心数量一一对应。"
+            alert.messageText = appL10n("温度源已自动选择", "Temperature Source Set to Auto")
+            alert.informativeText = appL10n("默认会使用当前最热的温度传感器来驱动风扇曲线。这里显示的是这台机器真实可读到的温度传感器，不一定与 CPU/GPU 核心数量一一对应。", "By default, the hottest available sensor is used to drive the fan curve. Sensor count may not match CPU/GPU core count.")
             alert.alertStyle = .informational
-            alert.addButton(withTitle: "知道了")
+            alert.addButton(withTitle: appL10n("知道了", "OK"))
             logger.info("Displayed first-run temperature source guidance")
             alert.runModal()
         }
@@ -1251,16 +1577,57 @@ class MenuBarManager {
         } catch {
             logger.error("Failed to restart app: \(error.localizedDescription, privacy: .public)")
             let alert = NSAlert()
-            alert.messageText = "无法重新启动"
-            alert.informativeText = "请手动重新打开 iFanControl。\n\n\(error.localizedDescription)"
+            alert.messageText = appL10n("无法重新启动", "Unable to Restart")
+            alert.informativeText = appL10n("请手动重新打开 iFanControl。\n\n\(error.localizedDescription)", "Please reopen iFanControl manually.\n\n\(error.localizedDescription)")
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "关闭")
+            alert.addButton(withTitle: appL10n("关闭", "Close"))
             alert.runModal()
         }
     }
     
     @objc func quitApp() {
         NSApp.terminate(nil)
+    }
+
+    @objc func openLogFolder() {
+        let opened = AppLog.shared.openLogDirectoryInFinder()
+        if opened {
+            logger.info("Opened diagnostic log folder")
+            AppLog.shared.info("user opened diagnostic log folder")
+        }
+    }
+
+    @objc func exportDiagnosticArchive() {
+        do {
+            let archiveURL = try AppLog.shared.createDiagnosticArchive()
+            NSWorkspace.shared.activateFileViewerSelecting([archiveURL])
+
+            let alert = NSAlert()
+            alert.messageText = appL10n("诊断包已导出", "Diagnostic Package Exported")
+            alert.informativeText = appL10n(
+                "导出位置：\n\(archiveURL.path)\n\n建议下一步将该 ZIP 作为附件发送给支持邮箱。",
+                "Exported to:\n\(archiveURL.path)\n\nAttach this ZIP when contacting support."
+            )
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: appL10n("写邮件", "Compose Email"))
+            alert.addButton(withTitle: appL10n("完成", "Done"))
+            if alert.runModal() == .alertFirstButtonReturn {
+                AppLog.shared.composeSupportEmail(archiveURL: archiveURL)
+            }
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = appL10n("导出诊断包失败", "Diagnostic Export Failed")
+            alert.informativeText = error.localizedDescription
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: appL10n("关闭", "Close"))
+            alert.runModal()
+            AppLog.shared.error("diagnostic export failed error=\(error.localizedDescription)")
+        }
+    }
+
+    @objc func contactSupport() {
+        AppLog.shared.info("user requested support email composition")
+        AppLog.shared.composeSupportEmail()
     }
 
     @objc func checkForUpdates() {
@@ -1283,9 +1650,13 @@ class MenuBarManager {
 // 应用委托
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
+    private var lastControlLoopLogTime: Date?
+    private let controlLoopLogInterval: TimeInterval = 10.0
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        AppLog.shared.bootstrapSession()
+        AppLog.shared.info("application did finish launching")
 
         FanManager.shared.refreshHardwareProfile()
         let config = ConfigManager.shared.syncHardwareProfile(maxRPM: FanManager.shared.currentMaxRPM)
@@ -1308,6 +1679,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
+        AppLog.shared.info("application will terminate")
         _ = CommandExecutor.shared.setFanAuto()
     }
     
@@ -1335,11 +1707,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     } else {
                         FanManager.shared.setFanRPM(rpm: targetRPM)
                     }
+                    self.logControlLoopSummaryIfNeeded(mode: "auto", reading: reading, targetRPM: targetRPM)
                 } else {
                     FanManager.shared.setFanRPM(rpm: config.manualRPM)
+                    self.logControlLoopSummaryIfNeeded(mode: "manual", reading: reading, targetRPM: config.manualRPM)
                 }
             }
         }
+    }
+
+    private func logControlLoopSummaryIfNeeded(mode: String, reading: TemperatureReading, targetRPM: Int) {
+        let now = Date()
+        if let last = lastControlLoopLogTime,
+           now.timeIntervalSince(last) < controlLoopLogInterval {
+            return
+        }
+        lastControlLoopLogTime = now
+        AppLog.shared.debug("control loop mode=\(mode) sensor=\(reading.sensor.key) temp=\(String(format: "%.2f", reading.value)) targetRPM=\(targetRPM)")
     }
 }
 
@@ -1370,7 +1754,7 @@ class SpeedSettingWindowController: NSWindowController {
             defer: false
         )
         
-        window.title = "设置风扇转速"
+        window.title = appL10n("设置风扇转速", "Set Fan Speed")
         window.center()
         
         super.init(window: window)
@@ -1387,16 +1771,16 @@ class SpeedSettingWindowController: NSWindowController {
     private func setupUI() {
         guard let contentView = window?.contentView else { return }
         
-        let titleLabel = NSTextField(labelWithString: "手动模式目标转速:")
+        let titleLabel = NSTextField(labelWithString: appL10n("手动模式目标转速:", "Manual Mode Target RPM:"))
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(titleLabel)
 
-        let modeLabel = NSTextField(labelWithString: "调节方式")
+        let modeLabel = NSTextField(labelWithString: appL10n("调节方式", "Adjustment Mode"))
         modeLabel.textColor = .secondaryLabelColor
         modeLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(modeLabel)
 
-        let controlModeSegmentedControl = NSSegmentedControl(labels: ["连续", "档位"], trackingMode: .selectOne, target: self, action: #selector(controlModeChanged))
+        let controlModeSegmentedControl = NSSegmentedControl(labels: [appL10n("连续", "Continuous"), appL10n("档位", "Stepped")], trackingMode: .selectOne, target: self, action: #selector(controlModeChanged))
         controlModeSegmentedControl.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(controlModeSegmentedControl)
         
@@ -1418,7 +1802,7 @@ class SpeedSettingWindowController: NSWindowController {
         stepHintLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(stepHintLabel)
 
-        let applyStatusLabel = NSTextField(labelWithString: "✓ 已应用")
+        let applyStatusLabel = NSTextField(labelWithString: appL10n("✓ 已应用", "✓ Applied"))
         applyStatusLabel.textColor = .systemGreen
         applyStatusLabel.font = .systemFont(ofSize: 12, weight: .medium)
         applyStatusLabel.alignment = .center
@@ -1426,11 +1810,11 @@ class SpeedSettingWindowController: NSWindowController {
         applyStatusLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(applyStatusLabel)
         
-        let applyButton = NSButton(title: "应用", target: self, action: #selector(applySpeed))
+        let applyButton = NSButton(title: appL10n("应用", "Apply"), target: self, action: #selector(applySpeed))
         applyButton.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(applyButton)
         
-        let cancelButton = NSButton(title: "取消", target: self, action: #selector(cancel))
+        let cancelButton = NSButton(title: appL10n("取消", "Cancel"), target: self, action: #selector(cancel))
         cancelButton.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(cancelButton)
         
@@ -1508,7 +1892,7 @@ class SpeedSettingWindowController: NSWindowController {
     private func updateModeUI() {
         controlModeSegmentedControl?.selectedSegment = (controlMode == .continuous) ? 0 : 1
         let isStepped = (controlMode == .stepped)
-        stepHintLabel?.stringValue = isStepped ? "步进：\(stepRPM) RPM" : ""
+        stepHintLabel?.stringValue = isStepped ? appL10n("步进：\(stepRPM) RPM", "Step: \(stepRPM) RPM") : ""
         stepHintLabel?.isHidden = !isStepped
     }
 
@@ -1588,7 +1972,7 @@ class SafetyFloorWindowController: NSWindowController {
             defer: false
         )
 
-        window.title = "安全兜底转速"
+        window.title = appL10n("安全兜底转速", "Safety Floor RPM")
         window.center()
 
         super.init(window: window)
@@ -1604,11 +1988,11 @@ class SafetyFloorWindowController: NSWindowController {
     private func setupUI() {
         guard let contentView = window?.contentView else { return }
 
-        let titleLabel = NSTextField(labelWithString: "危险温度（95℃）时的最低兜底转速")
+        let titleLabel = NSTextField(labelWithString: appL10n("危险温度（95℃）时的最低兜底转速", "Minimum floor RPM at critical temperature (95°C)"))
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(titleLabel)
 
-        let hintLabel = NSTextField(labelWithString: "仅作托底，不会压低用户曲线已经给出的更高转速")
+        let hintLabel = NSTextField(labelWithString: appL10n("仅作托底，不会压低用户曲线已经给出的更高转速", "Only a safety floor; never caps higher RPM requested by your curve"))
         hintLabel.textColor = .secondaryLabelColor
         hintLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(hintLabel)
@@ -1628,7 +2012,7 @@ class SafetyFloorWindowController: NSWindowController {
         rpmLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(rpmLabel)
 
-        let applyStatusLabel = NSTextField(labelWithString: "✓ 已应用")
+        let applyStatusLabel = NSTextField(labelWithString: appL10n("✓ 已应用", "✓ Applied"))
         applyStatusLabel.textColor = .systemGreen
         applyStatusLabel.font = .systemFont(ofSize: 12, weight: .medium)
         applyStatusLabel.alignment = .center
@@ -1636,12 +2020,12 @@ class SafetyFloorWindowController: NSWindowController {
         applyStatusLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(applyStatusLabel)
 
-        let applyButton = NSButton(title: "应用", target: self, action: #selector(applyValue))
+        let applyButton = NSButton(title: appL10n("应用", "Apply"), target: self, action: #selector(applyValue))
         applyButton.bezelStyle = .rounded
         applyButton.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(applyButton)
 
-        let cancelButton = NSButton(title: "取消", target: self, action: #selector(cancel))
+        let cancelButton = NSButton(title: appL10n("取消", "Cancel"), target: self, action: #selector(cancel))
         cancelButton.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(cancelButton)
 
@@ -1715,158 +2099,652 @@ class SafetyFloorWindowController: NSWindowController {
 
 @MainActor
 class HelpWindowController: NSWindowController {
+    private enum Section: Int, CaseIterable {
+        case overview
+        case diagnostics
+        case faq
+        case donation
+
+        func title() -> String {
+            switch self {
+                case .overview: return appL10n("简介", "Overview")
+                case .diagnostics: return appL10n("诊断与支持", "Diagnostics & Support")
+                case .faq: return appL10n("常见问题", "FAQ")
+                case .donation: return appL10n("支持作者", "Support the Author")
+            }
+        }
+    }
+
     private var versionLabel: NSTextField?
     private var automaticUpdateCheckbox: NSButton?
+    private var currentSection: Section = .overview
+    private var sidebarButtons: [Section: NSButton] = [:]
+    private var appHeaderView: NSView?
+    private var headerSeparatorView: NSView?
+    private var sectionContainerView: NSView?
+    private var sectionTitleLabel: NSTextField?
+    private var sectionViews: [Section: NSView] = [:]
+    private var donationMethodControl: NSSegmentedControl?
+    private var qrImageView: NSImageView?
+    private var qrCaptionLabel: NSTextField?
+    private let qrContext = CIContext(options: nil)
+    private let sidebarWidth: CGFloat = 176
+    private let contentWidth: CGFloat = 600
 
     init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 580, height: 520),
+            contentRect: NSRect(x: 0, y: 0, width: 720, height: 500),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
-        window.title = "关于 iFanControl"
+        window.title = appL10n("关于/帮助", "About / Help")
         window.center()
 
         super.init(window: window)
         applyWindowMaterialStyle(window)
         setupUI()
+        select(section: .overview)
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
+    private func makeSectionTitle(_ text: String) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+        label.font = .systemFont(ofSize: 18, weight: .semibold)
+        return label
+    }
+
+    private func makeCardView() -> NSView {
+        let card = NSView()
+        card.wantsLayer = true
+        card.layer?.cornerRadius = 16
+        card.layer?.borderWidth = 1
+        card.layer?.borderColor = NSColor.separatorColor.cgColor
+        card.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.84).cgColor
+        return card
+    }
+
+    private func makeBodyLabel(_ text: String) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+        label.maximumNumberOfLines = 0
+        label.lineBreakMode = .byWordWrapping
+        label.textColor = .secondaryLabelColor
+        return label
+    }
+
+    private func makeSymbolView(_ name: String, pointSize: CGFloat, weight: NSFont.Weight = .regular) -> NSImageView {
+        let view = NSImageView()
+        if let image = NSImage(
+            systemSymbolName: name,
+            accessibilityDescription: nil
+        )?.withSymbolConfiguration(.init(pointSize: pointSize, weight: weight)) {
+            view.image = image
+        }
+        view.imageScaling = .scaleProportionallyUpOrDown
+        view.contentTintColor = .secondaryLabelColor
+        return view
+    }
+
+    private func makeSectionRoot(horizontalCentered: Bool = false, verticalCentered: Bool = false) -> (NSView, NSStackView) {
+        let root = NSView()
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.spacing = 18
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        root.addSubview(stack)
+
+        let horizontalConstraint: NSLayoutConstraint = horizontalCentered
+            ? stack.centerXAnchor.constraint(equalTo: root.centerXAnchor)
+            : stack.leadingAnchor.constraint(equalTo: root.leadingAnchor)
+        let topConstraint: NSLayoutConstraint = verticalCentered
+            ? stack.centerYAnchor.constraint(equalTo: root.centerYAnchor)
+            : stack.topAnchor.constraint(equalTo: root.topAnchor, constant: 8)
+
+        NSLayoutConstraint.activate([
+            topConstraint,
+            horizontalConstraint,
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor),
+            stack.topAnchor.constraint(greaterThanOrEqualTo: root.topAnchor, constant: 8),
+            stack.bottomAnchor.constraint(lessThanOrEqualTo: root.bottomAnchor, constant: -24)
+        ])
+        return (root, stack)
+    }
+
+    private func makeSidebarButton(for section: Section) -> NSButton {
+        let button = NSButton(title: section.title(), target: self, action: #selector(sidebarButtonClicked(_:)))
+        button.bezelStyle = .regularSquare
+        button.isBordered = false
+        button.setButtonType(.momentaryChange)
+        button.font = .systemFont(ofSize: 15, weight: .semibold)
+        button.alignment = .center
+        button.contentTintColor = .labelColor
+        button.wantsLayer = true
+        button.layer?.cornerRadius = 13
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        button.widthAnchor.constraint(equalToConstant: 132).isActive = true
+        button.identifier = NSUserInterfaceItemIdentifier("sidebar-\(section.rawValue)")
+        return button
+    }
+
+    private func updateSidebarSelection() {
+        for (section, button) in sidebarButtons {
+            let isSelected = section == currentSection
+            button.contentTintColor = isSelected ? .white : .labelColor
+            button.layer?.backgroundColor = isSelected
+                ? NSColor.systemRed.cgColor
+                : NSColor.clear.cgColor
+        }
+    }
+
     private func setupUI() {
         guard let contentView = window?.contentView else { return }
 
+        let splitView = NSSplitView()
+        splitView.isVertical = true
+        splitView.dividerStyle = .thin
+        splitView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(splitView)
+
+        NSLayoutConstraint.activate([
+            splitView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            splitView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            splitView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            splitView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
+        ])
+
+        let sidebarContainer = NSView()
+        sidebarContainer.translatesAutoresizingMaskIntoConstraints = false
+        sidebarContainer.widthAnchor.constraint(equalToConstant: sidebarWidth).isActive = true
+        splitView.addArrangedSubview(sidebarContainer)
+
+        let sidebarBackground = NSVisualEffectView()
+        sidebarBackground.material = .sidebar
+        sidebarBackground.blendingMode = .withinWindow
+        sidebarBackground.state = .active
+        sidebarBackground.translatesAutoresizingMaskIntoConstraints = false
+        sidebarContainer.addSubview(sidebarBackground)
+        NSLayoutConstraint.activate([
+            sidebarBackground.topAnchor.constraint(equalTo: sidebarContainer.topAnchor),
+            sidebarBackground.leadingAnchor.constraint(equalTo: sidebarContainer.leadingAnchor),
+            sidebarBackground.trailingAnchor.constraint(equalTo: sidebarContainer.trailingAnchor),
+            sidebarBackground.bottomAnchor.constraint(equalTo: sidebarContainer.bottomAnchor)
+        ])
+
+        let sidebarStack = NSStackView()
+        sidebarStack.orientation = .vertical
+        sidebarStack.alignment = .centerX
+        sidebarStack.spacing = 12
+        sidebarStack.translatesAutoresizingMaskIntoConstraints = false
+        sidebarContainer.addSubview(sidebarStack)
+        NSLayoutConstraint.activate([
+            sidebarStack.centerXAnchor.constraint(equalTo: sidebarContainer.centerXAnchor),
+            sidebarStack.centerYAnchor.constraint(equalTo: sidebarContainer.centerYAnchor),
+            sidebarStack.leadingAnchor.constraint(greaterThanOrEqualTo: sidebarContainer.leadingAnchor, constant: 12),
+            sidebarStack.trailingAnchor.constraint(lessThanOrEqualTo: sidebarContainer.trailingAnchor, constant: -12)
+        ])
+
+        var buttons: [Section: NSButton] = [:]
+        for section in Section.allCases {
+            let button = makeSidebarButton(for: section)
+            sidebarStack.addArrangedSubview(button)
+            buttons[section] = button
+        }
+        let rightContainer = NSView()
+        rightContainer.translatesAutoresizingMaskIntoConstraints = false
+        splitView.addArrangedSubview(rightContainer)
+
+        let rightRoot = NSStackView()
+        rightRoot.orientation = .vertical
+        rightRoot.spacing = 12
+        rightRoot.translatesAutoresizingMaskIntoConstraints = false
+        rightContainer.addSubview(rightRoot)
+        NSLayoutConstraint.activate([
+            rightRoot.topAnchor.constraint(equalTo: rightContainer.topAnchor, constant: 14),
+            rightRoot.leadingAnchor.constraint(equalTo: rightContainer.leadingAnchor, constant: 18),
+            rightRoot.trailingAnchor.constraint(equalTo: rightContainer.trailingAnchor, constant: -18),
+            rightRoot.bottomAnchor.constraint(equalTo: rightContainer.bottomAnchor, constant: -14)
+        ])
+
+        let appHeader = NSStackView()
+        appHeader.orientation = .horizontal
+        appHeader.alignment = .centerY
+        appHeader.spacing = 10
+
         let iconView = NSImageView()
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-        iconView.imageScaling = .scaleProportionallyUpOrDown
         iconView.image = NSApp.applicationIconImage
+        iconView.imageScaling = .scaleProportionallyUpOrDown
         iconView.wantsLayer = true
-        iconView.layer?.cornerRadius = 18
+        iconView.layer?.cornerRadius = 10
         iconView.layer?.masksToBounds = true
-        contentView.addSubview(iconView)
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.widthAnchor.constraint(equalToConstant: 44).isActive = true
+        iconView.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        appHeader.addArrangedSubview(iconView)
 
-        let headerStack = NSStackView()
-        headerStack.orientation = .vertical
-        headerStack.spacing = 6
-        headerStack.translatesAutoresizingMaskIntoConstraints = false
-
-        let titleLabel = NSTextField(labelWithString: "iFanControl")
-        titleLabel.font = .systemFont(ofSize: 24, weight: .semibold)
-
-        let versionLabel = NSTextField(labelWithString: "版本 \(UpdateService.shared.currentVersionDisplay)")
+        let appTitleStack = NSStackView()
+        appTitleStack.orientation = .vertical
+        appTitleStack.spacing = 2
+        let appTitle = NSTextField(labelWithString: "iFanControl")
+        appTitle.font = .systemFont(ofSize: 20, weight: .semibold)
+        let versionLabel = NSTextField(labelWithString: appL10n("版本 \(UpdateService.shared.currentVersionDisplay)", "Version \(UpdateService.shared.currentVersionDisplay)"))
         versionLabel.textColor = .secondaryLabelColor
-        versionLabel.font = .systemFont(ofSize: 13)
-
-        headerStack.addArrangedSubview(titleLabel)
-        headerStack.addArrangedSubview(versionLabel)
-        contentView.addSubview(headerStack)
-
-        let buttonStack = NSStackView()
-        buttonStack.orientation = .horizontal
-        buttonStack.spacing = 10
-        buttonStack.translatesAutoresizingMaskIntoConstraints = false
-
-        let restartButton = NSButton(title: "重新启动", target: self, action: #selector(restartApp))
-        restartButton.bezelStyle = .rounded
-
-        let updateButton = NSButton(title: "检查更新", target: self, action: #selector(checkUpdates))
-        updateButton.bezelStyle = .rounded
-
-        let githubButton = NSButton(title: "GitHub", target: self, action: #selector(openGitHub))
-        githubButton.bezelStyle = .rounded
-
-        buttonStack.addArrangedSubview(restartButton)
-        buttonStack.addArrangedSubview(updateButton)
-        buttonStack.addArrangedSubview(githubButton)
-        contentView.addSubview(buttonStack)
-
-        let automaticUpdateCheckbox = NSButton(checkboxWithTitle: "自动检查更新", target: self, action: #selector(toggleAutomaticChecks(_:)))
-        automaticUpdateCheckbox.state = UpdateService.shared.automaticChecksEnabled ? .on : .off
-        automaticUpdateCheckbox.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(automaticUpdateCheckbox)
+        versionLabel.font = .systemFont(ofSize: 12)
+        appTitleStack.addArrangedSubview(appTitle)
+        appTitleStack.addArrangedSubview(versionLabel)
+        appHeader.addArrangedSubview(appTitleStack)
+        appHeader.addArrangedSubview(NSView())
+        rightRoot.addArrangedSubview(appHeader)
 
         let separator = NSBox()
         separator.boxType = .separator
-        separator.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(separator)
+        rightRoot.addArrangedSubview(separator)
 
-        let scrollView = NSScrollView()
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.hasVerticalScroller = true
-        scrollView.borderType = .noBorder
-        scrollView.drawsBackground = false
+        let sectionTitleLabel = makeSectionTitle("")
+        sectionTitleLabel.alignment = .center
+        rightRoot.addArrangedSubview(sectionTitleLabel)
 
-        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 520, height: 560))
-        textView.isEditable = false
-        textView.isSelectable = true
-        textView.drawsBackground = false
-        textView.textContainerInset = NSSize(width: 8, height: 8)
-        textView.font = .systemFont(ofSize: 13)
-        textView.string = """
-        常见问题
+        let sectionScroll = NSScrollView()
+        sectionScroll.drawsBackground = false
+        sectionScroll.hasVerticalScroller = true
+        sectionScroll.autohidesScrollers = true
+        sectionScroll.scrollerStyle = .overlay
+        sectionScroll.translatesAutoresizingMaskIntoConstraints = false
+        rightRoot.addArrangedSubview(sectionScroll)
+        sectionScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 320).isActive = true
 
-        1. 温度源默认怎么选？
-        默认使用当前最热的温度传感器。你也可以在菜单栏的“选择温度源”里手动指定。
+        let sectionCanvas = NSView()
+        sectionCanvas.translatesAutoresizingMaskIntoConstraints = false
+        sectionScroll.documentView = sectionCanvas
 
-        2. 为什么温度源数量和 CPU / GPU 核心数对不上？
-        这里显示的是 Apple Silicon 实际暴露出来的温度传感器，不一定与 CPU 或 GPU 核心数量一一对应。
-
-        3. 如果没有检测到风扇怎么办？
-        这通常意味着设备是无风扇机型，或者当前硬件暂不支持手动风扇控制。
-
-        4. 自动更新失败怎么办？
-        可以在“检查更新”失败后打开 GitHub Releases，手动下载并覆盖安装。
-
-        5. 手动模式和自动模式有什么区别？
-        自动模式会根据风扇曲线调速；手动模式会固定使用你设置的目标转速。
-
-        6. 安全兜底转速是什么？
-        当温度达到 95℃ 时，系统会保证风扇至少达到你设置的兜底转速，但不会压低用户曲线已经给出的更高转速。
-        """
-        textView.textContainer?.containerSize = NSSize(width: 520, height: CGFloat.greatestFiniteMagnitude)
-        textView.textContainer?.widthTracksTextView = true
-        textView.minSize = NSSize(width: 0, height: 520)
-        scrollView.documentView = textView
-        contentView.addSubview(scrollView)
-
+        let sectionContent = NSView()
+        sectionContent.translatesAutoresizingMaskIntoConstraints = false
+        sectionCanvas.addSubview(sectionContent)
         NSLayoutConstraint.activate([
-            iconView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 18),
-            iconView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 18),
-            iconView.widthAnchor.constraint(equalToConstant: 72),
-            iconView.heightAnchor.constraint(equalToConstant: 72),
+            sectionCanvas.leadingAnchor.constraint(equalTo: sectionScroll.contentView.leadingAnchor),
+            sectionCanvas.trailingAnchor.constraint(equalTo: sectionScroll.contentView.trailingAnchor),
+            sectionCanvas.topAnchor.constraint(equalTo: sectionScroll.contentView.topAnchor),
+            sectionCanvas.bottomAnchor.constraint(equalTo: sectionScroll.contentView.bottomAnchor),
+            sectionCanvas.widthAnchor.constraint(equalTo: sectionScroll.contentView.widthAnchor),
 
-            headerStack.topAnchor.constraint(equalTo: iconView.topAnchor, constant: 4),
-            headerStack.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 14),
-            headerStack.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -18),
-
-            buttonStack.topAnchor.constraint(equalTo: headerStack.bottomAnchor, constant: 12),
-            buttonStack.leadingAnchor.constraint(equalTo: headerStack.leadingAnchor),
-
-            automaticUpdateCheckbox.topAnchor.constraint(equalTo: buttonStack.bottomAnchor, constant: 12),
-            automaticUpdateCheckbox.leadingAnchor.constraint(equalTo: headerStack.leadingAnchor),
-
-            separator.topAnchor.constraint(equalTo: automaticUpdateCheckbox.bottomAnchor, constant: 16),
-            separator.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 18),
-            separator.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -18),
-
-            scrollView.topAnchor.constraint(equalTo: separator.bottomAnchor, constant: 12),
-            scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 18),
-            scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -18),
-            scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -18)
+            sectionContent.topAnchor.constraint(equalTo: sectionCanvas.topAnchor),
+            sectionContent.centerXAnchor.constraint(equalTo: sectionCanvas.centerXAnchor),
+            sectionContent.widthAnchor.constraint(equalToConstant: contentWidth),
+            sectionContent.widthAnchor.constraint(lessThanOrEqualTo: sectionCanvas.widthAnchor),
+            sectionContent.bottomAnchor.constraint(equalTo: sectionCanvas.bottomAnchor)
         ])
 
         self.versionLabel = versionLabel
-        self.automaticUpdateCheckbox = automaticUpdateCheckbox
+        self.sidebarButtons = buttons
+        self.appHeaderView = appHeader
+        self.headerSeparatorView = separator
+        self.sectionContainerView = sectionContent
+        self.sectionTitleLabel = sectionTitleLabel
+
+        buildSectionViews()
+        refreshDonationPreview()
+        updateSidebarSelection()
+    }
+
+    private func buildSectionViews() {
+        guard let container = sectionContainerView else { return }
+        sectionViews = [
+            .overview: makeOverviewSection(),
+            .diagnostics: makeDiagnosticsSection(),
+            .faq: makeFAQSection(),
+            .donation: makeDonationSection()
+        ]
+
+        for view in sectionViews.values {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(view)
+            NSLayoutConstraint.activate([
+                view.topAnchor.constraint(equalTo: container.topAnchor),
+                view.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+                view.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+                view.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+            ])
+            view.isHidden = true
+        }
+    }
+
+    private func makeOverviewSection() -> NSView {
+        let (view, stack) = makeSectionRoot(horizontalCentered: true, verticalCentered: true)
+
+        let iconView = NSImageView()
+        iconView.image = NSApp.applicationIconImage
+        iconView.imageScaling = .scaleProportionallyUpOrDown
+        iconView.wantsLayer = true
+        iconView.layer?.cornerRadius = 20
+        iconView.layer?.masksToBounds = true
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.widthAnchor.constraint(equalToConstant: 108).isActive = true
+        iconView.heightAnchor.constraint(equalToConstant: 108).isActive = true
+        stack.addArrangedSubview(iconView)
+
+        let appName = NSTextField(labelWithString: "iFanControl")
+        appName.font = .systemFont(ofSize: 36, weight: .bold)
+        appName.alignment = .center
+        stack.addArrangedSubview(appName)
+
+        let version = NSTextField(labelWithString: appL10n("版本 \(UpdateService.shared.currentVersionDisplay)", "Version \(UpdateService.shared.currentVersionDisplay)"))
+        version.font = .systemFont(ofSize: 18, weight: .medium)
+        version.textColor = .secondaryLabelColor
+        version.alignment = .center
+        stack.addArrangedSubview(version)
+
+        let intro = makeBodyLabel(
+            appL10n(
+                "iFanControl 是一款面向 Apple Silicon 设备的轻量风扇控制工具，支持自动曲线与手动转速。",
+                "iFanControl is a lightweight fan control utility for Apple Silicon devices, supporting auto curves and manual RPM."
+            )
+        )
+        intro.font = .systemFont(ofSize: 14)
+        intro.alignment = .center
+        intro.preferredMaxLayoutWidth = 420
+        stack.addArrangedSubview(intro)
+
+        let buttonRow = NSStackView()
+        buttonRow.orientation = .horizontal
+        buttonRow.spacing = 10
+        let restartButton = NSButton(title: appL10n("重新启动", "Restart"), target: self, action: #selector(restartApp))
+        restartButton.bezelStyle = .rounded
+        let updateButton = NSButton(title: appL10n("检查更新", "Check Updates"), target: self, action: #selector(checkUpdates))
+        updateButton.bezelStyle = .rounded
+        let githubButton = NSButton(title: "GitHub", target: self, action: #selector(openGitHub))
+        githubButton.bezelStyle = .rounded
+        buttonRow.addArrangedSubview(restartButton)
+        buttonRow.addArrangedSubview(updateButton)
+        buttonRow.addArrangedSubview(githubButton)
+        stack.addArrangedSubview(buttonRow)
+
+        let autoCheck = NSButton(
+            checkboxWithTitle: appL10n("自动检查更新", "Check updates automatically"),
+            target: self,
+            action: #selector(toggleAutomaticChecks(_:))
+        )
+        autoCheck.state = UpdateService.shared.automaticChecksEnabled ? .on : .off
+        automaticUpdateCheckbox = autoCheck
+        stack.addArrangedSubview(autoCheck)
+        return view
+    }
+
+    private func makeDiagnosticsSection() -> NSView {
+        let (view, stack) = makeSectionRoot(horizontalCentered: true, verticalCentered: true)
+
+        let supportCard = makeCardView()
+        supportCard.translatesAutoresizingMaskIntoConstraints = false
+        supportCard.widthAnchor.constraint(equalToConstant: 410).isActive = true
+        supportCard.heightAnchor.constraint(equalToConstant: 410).isActive = true
+        stack.addArrangedSubview(supportCard)
+
+        let supportStack = NSStackView()
+        supportStack.orientation = .vertical
+        supportStack.alignment = .centerX
+        supportStack.spacing = 18
+        supportStack.translatesAutoresizingMaskIntoConstraints = false
+        supportCard.addSubview(supportStack)
+        NSLayoutConstraint.activate([
+            supportStack.centerXAnchor.constraint(equalTo: supportCard.centerXAnchor),
+            supportStack.centerYAnchor.constraint(equalTo: supportCard.centerYAnchor),
+            supportStack.leadingAnchor.constraint(greaterThanOrEqualTo: supportCard.leadingAnchor, constant: 28),
+            supportStack.trailingAnchor.constraint(lessThanOrEqualTo: supportCard.trailingAnchor, constant: -28),
+            supportStack.topAnchor.constraint(greaterThanOrEqualTo: supportCard.topAnchor, constant: 28),
+            supportStack.bottomAnchor.constraint(lessThanOrEqualTo: supportCard.bottomAnchor, constant: -28)
+        ])
+
+        let supportTitle = NSTextField(labelWithString: appL10n("先导出诊断包，再发邮件给我们。", "Export diagnostics first, then email us."))
+        supportTitle.font = .systemFont(ofSize: 18, weight: .semibold)
+        supportTitle.alignment = .center
+        supportTitle.maximumNumberOfLines = 0
+        supportTitle.lineBreakMode = .byWordWrapping
+        supportTitle.preferredMaxLayoutWidth = 300
+        supportStack.addArrangedSubview(supportTitle)
+
+        let supportHint = makeBodyLabel(
+            appL10n(
+                "我们会结合日志更快定位问题。若只是小异常，也可以先试试重新启动或检查更新。",
+                "Logs help us diagnose issues faster. For smaller problems, you can also try restarting the app or checking for updates first."
+            )
+        )
+        supportHint.font = .systemFont(ofSize: 14)
+        supportHint.preferredMaxLayoutWidth = 300
+        supportHint.alignment = .center
+        supportStack.addArrangedSubview(supportHint)
+
+        let primaryButtons = NSStackView()
+        primaryButtons.orientation = .horizontal
+        primaryButtons.spacing = 10
+        primaryButtons.alignment = .centerY
+
+        let exportButton = NSButton(title: appL10n("导出诊断包", "Export Diagnostics"), target: self, action: #selector(exportDiagnostics))
+        exportButton.bezelStyle = .rounded
+        let contactButton = NSButton(title: appL10n("联系支持", "Contact Support"), target: self, action: #selector(contactSupport))
+        contactButton.bezelStyle = .rounded
+        primaryButtons.addArrangedSubview(exportButton)
+        primaryButtons.addArrangedSubview(contactButton)
+        supportStack.addArrangedSubview(primaryButtons)
+
+        let helperHint = NSTextField(labelWithString: appL10n("也可以先做这两步快速自检：", "You can also try these quick checks first:"))
+        helperHint.font = .systemFont(ofSize: 12, weight: .medium)
+        helperHint.textColor = .tertiaryLabelColor
+        helperHint.alignment = .center
+        supportStack.addArrangedSubview(helperHint)
+
+        let secondaryButtons = NSStackView()
+        secondaryButtons.orientation = .horizontal
+        secondaryButtons.spacing = 10
+        secondaryButtons.alignment = .centerY
+        let restartButton = NSButton(title: appL10n("重新启动", "Restart"), target: self, action: #selector(restartApp))
+        restartButton.bezelStyle = .rounded
+        let updateButton = NSButton(title: appL10n("检查更新", "Check Updates"), target: self, action: #selector(checkUpdates))
+        updateButton.bezelStyle = .rounded
+        let openLogButton = NSButton(title: appL10n("打开日志目录", "Open Log Folder"), target: self, action: #selector(openLogFolder))
+        openLogButton.bezelStyle = .rounded
+        secondaryButtons.addArrangedSubview(restartButton)
+        secondaryButtons.addArrangedSubview(updateButton)
+        secondaryButtons.addArrangedSubview(openLogButton)
+        supportStack.addArrangedSubview(secondaryButtons)
+        return view
+    }
+
+    private func makeFAQSection() -> NSView {
+        let (view, stack) = makeSectionRoot(horizontalCentered: true)
+
+        let intro = makeBodyLabel(appL10n("整理了最常遇到的几个问题，方便快速定位设置逻辑。", "A short set of answers for the most common questions."))
+        intro.font = .systemFont(ofSize: 14)
+        intro.preferredMaxLayoutWidth = contentWidth
+        intro.alignment = .center
+        stack.addArrangedSubview(intro)
+
+        let faqItems: [(String, String)] = [
+            (
+                appL10n("温度源是自动选择的吗？", "How is the temperature source selected?"),
+                appL10n("默认自动选择最热传感器；也可以在主界面手动固定某个温度源。", "By default the hottest sensor is selected automatically; you can pin a specific source in the main panel.")
+            ),
+            (
+                appL10n("为什么传感器数量和核心数不一致？", "Why does sensor count differ from core count?"),
+                appL10n("温度传感器由硬件与系统暴露机制决定，不一定和 CPU/GPU 核心一一对应。", "Sensor count depends on hardware and OS exposure and does not necessarily map 1:1 to CPU/GPU cores.")
+            ),
+            (
+                appL10n("自动模式和手动模式有什么区别？", "Auto mode vs Manual mode?"),
+                appL10n("自动模式会按温度曲线调速；手动模式会保持你设置的目标转速。", "Auto mode follows the temperature curve; manual mode keeps your target RPM.")
+            ),
+            (
+                appL10n("遇到兼容问题怎么办？", "What if compatibility issues occur?"),
+                appL10n("先到“诊断与支持”导出诊断包，再联系支持并附上 ZIP。", "Export diagnostics from Diagnostics & Support, then contact support with the ZIP attached.")
+            )
+        ]
+
+        for item in faqItems {
+            let card = makeCardView()
+            card.translatesAutoresizingMaskIntoConstraints = false
+            card.widthAnchor.constraint(equalToConstant: contentWidth).isActive = true
+            stack.addArrangedSubview(card)
+
+            let qaStack = NSStackView()
+            qaStack.orientation = .vertical
+            qaStack.spacing = 8
+            qaStack.translatesAutoresizingMaskIntoConstraints = false
+            card.addSubview(qaStack)
+
+            let q = NSTextField(labelWithString: item.0)
+            q.font = .systemFont(ofSize: 16, weight: .semibold)
+            qaStack.addArrangedSubview(q)
+
+            let a = makeBodyLabel(item.1)
+            a.font = .systemFont(ofSize: 14)
+            a.preferredMaxLayoutWidth = contentWidth - 48
+            qaStack.addArrangedSubview(a)
+
+            NSLayoutConstraint.activate([
+                qaStack.topAnchor.constraint(equalTo: card.topAnchor, constant: 18),
+                qaStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 24),
+                qaStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -24),
+                qaStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -18)
+            ])
+        }
+        return view
+    }
+
+    private func makeDonationSection() -> NSView {
+        let (view, stack) = makeSectionRoot(horizontalCentered: true, verticalCentered: true)
+        stack.alignment = .centerX
+
+        let coffeeIcon = makeSymbolView("cup.and.saucer.fill", pointSize: 28, weight: .medium)
+        coffeeIcon.contentTintColor = NSColor.systemBrown
+        coffeeIcon.translatesAutoresizingMaskIntoConstraints = false
+        coffeeIcon.widthAnchor.constraint(equalToConstant: 34).isActive = true
+        coffeeIcon.heightAnchor.constraint(equalToConstant: 34).isActive = true
+        stack.addArrangedSubview(coffeeIcon)
+
+        let introTitle = NSTextField(labelWithString: appL10n("请作者喝杯咖啡", "Buy the author a coffee"))
+        introTitle.font = .systemFont(ofSize: 22, weight: .bold)
+        introTitle.alignment = .center
+        stack.addArrangedSubview(introTitle)
+
+        let intro = makeBodyLabel(appL10n("喜欢 iFanControl 的话，欢迎续一杯。", "If you enjoy iFanControl, a coffee is always welcome."))
+        intro.font = .systemFont(ofSize: 14)
+        intro.preferredMaxLayoutWidth = 360
+        intro.alignment = .center
+        stack.addArrangedSubview(intro)
+
+        let methodControl = NSSegmentedControl(
+            labels: [appL10n("微信", "WeChat"), appL10n("支付宝", "Alipay")],
+            trackingMode: .selectOne,
+            target: self,
+            action: #selector(donationMethodChanged)
+        )
+        methodControl.selectedSegment = 0
+        stack.addArrangedSubview(methodControl)
+
+        let qrCard = NSView()
+        qrCard.wantsLayer = true
+        qrCard.layer?.cornerRadius = 18
+        qrCard.layer?.borderWidth = 1
+        qrCard.layer?.borderColor = NSColor.separatorColor.cgColor
+        qrCard.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.9).cgColor
+        qrCard.translatesAutoresizingMaskIntoConstraints = false
+        qrCard.widthAnchor.constraint(equalToConstant: 280).isActive = true
+        stack.addArrangedSubview(qrCard)
+
+        let qrStack = NSStackView()
+        qrStack.orientation = .vertical
+        qrStack.spacing = 8
+        qrStack.alignment = .centerX
+        qrStack.translatesAutoresizingMaskIntoConstraints = false
+        qrCard.addSubview(qrStack)
+        NSLayoutConstraint.activate([
+            qrStack.topAnchor.constraint(equalTo: qrCard.topAnchor, constant: 12),
+            qrStack.leadingAnchor.constraint(equalTo: qrCard.leadingAnchor, constant: 12),
+            qrStack.trailingAnchor.constraint(equalTo: qrCard.trailingAnchor, constant: -12),
+            qrStack.bottomAnchor.constraint(equalTo: qrCard.bottomAnchor, constant: -12)
+        ])
+
+        let caption = NSTextField(labelWithString: "")
+        caption.font = .systemFont(ofSize: 12, weight: .medium)
+        caption.textColor = .secondaryLabelColor
+
+        let qrImage = NSImageView()
+        qrImage.imageScaling = .scaleProportionallyUpOrDown
+        qrImage.wantsLayer = true
+        qrImage.layer?.backgroundColor = NSColor.white.cgColor
+        qrImage.layer?.cornerRadius = 12
+        qrImage.layer?.masksToBounds = true
+        qrImage.translatesAutoresizingMaskIntoConstraints = false
+        qrImage.widthAnchor.constraint(equalToConstant: 168).isActive = true
+        qrImage.heightAnchor.constraint(equalToConstant: 168).isActive = true
+
+        let hint = NSTextField(labelWithString: appL10n("感谢支持，帮助 iFanControl 持续改进。", "Thank you for helping iFanControl keep improving."))
+        hint.textColor = .secondaryLabelColor
+        hint.font = .systemFont(ofSize: 13)
+
+        qrStack.addArrangedSubview(caption)
+        qrStack.addArrangedSubview(qrImage)
+        qrStack.addArrangedSubview(hint)
+
+        self.donationMethodControl = methodControl
+        self.qrImageView = qrImage
+        self.qrCaptionLabel = caption
+        return view
     }
 
     override func showWindow(_ sender: Any?) {
-        versionLabel?.stringValue = "版本 \(UpdateService.shared.currentVersionDisplay)"
+        window?.title = appL10n("关于/帮助", "About / Help")
+        versionLabel?.stringValue = appL10n("版本 \(UpdateService.shared.currentVersionDisplay)", "Version \(UpdateService.shared.currentVersionDisplay)")
         automaticUpdateCheckbox?.state = UpdateService.shared.automaticChecksEnabled ? .on : .off
+        refreshDonationPreview()
         super.showWindow(sender)
+    }
+
+    private func select(section: Section) {
+        currentSection = section
+        sectionTitleLabel?.stringValue = section.title()
+        let isOverview = section == .overview
+        appHeaderView?.isHidden = isOverview
+        headerSeparatorView?.isHidden = isOverview
+        sectionTitleLabel?.isHidden = isOverview
+        for (key, view) in sectionViews {
+            view.isHidden = (key != section)
+        }
+        updateSidebarSelection()
+    }
+
+    @objc private func sidebarButtonClicked(_ sender: NSButton) {
+        guard let match = sidebarButtons.first(where: { $0.value === sender })?.key else { return }
+        select(section: match)
+    }
+
+    @objc private func donationMethodChanged() {
+        refreshDonationPreview()
+    }
+
+    private func refreshDonationPreview() {
+        let selected = donationMethodControl?.selectedSegment ?? 0
+        let isWechat = selected == 0
+        let payload = isWechat ? wechatDonatePayload : alipayDonatePayload
+        let caption = isWechat ? appL10n("微信赞赏码", "WeChat Donation QR") : appL10n("支付宝收款码", "Alipay Donation QR")
+        qrCaptionLabel?.stringValue = caption
+        qrImageView?.image = generateQRCodeImage(from: payload, targetSize: 168)
+    }
+
+    private func generateQRCodeImage(from string: String, targetSize: CGFloat) -> NSImage? {
+        guard let data = string.data(using: .utf8),
+              let filter = CIFilter(name: "CIQRCodeGenerator") else {
+            return nil
+        }
+        filter.setValue(data, forKey: "inputMessage")
+        filter.setValue("M", forKey: "inputCorrectionLevel")
+        guard let outputImage = filter.outputImage else { return nil }
+        let extent = outputImage.extent.integral
+        guard extent.width > 0 else { return nil }
+        let scale = max(1, floor(targetSize / extent.width))
+        let transformed = outputImage.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        guard let cgImage = qrContext.createCGImage(transformed, from: transformed.extent) else { return nil }
+        return NSImage(cgImage: cgImage, size: NSSize(width: transformed.extent.width, height: transformed.extent.height))
     }
 
     @objc private func checkUpdates() {
@@ -1881,9 +2759,22 @@ class HelpWindowController: NSWindowController {
         MenuBarManager.shared.restartApp()
     }
 
+    @objc private func openLogFolder() {
+        _ = AppLog.shared.openLogDirectoryInFinder()
+    }
+
+    @objc private func contactSupport() {
+        AppLog.shared.composeSupportEmail()
+    }
+
+    @objc private func exportDiagnostics() {
+        MenuBarManager.shared.exportDiagnosticArchive()
+    }
+
     @objc private func toggleAutomaticChecks(_ sender: NSButton) {
         UpdateService.shared.automaticChecksEnabled = (sender.state == .on)
     }
+
 }
 
 // 主函数

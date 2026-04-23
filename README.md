@@ -58,12 +58,36 @@ English readers can use [README_EN.md](README_EN.md).
 cd ~/Downloads/iFanControl-* && ./install.sh
 ```
 
+解压后可打开 `安装说明.html` 查看图文安装指南。
+
 ### 方式二：从官网下载安装
 
 - 官网：[ifancontrol.puremilkchun.top](https://ifancontrol.puremilkchun.top)
 - 更新源：[ifan-59w.pages.dev](https://ifan-59w.pages.dev/update-manifest.json)
 
 解压后也可直接运行 `install.sh`。如果需要图文说明，可打开仓库中的 [安装说明.html](安装说明.html)。
+
+## Support & Logs / 反馈与日志
+
+### English
+
+- Support email: `puremilkchun@foxmail.com`
+- Open `About / Help...` from the app menu, then use:
+  - `Export Diagnostics`
+  - `Open Log Folder`
+  - `Contact Support`
+- Exported diagnostics package: `~/Desktop/iFanControl-Diagnostics-*.zip`
+- Manual log path (advanced): `~/Library/Logs/iFanControl/ifancontrol.log`
+
+### 中文
+
+- 支持邮箱：`puremilkchun@foxmail.com`
+- 在应用菜单打开 `关于/帮助...` 后使用：
+  - `导出诊断包`
+  - `打开日志目录`
+  - `联系支持`
+- 导出的诊断包位置：`~/Desktop/iFanControl-Diagnostics-*.zip`
+- 日志原始路径（高级排查）：`~/Library/Logs/iFanControl/ifancontrol.log`
 
 ## 使用说明
 
