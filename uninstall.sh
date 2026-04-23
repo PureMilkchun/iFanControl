@@ -44,8 +44,17 @@ fi
 # 步骤 4: 删除配置文件
 echo ""
 echo "步骤 4/4: 删除配置文件..."
+REMOVED=false
 if [ -d "$HOME/Library/Application Support/iFanControl" ]; then
     rm -rf "$HOME/Library/Application Support/iFanControl"
+    REMOVED=true
+fi
+if [ -d "$HOME/Library/Application Support/MacFanControl" ]; then
+    rm -rf "$HOME/Library/Application Support/MacFanControl"
+    REMOVED=true
+fi
+
+if [ "$REMOVED" = true ]; then
     echo "✓ 配置文件已删除"
 else
     echo "配置文件不存在，跳过"

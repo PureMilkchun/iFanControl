@@ -5,96 +5,67 @@
 <h1 align="center">iFanControl</h1>
 
 <p align="center">
-  A simple fan control app for Apple Silicon Macs
+  Apple Silicon 带风扇 Mac 的菜单栏风扇控制工具
 </p>
 
 <p align="center">
-  一款适用于 Apple Silicon Mac 的简洁风扇控制应用
+  A menu bar fan control utility for Apple Silicon Macs with built-in fans
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/macOS-13.0+-blue" alt="Platform">
-  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/architecture-ARM64-purple" alt="Architecture">
+  <img src="https://img.shields.io/badge/macOS-13.0+-black" alt="Platform">
+  <img src="https://img.shields.io/badge/Apple%20Silicon-M%20Series-black" alt="Architecture">
+  <img src="https://img.shields.io/badge/license-MIT-black" alt="License">
 </p>
 
 ---
 
-## Features / 功能特性
+## 项目简介
 
-| English | 中文 |
-|---------|------|
-| Menu bar app - Shows temperature and fan speed | 菜单栏应用 - 实时显示温度和风扇转速 |
-| Automatic mode - Adjusts fan based on temperature curve | 自动模式 - 根据温度曲线自动调节风扇 |
-| Manual mode - Set a fixed fan speed | 手动模式 - 设置固定风扇转速 |
-| Customizable curves - Edit temperature-to-RPM mapping | 自定义曲线 - 编辑温度到转速的映射 |
-| Safe mode - Auto-recovery on failures | 安全模式 - 异常时自动恢复 |
-| Exit recovery - Restores auto mode when quitting | 退出恢复 - 退出时自动恢复自动模式 |
+iFanControl 是一个面向 Apple Silicon Mac 的原生菜单栏应用，提供实时温度与转速查看、自动/手动风扇控制、5 点风扇曲线、应用内更新，以及面向带风扇 M 系列设备的更稳健传感器探测。
 
-## What's New in v2.1 / v2.1 新特性
+当前仓库只保留源码、安装脚本和必要资源。历史发布包不再提交到仓库，统一通过 GitHub Releases 和官网分发。
 
-### v2.1 变更
-- **品牌更新**：软件名称由 MacFanControl 更名为 iFanControl
-- **版本号更新**：v2.0 → v2.1
+English readers can use [README_EN.md](README_EN.md).
 
-### v2.0 改进
-- **一次性授权**：安装时只需输入一次密码，之后永久免密运行
-- **修复"应用已损坏"**：自动处理 quarantine 属性
-- **更稳定的安装**：使用 sudo 直接执行，不再依赖 osascript
+## 当前能力
 
----
+- 菜单栏显示当前温度、风扇转速和控制模式
+- 自动模式：根据 5 点风扇曲线调速
+- 手动模式：固定目标 RPM
+- 安全兜底转速：高温时只托底，不压低用户更高转速
+- 温度源选择：默认选择最热传感器，也支持手动指定
+- 应用内更新：支持手动检查，也支持后台自动检查
+- 关于窗口：整合版本号、检查更新、自动检查更新、GitHub 和重启入口
+- 开机自启动
+- 安装诊断与一键卸载脚本
 
-## Quick Install / 快速安装
+## 适用范围
 
-### English
+- macOS 13 及以上
+- 带风扇的 Apple Silicon Mac
+- 重点覆盖 M1 / M2 / M3 / M4 系列
 
-1. Download `iFanControl-2.1.zip` from [Releases](https://github.com/PureMilkchun/iFanControl/releases/tag/v2.1)
-2. Unzip the file
-3. Open Terminal and run:
-   ```bash
-   cd ~/Downloads/iFanControl-2.1 && ./install.sh
-   ```
-4. Enter your admin password (only once)
-5. Done! The app runs without requiring passwords anymore
+说明：无风扇设备不会获得有效的风扇控制能力。温度源列表展示的是系统实际暴露的热传感器，不一定与 CPU / GPU 核心数量一一对应。
 
-### 中文
+## 安装
 
-1. 从 [Releases](https://github.com/PureMilkchun/iFanControl/releases/tag/v2.1) 下载 `iFanControl-2.1.zip`
-2. 解压 ZIP 文件
-3. 打开终端，运行以下命令：
-   ```bash
-   cd ~/Downloads/iFanControl-2.1 && ./install.sh
-   ```
-4. 输入管理员密码（仅需这一次）
-5. 完成！之后运行应用永久免密
+### 方式一：从 GitHub Releases 下载
 
-### 安装指南
+前往 [Releases](https://github.com/PureMilkchun/iFanControl/releases) 下载最新 ZIP，解压后运行：
 
-> 解压后可打开 `安装说明.html` 查看图文安装指南
+```bash
+cd ~/Downloads/iFanControl-* && ./install.sh
+```
 
-## Usage / 使用方法
+解压后可打开 `安装说明.html` 查看图文安装指南。
 
-### English
+### 方式二：从官网下载安装
 
-1. Open `/Applications/iFanControl.app`
-2. The app appears in your menu bar showing temperature and fan speed
+- 官网：[ifancontrol.puremilkchun.top](https://ifancontrol.puremilkchun.top)
+- 更新源：[ifan-59w.pages.dev](https://ifan-59w.pages.dev/update-manifest.json)
 
-**Menu Options:**
-- **Fan Curve Editor** - Customize the temperature-to-RPM curve
-- **Manual Mode** - Set a fixed fan speed
-- **Auto Mode** - Follow the temperature curve (default)
-- **Auto Start** - Launch at login
-
-### 中文
-
-1. 打开 `/Applications/iFanControl.app`
-2. 应用会出现在菜单栏，显示温度和风扇转速
-
-**菜单选项：**
-- **风扇曲线编辑器** - 自定义温度到转速的曲线
-- **手动模式** - 设置固定风扇转速
-- **自动模式** - 根据温度曲线调节（默认）
-- **开机自启动** - 登录时自动启动
+解压后也可直接运行 `install.sh`。如果需要图文说明，可打开仓库中的 [安装说明.html](安装说明.html)。
 
 ## Support & Logs / 反馈与日志
 
@@ -118,53 +89,61 @@
 - 导出的诊断包位置：`~/Desktop/iFanControl-Diagnostics-*.zip`
 - 日志原始路径（高级排查）：`~/Library/Logs/iFanControl/ifancontrol.log`
 
-## How It Works / 工作原理
+## 使用说明
 
-### English
+1. 打开 `/Applications/iFanControl.app`
+2. 应用会驻留在菜单栏
+3. 在菜单中切换自动/手动模式、编辑曲线、调整安全兜底转速
+4. 在 `关于 iFanControl...` 中查看版本、检查更新、设置自动检查更新或跳转 GitHub
 
-iFanControl uses [kentsmc](https://github.com/exelban/kentsmc) to:
-- Read CPU temperature from SMC sensors
-- Control fan speed via SMC writes
-- Run as a normal macOS app with `sudo -S` for privileged operations
+## 仓库结构
 
-### 中文
-
-iFanControl 使用 [kentsmc](https://github.com/exelban/kentsmc) 来：
-- 从 SMC 传感器读取 CPU 温度
-- 通过 SMC 写入控制风扇转速
-- 以普通 macOS 应用运行，使用 `sudo -S` 执行特权操作
-
-## Requirements / 系统要求
-
-- macOS 13.0 or later / macOS 13.0 或更高版本
-- Apple Silicon Mac with built-in fans (M1/M2/M3/M4/M5)
-- Admin password for initial setup / 首次设置需要管理员密码
-
-## Uninstall / 卸载
-
-在解压目录中运行 `./uninstall.sh` 或执行以下命令：
-
-```bash
-cd ~/Downloads/iFanControl-2.1 && ./uninstall.sh
+```text
+.
+├── Package.swift
+├── Sources/
+│   ├── FanCurveEditor/
+│   └── MacFanControl/
+├── iFanControl.app/        # App bundle 模板资源
+├── install.sh
+├── diagnose.sh
+├── uninstall.sh
+├── Install.command
+├── 安装说明.html
+└── icon.png
 ```
 
-## License / 许可证
+## 开发
 
-MIT License - see [LICENSE](LICENSE) for details.
+本项目使用 Swift Package Manager：
 
-MIT 许可证 - 详见 [LICENSE](LICENSE)。
+```bash
+swift build
+swift run
+```
 
-## Credits / 致谢
+CI 位于 `.github/workflows/swift.yml`，默认会对 `main` 执行构建检查。
 
-- [kentsmc](https://github.com/exelban/kentsmc) - SMC access tool / SMC 访问工具
-- [Stats](https://github.com/exelban/stats) - Inspiration for fan curve editor / 风扇曲线编辑器灵感来源
+## 更新机制
 
-## Disclaimer / 免责声明
+- 手动检查：`关于 iFanControl... -> 检查更新`
+- 自动检查：启动后延迟检查，并带 24 小时节流
+- 更新包来源：`pages.dev` 上的 `update-manifest.json` 与 ZIP
+- 更新失败时：会直接引导到 GitHub Releases 手动下载
 
-### English
+## 卸载
 
-This software interacts with low-level hardware controls. Use at your own risk.
+```bash
+./uninstall.sh
+```
 
-### 中文
+如果你更习惯双击，也可以使用 `uninstall.command`。
 
-本软件涉及底层硬件控制，使用风险自负。
+## 致谢
+
+- [kentsmc](https://github.com/exelban/kentsmc)
+- [Stats](https://github.com/exelban/stats)
+
+## 许可证
+
+[MIT](LICENSE)

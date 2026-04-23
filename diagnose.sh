@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# iFanControl 安装诊断脚本 v2.3
+# iFanControl 安装诊断脚本
 # 用户友好版本
 
 # 颜色定义
