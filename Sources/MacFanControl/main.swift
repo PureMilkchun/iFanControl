@@ -274,6 +274,10 @@ final class InstallationCoordinator {
         .appendingPathComponent("Library")
         .appendingPathComponent("Application Support")
         .appendingPathComponent("MacFanControl")
+    private let legacyConfigPath = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library")
+        .appendingPathComponent("Application Support")
+        .appendingPathComponent("iFanControl")
     private let logPath = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library")
         .appendingPathComponent("Logs")
@@ -326,6 +330,7 @@ final class InstallationCoordinator {
         KENTSMC_PATH=\(shellQuoted(kentsmcPath))
         SUDOERS_PATH=\(shellQuoted(sudoersPath))
         CONFIG_PATH=\(shellQuoted(configPath.path))
+        LEGACY_CONFIG_PATH=\(shellQuoted(legacyConfigPath.path))
         LOG_PATH=\(shellQuoted(logPath.path))
         LAUNCH_AGENT=\(shellQuoted(launchAgentPath.path))
 
@@ -368,6 +373,7 @@ final class InstallationCoordinator {
         echo ""
         echo "步骤 4/6: 删除配置..."
         rm -rf "$CONFIG_PATH"
+        rm -rf "$LEGACY_CONFIG_PATH"
         echo "✓ 配置已删除"
 
         echo ""
@@ -1898,7 +1904,7 @@ class SpeedSettingWindowController: NSWindowController {
         self.currentRPM = initialRPM
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 210),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 250),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -1946,6 +1952,23 @@ class SpeedSettingWindowController: NSWindowController {
         rpmLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(rpmLabel)
 
+        let rpmExplanationLabel = NSTextField(labelWithString: appL10n(
+            "实际转速接近目标值即可，不一定完全相等。",
+            "Actual RPM only needs to stay near the target; it may not match exactly."
+        ))
+        rpmExplanationLabel.textColor = .secondaryLabelColor
+        rpmExplanationLabel.font = .systemFont(ofSize: 12)
+        rpmExplanationLabel.alignment = .center
+        rpmExplanationLabel.lineBreakMode = .byWordWrapping
+        rpmExplanationLabel.maximumNumberOfLines = 2
+        rpmExplanationLabel.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(rpmExplanationLabel)
+
+        let rpmHelpButton = NSButton(title: "?", target: self, action: #selector(showRPMHelp))
+        rpmHelpButton.bezelStyle = .helpButton
+        rpmHelpButton.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(rpmHelpButton)
+
         let stepHintLabel = NSTextField(labelWithString: "")
         stepHintLabel.textColor = .secondaryLabelColor
         stepHintLabel.alignment = .center
@@ -1985,7 +2008,14 @@ class SpeedSettingWindowController: NSWindowController {
             rpmLabel.topAnchor.constraint(equalTo: rpmSlider.bottomAnchor, constant: 10),
             rpmLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
 
-            stepHintLabel.topAnchor.constraint(equalTo: rpmLabel.bottomAnchor, constant: 6),
+            rpmExplanationLabel.topAnchor.constraint(equalTo: rpmLabel.bottomAnchor, constant: 6),
+            rpmExplanationLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            rpmExplanationLabel.widthAnchor.constraint(lessThanOrEqualTo: contentView.widthAnchor, constant: -70),
+
+            rpmHelpButton.centerYAnchor.constraint(equalTo: rpmExplanationLabel.centerYAnchor),
+            rpmHelpButton.leadingAnchor.constraint(equalTo: rpmExplanationLabel.trailingAnchor, constant: 6),
+
+            stepHintLabel.topAnchor.constraint(equalTo: rpmExplanationLabel.bottomAnchor, constant: 6),
             stepHintLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
 
             applyStatusLabel.topAnchor.constraint(equalTo: stepHintLabel.bottomAnchor, constant: 6),
@@ -2065,6 +2095,30 @@ class SpeedSettingWindowController: NSWindowController {
     @objc private func controlModeChanged() {
         controlMode = (controlModeSegmentedControl?.selectedSegment == 1) ? .stepped : .continuous
         updateSliderDisplay()
+    }
+
+    @objc private func showRPMHelp() {
+        let alert = NSAlert()
+        alert.messageText = appL10n("为什么实际转速不完全等于设定值？", "Why doesn't actual RPM exactly match the target?")
+        alert.informativeText = appL10n(
+            """
+            iFanControl 会向系统发送目标转速，但最终转速仍由 SMC、风扇硬件和系统保护策略共同决定。
+
+            因此实际 RPM 可能会有轻微上下浮动。例如目标是 3000 RPM，实际稳定在 2960 RPM 附近，通常就说明控制已经生效。
+
+            这是正常现象，不代表设置失败。
+            """,
+            """
+            iFanControl sends a target RPM to the system, but the final speed is still affected by the SMC, fan hardware, and system protection behavior.
+
+            Actual RPM may fluctuate slightly. For example, if the target is 3000 RPM and the fan stabilizes near 2960 RPM, control is usually working as expected.
+
+            This is normal and does not mean the setting failed.
+            """
+        )
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: appL10n("明白了", "Got it"))
+        alert.runModal()
     }
 
     @objc func applySpeed() {
@@ -2248,6 +2302,142 @@ class SafetyFloorWindowController: NSWindowController {
 }
 
 @MainActor
+final class AdaptiveCardView: NSView {
+    private let backgroundAlpha: CGFloat
+
+    init(cornerRadius: CGFloat = 16, backgroundAlpha: CGFloat = 0.84) {
+        self.backgroundAlpha = backgroundAlpha
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = cornerRadius
+        layer?.borderWidth = 1
+        refreshThemeColors()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        refreshThemeColors()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshThemeColors()
+    }
+
+    func refreshThemeColors() {
+        guard let layer else { return }
+        let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let borderColor = isDark
+            ? NSColor(calibratedWhite: 0.32, alpha: 1)
+            : NSColor(calibratedWhite: 0.78, alpha: 1)
+        let backgroundColor = isDark
+            ? NSColor(calibratedWhite: 0.12, alpha: backgroundAlpha)
+            : NSColor(calibratedWhite: 1.0, alpha: backgroundAlpha)
+        layer.borderColor = cgColor(for: borderColor)
+        layer.backgroundColor = cgColor(for: backgroundColor)
+        needsDisplay = true
+    }
+
+    private func cgColor(for color: NSColor) -> CGColor {
+        var resolvedColor = color.cgColor
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            resolvedColor = color.cgColor
+        }
+        return resolvedColor
+    }
+}
+
+@MainActor
+final class AdaptiveQRCodeImageView: NSImageView {
+    private static let qrContext = CIContext(options: nil)
+    private var payload: String = ""
+    private let targetSize: CGFloat
+
+    init(targetSize: CGFloat) {
+        self.targetSize = targetSize
+        super.init(frame: .zero)
+        imageScaling = .scaleProportionallyUpOrDown
+        wantsLayer = true
+        layer?.cornerRadius = 12
+        layer?.masksToBounds = true
+        refreshThemeColors()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func setPayload(_ payload: String) {
+        self.payload = payload
+        refreshThemeColors()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        refreshThemeColors()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshThemeColors()
+    }
+
+    func refreshThemeColors() {
+        layer?.backgroundColor = cgColor(for: backgroundColor)
+        image = generateQRCodeImage()
+        needsDisplay = true
+    }
+
+    private var isDarkMode: Bool {
+        effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+    }
+
+    private var foregroundColor: NSColor {
+        isDarkMode ? .white : .black
+    }
+
+    private var backgroundColor: NSColor {
+        isDarkMode ? NSColor(calibratedWhite: 0.08, alpha: 1) : .white
+    }
+
+    private func cgColor(for color: NSColor) -> CGColor {
+        var resolvedColor = color.cgColor
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            resolvedColor = color.cgColor
+        }
+        return resolvedColor
+    }
+
+    private func generateQRCodeImage() -> NSImage? {
+        guard let data = payload.data(using: .utf8),
+              let generator = CIFilter(name: "CIQRCodeGenerator") else {
+            return nil
+        }
+        generator.setValue(data, forKey: "inputMessage")
+        generator.setValue("M", forKey: "inputCorrectionLevel")
+        guard var outputImage = generator.outputImage else { return nil }
+
+        if let colorFilter = CIFilter(name: "CIFalseColor") {
+            colorFilter.setValue(outputImage, forKey: kCIInputImageKey)
+            colorFilter.setValue(CIColor(color: foregroundColor), forKey: "inputColor0")
+            colorFilter.setValue(CIColor(color: backgroundColor), forKey: "inputColor1")
+            outputImage = colorFilter.outputImage ?? outputImage
+        }
+
+        let extent = outputImage.extent.integral
+        guard extent.width > 0 else { return nil }
+        let scale = max(1, floor(targetSize / extent.width))
+        let transformed = outputImage.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        guard let cgImage = Self.qrContext.createCGImage(transformed, from: transformed.extent) else { return nil }
+        return NSImage(cgImage: cgImage, size: NSSize(width: transformed.extent.width, height: transformed.extent.height))
+    }
+}
+
+@MainActor
 class HelpWindowController: NSWindowController {
     private enum Section: Int, CaseIterable {
         case overview
@@ -2275,9 +2465,9 @@ class HelpWindowController: NSWindowController {
     private var sectionTitleLabel: NSTextField?
     private var sectionViews: [Section: NSView] = [:]
     private var donationMethodControl: NSSegmentedControl?
-    private var qrImageView: NSImageView?
+    private var qrImageView: AdaptiveQRCodeImageView?
     private var qrCaptionLabel: NSTextField?
-    private let qrContext = CIContext(options: nil)
+    private var adaptiveCards: [AdaptiveCardView] = []
     private let sidebarWidth: CGFloat = 176
     private let contentWidth: CGFloat = 600
 
@@ -2295,10 +2485,20 @@ class HelpWindowController: NSWindowController {
         applyWindowMaterialStyle(window)
         setupUI()
         select(section: .overview)
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(systemAppearanceChanged(_:)),
+            name: Notification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil
+        )
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        DistributedNotificationCenter.default().removeObserver(self)
     }
 
     private func makeSectionTitle(_ text: String) -> NSTextField {
@@ -2308,12 +2508,8 @@ class HelpWindowController: NSWindowController {
     }
 
     private func makeCardView() -> NSView {
-        let card = NSView()
-        card.wantsLayer = true
-        card.layer?.cornerRadius = 16
-        card.layer?.borderWidth = 1
-        card.layer?.borderColor = NSColor.separatorColor.cgColor
-        card.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.84).cgColor
+        let card = AdaptiveCardView()
+        adaptiveCards.append(card)
         return card
     }
 
@@ -2794,12 +2990,8 @@ class HelpWindowController: NSWindowController {
         methodControl.selectedSegment = 0
         stack.addArrangedSubview(methodControl)
 
-        let qrCard = NSView()
-        qrCard.wantsLayer = true
-        qrCard.layer?.cornerRadius = 18
-        qrCard.layer?.borderWidth = 1
-        qrCard.layer?.borderColor = NSColor.separatorColor.cgColor
-        qrCard.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.9).cgColor
+        let qrCard = AdaptiveCardView(cornerRadius: 18, backgroundAlpha: 0.9)
+        adaptiveCards.append(qrCard)
         qrCard.translatesAutoresizingMaskIntoConstraints = false
         qrCard.widthAnchor.constraint(equalToConstant: 280).isActive = true
         stack.addArrangedSubview(qrCard)
@@ -2821,12 +3013,7 @@ class HelpWindowController: NSWindowController {
         caption.font = .systemFont(ofSize: 12, weight: .medium)
         caption.textColor = .secondaryLabelColor
 
-        let qrImage = NSImageView()
-        qrImage.imageScaling = .scaleProportionallyUpOrDown
-        qrImage.wantsLayer = true
-        qrImage.layer?.backgroundColor = NSColor.white.cgColor
-        qrImage.layer?.cornerRadius = 12
-        qrImage.layer?.masksToBounds = true
+        let qrImage = AdaptiveQRCodeImageView(targetSize: 168)
         qrImage.translatesAutoresizingMaskIntoConstraints = false
         qrImage.widthAnchor.constraint(equalToConstant: 168).isActive = true
         qrImage.heightAnchor.constraint(equalToConstant: 168).isActive = true
@@ -2881,23 +3068,25 @@ class HelpWindowController: NSWindowController {
         let payload = isWechat ? wechatDonatePayload : alipayDonatePayload
         let caption = isWechat ? appL10n("微信赞赏码", "WeChat Donation QR") : appL10n("支付宝收款码", "Alipay Donation QR")
         qrCaptionLabel?.stringValue = caption
-        qrImageView?.image = generateQRCodeImage(from: payload, targetSize: 168)
+        qrImageView?.setPayload(payload)
     }
 
-    private func generateQRCodeImage(from string: String, targetSize: CGFloat) -> NSImage? {
-        guard let data = string.data(using: .utf8),
-              let filter = CIFilter(name: "CIQRCodeGenerator") else {
-            return nil
+    @objc private func systemAppearanceChanged(_ notification: Notification) {
+        DispatchQueue.main.async { [weak self] in
+            self?.refreshAdaptiveThemeColors()
         }
-        filter.setValue(data, forKey: "inputMessage")
-        filter.setValue("M", forKey: "inputCorrectionLevel")
-        guard let outputImage = filter.outputImage else { return nil }
-        let extent = outputImage.extent.integral
-        guard extent.width > 0 else { return nil }
-        let scale = max(1, floor(targetSize / extent.width))
-        let transformed = outputImage.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-        guard let cgImage = qrContext.createCGImage(transformed, from: transformed.extent) else { return nil }
-        return NSImage(cgImage: cgImage, size: NSSize(width: transformed.extent.width, height: transformed.extent.height))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            self?.refreshAdaptiveThemeColors()
+        }
+    }
+
+    private func refreshAdaptiveThemeColors() {
+        for card in adaptiveCards {
+            card.refreshThemeColors()
+        }
+        qrImageView?.refreshThemeColors()
+        updateSidebarSelection()
+        window?.contentView?.needsDisplay = true
     }
 
     @objc private func checkUpdates() {

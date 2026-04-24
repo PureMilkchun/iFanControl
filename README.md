@@ -140,7 +140,7 @@ CI 位于 `.github/workflows/swift.yml`，默认会对 `main` 执行构建检查
 ./uninstall.sh
 ```
 
-如果你更习惯双击，也可以使用 `uninstall.command`。
+如果脚本来自下载的 ZIP，推荐像安装一样将 `uninstall.sh` 拖入终端执行；不要依赖双击 `.command` 文件。
 
 ## 致谢
 

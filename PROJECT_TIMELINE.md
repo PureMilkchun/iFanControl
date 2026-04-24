@@ -80,6 +80,89 @@
 - 时间戳记忆改为：
   - `/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_TIMELINE.md`
 
+### 2026-04-24 01:30 左右
+- 官网下载策略正式切换完成：
+  - 主下载按钮改为 `./iFanControl-macOS.dmg`
+  - 页脚下载入口改为 `./iFanControl-macOS.dmg`
+  - 中英文页脚文案改为“下载 DMG / Download DMG”
+- `docs` 目录新增固定文件名 DMG：
+  - `/Users/puremilk/Documents/mac fancontrol/docs/iFanControl-macOS.dmg`
+- 官网已完成发布，发布预览地址：
+  - `https://b23c2448.ifan-59w.pages.dev`
+
+### 2026-04-24 01:35 左右
+- GitHub Release `v2.8.21` 已确认包含双资产：
+  - `iFanControl-macOS.dmg`（官网手动下载安装）
+  - `iFanControl-macOS.zip`（应用内自动更新）
+- `update-manifest.json` 保持 ZIP 更新链路不变（`macos_arm64_zip_url` 仍指向 ZIP）
+
+### 2026-04-24 01:40 左右
+- 修复 GitHub Actions 长期构建告警：
+  - 原因 1：仓库无 `Tests/` 时 `swift test` 直接失败
+  - 原因 2：`Package.swift` 使用 `swift-tools-version: 6.2`，而 GitHub Runner 为 6.1
+- 处理动作：
+  - workflow 调整为“仅在存在测试文件时运行 `swift test`”
+  - `Package.swift` tools version 下调为 `6.1`
+  - `actions/checkout` 升级到 `v5`，消除 Node20 弃用警告
+- 结果：
+  - 最新 CI 连续通过，`Swift` workflow 已恢复绿色
+
+### 2026-04-24 01:50 左右
+- 为验证更新链路，创建 `2.8.22` 测试更新：
+  - 基于 `2.8.21` 复制出测试 ZIP
+  - 将 `update-manifest.json` 提升到 `2.8.22 / build 22`
+  - 发布到 Pages，并创建 GitHub `v2.8.22` Release
+
+### 2026-04-24 02:00 左右
+- 收到反馈：App 内“完整卸载”入口消失
+- 根因定位：
+  - 完整卸载实现停留在 `distribution-a/prototype-app` 实验线
+  - 正式更新 ZIP 仍使用主线旧包，未包含该功能
+- 处理动作：
+  - 将完整卸载能力正式并回 `macfan-control-v2` 主线
+  - 在 `关于/帮助 -> 诊断与支持` 恢复 `完整卸载 / Full Uninstall`
+  - 保留一次性临时卸载脚本流程（退出后继续清理）
+
+### 2026-04-24 02:05 左右
+- 重新打包并发布 `2.8.22` 正式更新 ZIP（包含完整卸载恢复）
+- 同步更新：
+  - `docs/iFanControl-macOS.zip`
+  - `docs/update-manifest.json`（新 hash/size）
+  - GitHub `v2.8.22` Release 资产
+- 主仓库代码已推送并通过 CI
+
+### 2026-04-24 02:15 左右
+- 新发现：网络下载场景下，DMG 中双击 `.command` 依旧容易被 Gatekeeper 持续拦截
+- 决策变更：
+  - 放弃 DMG 作为正式安装主链路
+  - 回退为“拖拽 `install.sh` 到终端执行”的 ZIP 安装模式
+- 同步动作：
+  - 安装指南 HTML 回退并修正文案（明确不要双击 `Install.command`）
+  - README 中英文同步改为拖拽安装推荐
+  - 更新器逻辑改为优先 `install.sh`，避免 command-first 行为
+
+### 2026-04-24 02:20 左右
+- 虽然重打了可包含 `.sh` 的 DMG 并验证成功，但最终仍确认正式策略为 ZIP-only
+- 官网最终发布状态：
+  - 官网下载按钮：`ZIP`
+  - 应用内更新：`ZIP`
+  - `update-manifest.json` 说明已更新为“全链路 ZIP”
+- 最终结论：
+  - **首装走 ZIP**
+  - **更新走 ZIP**
+
+### 2026-04-24 13:15 左右
+- 准备发布 `2.8.23 / build 23`：
+  - 修复关于/帮助窗口在系统深浅色切换后卡片不换色的问题
+  - 支持作者二维码改为随深浅色重新生成（亮色黑码白底，暗色白码深底）
+  - 手动转速弹窗新增“实际 RPM 不一定完全等于设定值”的解释入口
+  - App 内完整卸载补齐旧配置目录 `~/Library/Application Support/iFanControl` 清理
+- 官网与自动更新继续保持 ZIP-only：
+  - `docs/iFanControl-macOS.zip`
+  - `docs/iFanControl-macOS-2.8.23.zip`
+  - `docs/update-manifest.json` 升到 `2.8.23 / build 23`
+- 官网发布目录中移除残留 `iFanControl-macOS.dmg`，避免公开 DMG 入口继续误导用户。
+
 ## 2026-04-23
 
 ### 2026-04-23

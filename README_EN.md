@@ -102,7 +102,7 @@ CI is defined in `.github/workflows/swift.yml`.
 ./uninstall.sh
 ```
 
-If you prefer double-clicking, use `uninstall.command`.
+If the script came from a downloaded ZIP, drag `uninstall.sh` into Terminal and run it there; do not rely on double-clicking `.command` files.
 
 ## Credits
 
