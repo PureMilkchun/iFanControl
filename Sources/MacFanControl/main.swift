@@ -1023,7 +1023,6 @@ class UpdateService {
     private let releasesHomeURL = URL(string: "https://github.com/PureMilkchun/iFanControl/releases")!
     private let lastCheckKey = "ifancontrol.update.last_check"
     private let automaticCheckEnabledKey = "ifancontrol.update.automatic_check_enabled"
-    private let checkInterval: TimeInterval = 24 * 60 * 60
     private var isChecking = false
 
     private var currentShortVersion: String {
@@ -1087,7 +1086,10 @@ class UpdateService {
 
     func checkForUpdates(triggeredByUser: Bool) {
         if isChecking { return }
-        if !triggeredByUser && !shouldRunScheduledCheck() { return }
+        if !triggeredByUser && !automaticChecksEnabled {
+            logger.info("Skipping automatic update check because automatic checks are disabled.")
+            return
+        }
 
         isChecking = true
         logger.info("Starting update check. triggeredByUser=\(triggeredByUser, privacy: .public)")
@@ -1125,16 +1127,6 @@ class UpdateService {
                 }
             }
         }
-    }
-
-    private func shouldRunScheduledCheck() -> Bool {
-        guard automaticChecksEnabled else {
-            return false
-        }
-        guard let last = UserDefaults.standard.object(forKey: lastCheckKey) as? Date else {
-            return true
-        }
-        return Date().timeIntervalSince(last) >= checkInterval
     }
 
     private func recordLastCheckNow() {
