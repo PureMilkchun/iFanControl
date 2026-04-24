@@ -400,6 +400,93 @@ final class InstallationCoordinator {
     }
 }
 
+// 匿名活跃统计：仅发送随机安装 ID、版本号和 build，每天最多一次。
+final class PrivacyStatsService: @unchecked Sendable {
+    static let shared = PrivacyStatsService()
+
+    private let logger = Logger(subsystem: appSubsystem, category: "PrivacyStats")
+    private let endpointURL = URL(string: "https://ifan-59w.pages.dev/api/heartbeat")!
+    private let enabledKey = "ifancontrol.privacy_stats.enabled"
+    private let installIDKey = "ifancontrol.privacy_stats.install_id"
+    private let lastHeartbeatDayKey = "ifancontrol.privacy_stats.last_heartbeat_day"
+
+    private init() {}
+
+    var anonymousStatsEnabled: Bool {
+        get {
+            if UserDefaults.standard.object(forKey: enabledKey) == nil {
+                return true
+            }
+            return UserDefaults.standard.bool(forKey: enabledKey)
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: enabledKey)
+            logger.info("Anonymous active-use stats toggled. enabled=\(newValue, privacy: .public)")
+        }
+    }
+
+    func sendDailyHeartbeatIfNeeded() {
+        guard anonymousStatsEnabled else {
+            logger.info("Skipping anonymous heartbeat because the user disabled it.")
+            return
+        }
+
+        let day = Self.utcDayString()
+        guard UserDefaults.standard.string(forKey: lastHeartbeatDayKey) != day else {
+            return
+        }
+
+        let installID = currentInstallID()
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+
+        Task {
+            do {
+                var request = URLRequest(url: endpointURL)
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.timeoutInterval = 8
+
+                let payload: [String: String] = [
+                    "install_id": installID,
+                    "version": shortVersion,
+                    "build": buildVersion
+                ]
+                let body = try JSONSerialization.data(withJSONObject: payload)
+                let (_, response) = try await URLSession.shared.upload(for: request, from: body)
+
+                guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                    logger.warning("Anonymous heartbeat was not accepted by the server.")
+                    return
+                }
+
+                UserDefaults.standard.set(day, forKey: lastHeartbeatDayKey)
+                logger.info("Anonymous heartbeat sent successfully.")
+            } catch {
+                logger.warning("Anonymous heartbeat failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
+    private func currentInstallID() -> String {
+        if let existing = UserDefaults.standard.string(forKey: installIDKey), !existing.isEmpty {
+            return existing
+        }
+        let newID = UUID().uuidString
+        UserDefaults.standard.set(newID, forKey: installIDKey)
+        return newID
+    }
+
+    private static func utcDayString(for date: Date = Date()) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+}
+
 enum ManualRPMControlMode: String {
     case continuous
     case stepped
@@ -1790,6 +1877,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
             UpdateService.shared.checkForUpdates(triggeredByUser: false)
         }
+
+        // 匿名活跃统计每天最多发送一次，且可在“关于/帮助”中关闭。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
+            PrivacyStatsService.shared.sendDailyHeartbeatIfNeeded()
+        }
     }
     
     func applicationWillTerminate(_ notification: Notification) {
@@ -2449,6 +2541,7 @@ class HelpWindowController: NSWindowController {
 
     private var versionLabel: NSTextField?
     private var automaticUpdateCheckbox: NSButton?
+    private var anonymousStatsCheckbox: NSButton?
     private var currentSection: Section = .overview
     private var sidebarButtons: [Section: NSButton] = [:]
     private var appHeaderView: NSView?
@@ -2807,6 +2900,27 @@ class HelpWindowController: NSWindowController {
         autoCheck.state = UpdateService.shared.automaticChecksEnabled ? .on : .off
         automaticUpdateCheckbox = autoCheck
         stack.addArrangedSubview(autoCheck)
+
+        let statsCheck = NSButton(
+            checkboxWithTitle: appL10n("共享匿名活跃统计", "Share anonymous active-use statistics"),
+            target: self,
+            action: #selector(toggleAnonymousStats(_:))
+        )
+        statsCheck.state = PrivacyStatsService.shared.anonymousStatsEnabled ? .on : .off
+        anonymousStatsCheckbox = statsCheck
+        stack.addArrangedSubview(statsCheck)
+
+        let statsHint = makeBodyLabel(
+            appL10n(
+                "仅用于了解软件是否仍被使用：每天最多发送一次随机匿名 ID、版本号和 build，不发送姓名、邮箱、序列号或设备名称。",
+                "Used only to understand whether the app is still active: at most once per day, it sends a random anonymous ID, version, and build. It does not send your name, email, serial number, or device name."
+            )
+        )
+        statsHint.font = .systemFont(ofSize: 11)
+        statsHint.alignment = .center
+        statsHint.preferredMaxLayoutWidth = 430
+        stack.addArrangedSubview(statsHint)
+
         return view
     }
 
@@ -3028,6 +3142,7 @@ class HelpWindowController: NSWindowController {
         window?.title = appL10n("关于/帮助", "About / Help")
         versionLabel?.stringValue = appL10n("版本 \(UpdateService.shared.currentVersionDisplay)", "Version \(UpdateService.shared.currentVersionDisplay)")
         automaticUpdateCheckbox?.state = UpdateService.shared.automaticChecksEnabled ? .on : .off
+        anonymousStatsCheckbox?.state = PrivacyStatsService.shared.anonymousStatsEnabled ? .on : .off
         refreshDonationPreview()
         super.showWindow(sender)
     }
@@ -3111,6 +3226,13 @@ class HelpWindowController: NSWindowController {
 
     @objc private func toggleAutomaticChecks(_ sender: NSButton) {
         UpdateService.shared.automaticChecksEnabled = (sender.state == .on)
+    }
+
+    @objc private func toggleAnonymousStats(_ sender: NSButton) {
+        PrivacyStatsService.shared.anonymousStatsEnabled = (sender.state == .on)
+        if sender.state == .on {
+            PrivacyStatsService.shared.sendDailyHeartbeatIfNeeded()
+        }
     }
 
 }

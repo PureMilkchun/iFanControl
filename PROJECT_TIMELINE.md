@@ -172,6 +172,25 @@
   - `last_check` 只保留为记录信息，不再阻止发现新版本
 - 准备发布 `2.8.24 / build 24`，专门修复自动检查更新不弹窗问题。
 
+### 2026-04-24 14:40 左右
+- 新增“隐私优先统计”全链路（不改变 ZIP 更新契约）：
+  - 官网新增 `Pages Functions`：
+    - `GET /download`：302 到 `iFanControl-macOS.zip`，并写入聚合下载计数
+    - `POST /api/heartbeat`：写入匿名活跃计数（仅随机安装 ID 的哈希、version、build）
+    - `GET /api/stats`：统计读取接口，已加 `Bearer` token 鉴权
+  - Cloudflare Pages 项目 `ifan` 已绑定 KV 命名空间 `IFAN_STATS`
+  - 线上已验证：
+    - `/download` 返回 302 且可累计 `download:total`
+    - `/api/heartbeat` 返回 `{"ok":true}` 且可累计活跃计数
+    - `/api/stats` 未带 token 返回 401，带 token 可读统计
+- App 端同步改动：
+  - 新增 `PrivacyStatsService`，应用启动后延迟上报每日一次匿名心跳
+  - `关于/帮助 -> 简介` 新增“共享匿名活跃统计”开关及说明文案
+- 发布产物升级到 `2.8.25 / build 25`：
+  - `docs/update-manifest.json` 升到 `2.8.25 / 25`
+  - `docs/iFanControl-macOS.zip` 已替换为 `2.8.25`，sha256 为 `553f9861894e65394fcaf911799d201412c927d5d56f798c8d248e169b22805c`
+  - 官网页面下载入口改为 `./download`，构建标记更新为 `build 20260424b`
+
 ## 2026-04-23
 
 ### 2026-04-23

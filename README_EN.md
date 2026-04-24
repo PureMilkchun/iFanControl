@@ -25,6 +25,7 @@ This repository now keeps only source code, scripts, and essential resources. Re
 - Temperature source selection with automatic hottest-sensor mode by default
 - In-app updates with manual and scheduled checks
 - Unified “About iFanControl” window with version, update controls, GitHub, and restart
+- Anonymous active-use stats, sent at most once per day and configurable in About / Help
 - Launch at login
 - Install diagnostics and uninstall scripts
 
@@ -61,7 +62,11 @@ You can also open [安装说明.html](安装说明.html) for the illustrated ins
 1. Open `/Applications/iFanControl.app`
 2. The app lives in the menu bar
 3. Use the menu to switch auto/manual mode, edit the fan curve, and adjust the safety floor RPM
-4. Open `About iFanControl...` to view version info, check for updates, toggle automatic update checks, restart the app, or open GitHub
+4. Open `About iFanControl...` to view version info, check for updates, toggle automatic update checks, toggle anonymous stats, restart the app, or open GitHub
+
+## Privacy & Stats
+
+iFanControl sends an anonymous active-use heartbeat at most once per day by default, so the solo developer can understand whether the app is still being used in the real world. It only includes a random anonymous ID, version, and build; it does not send your name, email, serial number, device name, fan readings, or temperature readings. You can disable this in `About / Help -> Overview` by turning off “Share anonymous active-use statistics”.
 
 ## Repository Layout
 
@@ -92,7 +97,7 @@ CI is defined in `.github/workflows/swift.yml`.
 ## Update Flow
 
 - Manual check: `About iFanControl... -> Check for Updates`
-- Automatic check: delayed on launch with a 24-hour throttle
+- Automatic check: delayed on launch; when enabled, it fetches the manifest directly so new releases are not missed
 - Update source: `pages.dev` manifest and ZIP
 - Failure fallback: open GitHub Releases for manual download
 
