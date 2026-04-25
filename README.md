@@ -45,7 +45,7 @@ English readers can use [README_EN.md](README_EN.md).
 
 - macOS 13 及以上
 - 带风扇的 Apple Silicon Mac
-- 重点覆盖 M1 / M2 / M3 / M4 系列
+- 重点覆盖 M1 / M2 / M3 / M4 / M5 系列
 
 说明：无风扇设备不会获得有效的风扇控制能力。温度源列表展示的是系统实际暴露的热传感器，不一定与 CPU / GPU 核心数量一一对应。
 
