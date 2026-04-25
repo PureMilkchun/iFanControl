@@ -9,9 +9,14 @@
 import AppKit
 import Foundation
 
-private let usesEnglishInFanCurveEditor = Locale.preferredLanguages.first?.lowercased().hasPrefix("en") ?? false
+private let currentLanguage: String = {
+    if let saved = UserDefaults.standard.string(forKey: "ifancontrol.ui.language") {
+        return saved
+    }
+    return Locale.preferredLanguages.first?.lowercased().hasPrefix("en") == true ? "en" : "zh"
+}()
 private func fanCurveL10n(_ zh: String, _ en: String) -> String {
-    usesEnglishInFanCurveEditor ? en : zh
+    currentLanguage == "en" ? en : zh
 }
 
 // 配置结构（与主应用一致）

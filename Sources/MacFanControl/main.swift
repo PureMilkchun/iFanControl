@@ -34,9 +34,14 @@ private let defaultManualRPMStep = 500
 private let supportEmailAddress = "puremilkchun@foxmail.com"
 private let wechatDonatePayload = "wxp://f2f0rVY6iLnpjTqEKL4HKTHRw3Ej81vNbWU9UUXk4msd30ehG7Xh9NwXEyNsZaTn5gZE"
 private let alipayDonatePayload = "https://qr.alipay.com/fkx16601ptfadpsxd3mfpf6"
-private let appUsesEnglish = Locale.preferredLanguages.first?.lowercased().hasPrefix("en") ?? false
+private let currentLanguage: String = {
+    if let saved = UserDefaults.standard.string(forKey: "ifancontrol.ui.language") {
+        return saved
+    }
+    return Locale.preferredLanguages.first?.lowercased().hasPrefix("en") == true ? "en" : "zh"
+}()
 private func appL10n(_ zh: String, _ en: String) -> String {
-    appUsesEnglish ? en : zh
+    currentLanguage == "en" ? en : zh
 }
 
 final class AppLog: @unchecked Sendable {
@@ -1575,6 +1580,19 @@ class MenuBarManager {
         aboutItem.target = self
         menu.addItem(aboutItem)
 
+        let languageItem = NSMenuItem(title: appL10n("语言", "Language"), action: nil, keyEquivalent: "")
+        let languageMenu = NSMenu()
+        let zhItem = NSMenuItem(title: "中文", action: #selector(switchToChinese), keyEquivalent: "")
+        zhItem.target = self
+        zhItem.state = currentLanguage == "zh" ? .on : .off
+        languageMenu.addItem(zhItem)
+        let enItem = NSMenuItem(title: "English", action: #selector(switchToEnglish), keyEquivalent: "")
+        enItem.target = self
+        enItem.state = currentLanguage == "en" ? .on : .off
+        languageMenu.addItem(enItem)
+        menu.setSubmenu(languageMenu, for: languageItem)
+        menu.addItem(languageItem)
+
         menu.addItem(NSMenuItem.separator())
 
         let restartItem = NSMenuItem(title: appL10n("重新启动", "Restart"), action: #selector(restartApp), keyEquivalent: "r")
@@ -1697,6 +1715,28 @@ class MenuBarManager {
         presentWindowFront(safetyFloorWindowController?.window)
     }
 
+    @objc func switchToChinese() {
+        UserDefaults.standard.set("zh", forKey: "ifancontrol.ui.language")
+        showRestartRequiredAlert()
+    }
+
+    @objc func switchToEnglish() {
+        UserDefaults.standard.set("en", forKey: "ifancontrol.ui.language")
+        showRestartRequiredAlert()
+    }
+
+    private func showRestartRequiredAlert() {
+        let alert = NSAlert()
+        alert.messageText = appL10n("语言已切换", "Language Changed")
+        alert.informativeText = appL10n("重启应用后生效。是否现在重启？", "Restart the app to apply. Restart now?")
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: appL10n("立即重启", "Restart Now"))
+        alert.addButton(withTitle: appL10n("稍后", "Later"))
+        if alert.runModal() == .alertFirstButtonReturn {
+            restartApp()
+        }
+    }
+
     @objc func selectAutomaticTemperatureSource() {
         var config = ConfigManager.shared.loadConfig()
         config.temperatureSourceMode = "hottest"
@@ -1721,6 +1761,22 @@ class MenuBarManager {
 
     private func maybeShowStartupGuidance() {
         let defaults = UserDefaults.standard
+
+        // 首次启动语言选择
+        if defaults.string(forKey: "ifancontrol.ui.language") == nil {
+            let alert = NSAlert()
+            alert.messageText = "选择语言 / Select Language"
+            alert.informativeText = "请选择界面语言。你可以在菜单中随时更改。\nPlease select your language. You can change it anytime from the menu."
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "中文")
+            alert.addButton(withTitle: "English")
+            let response = alert.runModal()
+            if response == .alertSecondButtonReturn {
+                defaults.set("en", forKey: "ifancontrol.ui.language")
+            } else {
+                defaults.set("zh", forKey: "ifancontrol.ui.language")
+            }
+        }
 
         if FanManager.shared.fanCount == 0 && !defaults.bool(forKey: unsupportedHardwareHintKey) {
             defaults.set(true, forKey: unsupportedHardwareHintKey)

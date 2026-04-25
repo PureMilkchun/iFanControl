@@ -1,8 +1,13 @@
 import Foundation
 
-private let usesEnglishInSensors = Locale.preferredLanguages.first?.lowercased().hasPrefix("en") ?? false
+private let currentLanguage: String = {
+    if let saved = UserDefaults.standard.string(forKey: "ifancontrol.ui.language") {
+        return saved
+    }
+    return Locale.preferredLanguages.first?.lowercased().hasPrefix("en") == true ? "en" : "zh"
+}()
 private func sensorL10n(_ zh: String, _ en: String) -> String {
-    usesEnglishInSensors ? en : zh
+    currentLanguage == "en" ? en : zh
 }
 
 enum TemperatureSensorCategory: Int, CaseIterable {
