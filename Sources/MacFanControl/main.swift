@@ -400,7 +400,7 @@ final class InstallationCoordinator {
     }
 }
 
-// 匿名活跃统计：仅发送随机安装 ID、版本号和 build，每天最多一次。
+// 匿名运行反馈：仅发送随机安装 ID、版本号和 build，按固定间隔上报。
 final class PrivacyStatsService: @unchecked Sendable {
     static let shared = PrivacyStatsService()
 
@@ -408,7 +408,8 @@ final class PrivacyStatsService: @unchecked Sendable {
     private let endpointURL = URL(string: "https://ifan-59w.pages.dev/api/heartbeat")!
     private let enabledKey = "ifancontrol.privacy_stats.enabled"
     private let installIDKey = "ifancontrol.privacy_stats.install_id"
-    private let lastHeartbeatDayKey = "ifancontrol.privacy_stats.last_heartbeat_day"
+    private let lastHeartbeatAtKey = "ifancontrol.privacy_stats.last_heartbeat_at"
+    private let reportInterval: TimeInterval = 15 * 60
 
     private init() {}
 
@@ -421,18 +422,19 @@ final class PrivacyStatsService: @unchecked Sendable {
         }
         set {
             UserDefaults.standard.set(newValue, forKey: enabledKey)
-            logger.info("Anonymous active-use stats toggled. enabled=\(newValue, privacy: .public)")
+            logger.info("Anonymous user-count stats toggled. enabled=\(newValue, privacy: .public)")
         }
     }
 
-    func sendDailyHeartbeatIfNeeded() {
+    func sendHeartbeatIfNeeded(force: Bool = false) {
         guard anonymousStatsEnabled else {
             logger.info("Skipping anonymous heartbeat because the user disabled it.")
             return
         }
 
-        let day = Self.utcDayString()
-        guard UserDefaults.standard.string(forKey: lastHeartbeatDayKey) != day else {
+        let now = Date().timeIntervalSince1970
+        let lastHeartbeatAt = UserDefaults.standard.double(forKey: lastHeartbeatAtKey)
+        if !force, lastHeartbeatAt > 0, now - lastHeartbeatAt < reportInterval {
             return
         }
 
@@ -460,7 +462,7 @@ final class PrivacyStatsService: @unchecked Sendable {
                     return
                 }
 
-                UserDefaults.standard.set(day, forKey: lastHeartbeatDayKey)
+                UserDefaults.standard.set(now, forKey: lastHeartbeatAtKey)
                 logger.info("Anonymous heartbeat sent successfully.")
             } catch {
                 logger.warning("Anonymous heartbeat failed: \(error.localizedDescription, privacy: .public)")
@@ -477,14 +479,6 @@ final class PrivacyStatsService: @unchecked Sendable {
         return newID
     }
 
-    private static func utcDayString(for date: Date = Date()) -> String {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
-    }
 }
 
 enum ManualRPMControlMode: String {
@@ -1852,6 +1846,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     static weak var shared: AppDelegate?
     private var lastControlLoopLogTime: Date?
     private let controlLoopLogInterval: TimeInterval = 10.0
+    private var statsHeartbeatTimer: Timer?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
@@ -1878,14 +1873,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             UpdateService.shared.checkForUpdates(triggeredByUser: false)
         }
 
-        // 匿名活跃统计每天最多发送一次，且可在“关于/帮助”中关闭。
+        // 匿名运行反馈：启动后先上报一次，运行期间每 15 分钟尝试上报一次。
         DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
-            PrivacyStatsService.shared.sendDailyHeartbeatIfNeeded()
+            PrivacyStatsService.shared.sendHeartbeatIfNeeded(force: true)
+        }
+        statsHeartbeatTimer?.invalidate()
+        statsHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) { _ in
+            PrivacyStatsService.shared.sendHeartbeatIfNeeded()
+        }
+        if let timer = statsHeartbeatTimer {
+            RunLoop.main.add(timer, forMode: .common)
         }
     }
     
     func applicationWillTerminate(_ notification: Notification) {
         AppLog.shared.info("application will terminate")
+        statsHeartbeatTimer?.invalidate()
         _ = CommandExecutor.shared.setFanAuto()
     }
 
@@ -2902,18 +2905,31 @@ class HelpWindowController: NSWindowController {
         stack.addArrangedSubview(autoCheck)
 
         let statsCheck = NSButton(
-            checkboxWithTitle: appL10n("共享匿名活跃统计", "Share anonymous active-use statistics"),
+            checkboxWithTitle: appL10n("匿名统计用户量", "Anonymous user-count stats"),
             target: self,
             action: #selector(toggleAnonymousStats(_:))
         )
         statsCheck.state = PrivacyStatsService.shared.anonymousStatsEnabled ? .on : .off
         anonymousStatsCheckbox = statsCheck
-        stack.addArrangedSubview(statsCheck)
+
+        let statsHelpButton = NSButton(title: "?", target: self, action: #selector(showAnonymousStatsHelp))
+        statsHelpButton.bezelStyle = .rounded
+        statsHelpButton.font = .systemFont(ofSize: 11, weight: .semibold)
+        statsHelpButton.setContentHuggingPriority(.required, for: .horizontal)
+
+        let statsRow = NSStackView()
+        statsRow.orientation = .horizontal
+        statsRow.alignment = .centerY
+        statsRow.spacing = 6
+        statsRow.addArrangedSubview(statsCheck)
+        statsRow.addArrangedSubview(statsHelpButton)
+        statsRow.setHuggingPriority(.required, for: .horizontal)
+        stack.addArrangedSubview(statsRow)
 
         let statsHint = makeBodyLabel(
             appL10n(
-                "仅用于了解软件是否仍被使用：每天最多发送一次随机匿名 ID、版本号和 build，不发送姓名、邮箱、序列号或设备名称。",
-                "Used only to understand whether the app is still active: at most once per day, it sends a random anonymous ID, version, and build. It does not send your name, email, serial number, or device name."
+                "仅用于匿名统计有多少人在使用 iFanControl，帮助开发者判断这个软件是不是还活着。不会上传姓名、邮箱、序列号或设备名称。",
+                "Only used to anonymously count how many people are using iFanControl, so the developer knows the app is still alive. It does not upload your name, email, serial number, or device name."
             )
         )
         statsHint.font = .systemFont(ofSize: 11)
@@ -3228,10 +3244,68 @@ class HelpWindowController: NSWindowController {
         UpdateService.shared.automaticChecksEnabled = (sender.state == .on)
     }
 
+    @objc private func showAnonymousStatsHelp() {
+        let alert = NSAlert()
+        alert.messageText = appL10n("匿名统计到底在统计什么？", "What does anonymous stats actually collect?")
+        alert.informativeText = appL10n(
+            """
+            这里只统计“有多少人在用 iFanControl”。
+
+            应用会定期发送一个随机安装 ID、版本号和 build，用来估算使用人数。不包含你的姓名、邮箱、序列号、设备名称，也不会上传风扇曲线内容。
+
+            说得直白一点：这个功能主要是让开发者知道，原来真的还有人在用他的软件，他会开心一下。
+
+            不过截至这个版本发出时，最新版的活跃用户基本上还是开发者本人。是的，看到后台时会有一点点想哭。
+            """,
+            """
+            This only counts how many people are using iFanControl.
+
+            The app periodically sends a random install ID, version, and build so the developer can estimate active usage. It does not include your name, email, serial number, device name, or your fan-curve content.
+
+            Put simply: this feature mainly exists so the developer knows someone is actually using the app, which makes them a little happier.
+
+            As of this version, the latest build is still mostly being used by the developer himself. Yes, the stats dashboard can be emotionally devastating.
+            """
+        )
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: appL10n("明白了", "Got it"))
+        alert.runModal()
+    }
+
     @objc private func toggleAnonymousStats(_ sender: NSButton) {
-        PrivacyStatsService.shared.anonymousStatsEnabled = (sender.state == .on)
+        let shouldEnable = (sender.state == .on)
+        if !shouldEnable {
+            let alert = NSAlert()
+            alert.messageText = appL10n("真的要关闭匿名统计吗？", "Really turn off anonymous stats?")
+            alert.informativeText = appL10n(
+                """
+                iFanControl 的匿名统计只用来估算“有多少人在使用这个软件”。
+
+                现实情况是：用户并不多，最新版很多时候甚至只有开发者自己在用。每多一个保持开启的用户，后台那个孤零零的数字都会稍微体面一点，也会让开发者更有动力继续更新。
+
+                如果你还是想关闭，当然完全可以。这只是一次带着一点点求生欲的挽留。
+                """,
+                """
+                Anonymous stats in iFanControl are only used to estimate how many people are actually using the app.
+
+                The honest reality: there are not many users, and sometimes the latest build is effectively used only by the developer. Every person who leaves this on makes that lonely dashboard number a little less bleak, and gives the developer a bit more motivation to keep shipping updates.
+
+                If you still want to turn it off, that is absolutely fine. This is simply a mildly dramatic attempt to ask you to reconsider.
+                """
+            )
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: appL10n("继续支持开发者", "Keep it on"))
+            alert.addButton(withTitle: appL10n("还是关闭吧", "Turn it off anyway"))
+
+            if alert.runModal() == .alertFirstButtonReturn {
+                sender.state = .on
+                return
+            }
+        }
+
+        PrivacyStatsService.shared.anonymousStatsEnabled = shouldEnable
         if sender.state == .on {
-            PrivacyStatsService.shared.sendDailyHeartbeatIfNeeded()
+            PrivacyStatsService.shared.sendHeartbeatIfNeeded(force: true)
         }
     }
 
