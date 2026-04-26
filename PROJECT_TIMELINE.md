@@ -34,20 +34,39 @@
   - 新增"Cloudflare Pages Functions 部署纪律"章节，记录正确部署流程、禁止事项和原因
   - 新增"5b. 统计后台（ifan-stats）"章节，记录项目位置、线上地址、架构、部署命令和功能列表
 
-### 2026-04-26 晚间
-- 内存优化工作：
-  - 分析发现 `updateMenu()` 每 2 秒重建整个 NSMenu 是内存飙升根因（~90MB）
-  - 实现 `buildMenuOnce()` + `updateDynamicMenuItems()` 模式：菜单结构只建一次，后续仅原地更新 title/state
-  - 删除 `temperatureHistory` 死代码（仅写入从未读取）
-  - 优化后内存稳定在 ~39MB，用户确认
-- 风扇曲线预设系统尝试：
-  - 完成方案设计：3 个 Tab 按钮、双击重命名、config.json 存储 `curvePresets`
-  - 代码实现并编译通过，但运行时 UI 未显示（原因未明）
-  - 用户决定回滚，保留方案规划
-- 回滚事故：
-  - `git checkout` 回滚预设代码时，连带回滚了未提交的内存优化
-  - 已重新应用内存优化（buildMenuOnce + updateDynamicMenuItems）
-  - 预设方案已记录到记忆文件 `project_fan_curve_presets_plan.md`
+### 2026-04-26 晚间 — 内存优化 + 预设尝试 + 菜单响应优化
+
+#### 第一阶段：内存优化
+- 分析发现 `updateMenu()` 每 2 秒重建整个 NSMenu 是内存飙升根因（~90MB）
+- 实现 `buildMenuOnce()` + `updateDynamicMenuItems()` 模式：菜单结构只建一次，后续仅原地更新 title/state
+- 删除 `temperatureHistory` 死代码（仅写入从未读取）
+- 优化后内存稳定在 ~39MB，用户确认
+- **发布 v2.9.0 / build 30**
+
+#### 第二阶段：风扇曲线预设系统尝试（已回滚）
+- 完成方案设计：3 个 Tab 按钮、双击重命名、config.json 存储 `curvePresets`
+- 代码实现并编译通过，但运行时 UI 未显示（原因未明）
+- 用户决定回滚，保留方案规划到 `project_fan_curve_presets_plan.md`
+- 回滚事故：`git checkout` 连带回滚了未提交的内存优化，已重新应用
+
+#### 第三阶段：菜单响应性能优化
+- 用户反馈菜单点击有延迟（优化前就存在）
+- 根因分析：
+  1. `ConfigManager.loadConfig()` 每 2 秒从磁盘读取 + 解析 JSON
+  2. `refreshTelemetry()` 在主线程逐个调用 `kentsmc` 子进程（每个传感器一个 Process），阻塞主线程
+  3. `startAutoControlLoop()` 也有独立的 2 秒定时器，同样在主线程做硬件 I/O
+- 解决方案：
+  1. **Config 缓存**：`loadConfig()` 增加 mtime 检查，文件未变化时返回缓存，避免磁盘 I/O
+  2. **BackgroundHardwareReader**：独立的非 MainActor 类，在后台 DispatchQueue 上执行硬件读取，通过 NSLock 保护缓存
+  3. **菜单定时器改造**：定时器 dispatch 硬件读取到后台，`updateDynamicMenuItems()` 只从后台缓存读取
+  4. **自动控温循环改造**：`startAutoControlLoop()` 改为从 BackgroundHardwareReader 缓存读取温度，不再触发主线程硬件 I/O
+- 效果：菜单点击从"有延迟"变为"即时弹出"
+- **发布 v2.9.1 / build 31**
+
+#### 附：Cloudflare KV 用量预警
+- 收到 Cloudflare 邮件：Workers KV 免费层已达 50%
+- 免费层限制：每天 1,000 次写入；当前约 5 个日活用户（每人每天 96 次心跳写入）
+- 结论：暂不需要升级，但用户继续增长时需注意（$5/月付费计划可支撑 ~10,000 日活）
 
 ## 2026-04-24
 
