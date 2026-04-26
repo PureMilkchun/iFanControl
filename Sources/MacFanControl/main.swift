@@ -620,6 +620,73 @@ final class CommandExecutor: @unchecked Sendable {
     }
 }
 
+// 后台硬件读取器（不绑定 MainActor，真正的后台线程执行）
+private final class BackgroundHardwareReader: @unchecked Sendable {
+    static let shared = BackgroundHardwareReader()
+    private let kentsmcPath = "/usr/local/bin/kentsmc"
+    private let queue = DispatchQueue(label: "com.ifancontrol.hw-reader", qos: .utility)
+    private let lock = NSLock()
+
+    // 读取结果缓存（由后台线程写入，主线程读取）
+    private var _temperatures: [String: Double] = [:]
+    private var _fanRPMs: [Int: Int] = [:]
+
+    var temperatures: [String: Double] {
+        lock.lock(); defer { lock.unlock() }
+        return _temperatures
+    }
+    var fanRPMs: [Int: Int] {
+        lock.lock(); defer { lock.unlock() }
+        return _fanRPMs
+    }
+
+    private func executeRead(args: [String]) -> String? {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: kentsmcPath)
+        task.arguments = args
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = Pipe()
+        do {
+            try task.run()
+            task.waitUntilExit()
+            guard task.terminationStatus == 0 else { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch { return nil }
+    }
+
+    private func readNumeric(forKey key: String) -> Double? {
+        guard let output = executeRead(args: ["-r", key]),
+              let range = output.range(of: "\\((-?\\d+(?:\\.\\d+)?)\\)", options: .regularExpression) else {
+            return nil
+        }
+        return Double(output[range].dropFirst().dropLast())
+    }
+
+    /// 在后台队列执行一次完整的硬件轮询
+    func refresh(sensors: [TemperatureSensorDefinition], fans: [FanInfo]) {
+        queue.async { [self] in
+            var temps: [String: Double] = [:]
+            for sensor in sensors {
+                if let val = readNumeric(forKey: sensor.key), val >= 0, val <= 120 {
+                    temps[sensor.key] = val
+                }
+            }
+            var rpms: [Int: Int] = [:]
+            for fan in fans {
+                if let val = readNumeric(forKey: fan.actualKey), val >= 0 {
+                    rpms[fan.index] = Int(val.rounded())
+                }
+            }
+            lock.lock()
+            if !temps.isEmpty { _temperatures = temps }
+            if !rpms.isEmpty { _fanRPMs = rpms }
+            lock.unlock()
+        }
+    }
+}
+
 // 风扇管理器
 @MainActor
 class FanManager {
@@ -634,8 +701,8 @@ class FanManager {
     private(set) var fans: [FanInfo] = []
     private(set) var availableTemperatureSensors: [TemperatureSensorDefinition] = []
     private(set) var currentMaxRPM: Int = 4900
-    
-    private var cachedTemperatures: [String: Double] = [:]
+
+    private(set) var cachedTemperatures: [String: Double] = [:]
     private var cachedFanRPMs: [Int: Int] = [:]
     private var lastTelemetryRefresh: Date?
     private var lastTelemetryLogTimestamp: Date?
@@ -1017,7 +1084,9 @@ class ConfigManager {
     static let shared = ConfigManager()
     private let configDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!.appendingPathComponent("MacFanControl")
     private let configFile: URL
-    
+    private var cachedConfig: Config?
+    private var cachedConfigMtime: Date?
+
     init() {
         configFile = configDir.appendingPathComponent("config.json")
         createConfigDir()
@@ -1028,17 +1097,28 @@ class ConfigManager {
     }
     
     func loadConfig() -> Config {
+        // 检查文件是否被外部修改
+        if let mtime = try? configFile.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+           let cached = cachedConfig,
+           mtime == cachedConfigMtime {
+            return cached
+        }
+
         if let data = try? Data(contentsOf: configFile),
            let config = try? JSONDecoder().decode(Config.self, from: data) {
+            cachedConfig = config
+            cachedConfigMtime = try? configFile.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
             return config
         }
-        
+
         if let bundleConfigURL = Bundle.main.url(forResource: "config", withExtension: "json"),
            let data = try? Data(contentsOf: bundleConfigURL),
            let config = try? JSONDecoder().decode(Config.self, from: data) {
+            cachedConfig = config
+            cachedConfigMtime = nil
             return config
         }
-        
+
         return Config(
             version: "1.0",
             curve: [
@@ -1064,6 +1144,8 @@ class ConfigManager {
         do {
             let data = try JSONEncoder().encode(config)
             try data.write(to: configFile)
+            cachedConfig = config
+            cachedConfigMtime = try? configFile.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
         } catch {
             print("Error saving config: \(error)")
         }
@@ -1441,8 +1523,18 @@ class MenuBarManager {
 
         NotificationCenter.default.addObserver(self, selector: #selector(handleCurveSaved), name: NSNotification.Name("FanCurveDidSave"), object: nil)
 
-        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+        // 后台轮询硬件（避免主线程阻塞导致菜单点击延迟）
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            guard let self else { return }
             Task { @MainActor in
+                let fm = FanManager.shared
+                fm.probeHardwareIfNeeded()
+                // 后台线程读取传感器 + 风扇（真正非阻塞）
+                BackgroundHardwareReader.shared.refresh(
+                    sensors: fm.availableTemperatureSensors,
+                    fans: fm.fans
+                )
+                // 主线程更新菜单 UI
                 self.updateDynamicMenuItems()
             }
         }
@@ -1601,7 +1693,16 @@ class MenuBarManager {
         guard let statusItem = statusItem else { return }
 
         let config = ConfigManager.shared.loadConfig()
-        let readings = FanManager.shared.availableTemperatureReadings()
+
+        // 从后台读取器的缓存读取（零硬件 I/O，零磁盘 I/O）
+        let bgReader = BackgroundHardwareReader.shared
+        let readings: [TemperatureReading] = FanManager.shared.availableTemperatureSensors.compactMap { sensor in
+            guard let value = bgReader.temperatures[sensor.key] else { return nil }
+            return TemperatureReading(sensor: sensor, value: value)
+        }.sorted { lhs, rhs in
+            if lhs.sensor.sortKey != rhs.sensor.sortKey { return lhs.sensor.sortKey < rhs.sensor.sortKey }
+            return lhs.value > rhs.value
+        }
 
         let selectedReading: TemperatureReading?
         if config.temperatureSourceMode == "manual",
@@ -1616,7 +1717,7 @@ class MenuBarManager {
             currentTemperatureSensorName = selectionSummary(for: reading, in: readings, automatic: config.temperatureSourceMode != "manual")
         }
 
-        if let rpm = FanManager.shared.readPrimaryFanRPM(refresh: false) {
+        if let rpm = bgReader.fanRPMs.values.max() {
             currentFanRPM = rpm
         }
 
@@ -2057,9 +2158,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 let curve = config.curve
                 let isAutoMode = config.mode == "auto"
 
-                guard let reading = FanManager.shared.currentTemperatureReading(using: config) else {
-                    return
+                // 从后台读取器缓存读取（不触发主线程硬件 I/O）
+                let bgReader = BackgroundHardwareReader.shared
+                let readings: [TemperatureReading] = FanManager.shared.availableTemperatureSensors.compactMap { sensor in
+                    guard let value = bgReader.temperatures[sensor.key] else { return nil }
+                    return TemperatureReading(sensor: sensor, value: value)
                 }
+                let reading: TemperatureReading?
+                if config.temperatureSourceMode == "manual", let key = config.selectedTemperatureSensorKey {
+                    reading = readings.first(where: { $0.sensor.key == key })
+                } else {
+                    reading = readings.max(by: { $0.value < $1.value })
+                }
+                guard let reading else { return }
 
                 if isAutoMode {
                     let safetyFloorRPM = min(max(config.safetyFloorRPM ?? FanManager.shared.defaultSafetyRPM, 2000), FanManager.shared.currentMaxRPM)
