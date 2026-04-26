@@ -25,7 +25,7 @@ This repository now keeps only source code, scripts, and essential resources. Re
 - Temperature source selection with automatic hottest-sensor mode by default
 - In-app updates with manual and scheduled checks
 - Unified “About iFanControl” window with version, update controls, GitHub, and restart
-- Anonymous active-use stats, sent at most once per day and configurable in About / Help
+- Anonymous user-count stats sent at a fixed interval, configurable in About / Help
 - Launch at login
 - Install diagnostics and uninstall scripts
 
@@ -66,7 +66,7 @@ You can also open [安装说明.html](安装说明.html) for the illustrated ins
 
 ## Privacy & Stats
 
-iFanControl sends an anonymous active-use heartbeat at most once per day by default, so the solo developer can understand whether the app is still being used in the real world. It only includes a random anonymous ID, version, and build; it does not send your name, email, serial number, device name, fan readings, or temperature readings. You can disable this in `About / Help -> Overview` by turning off “Share anonymous active-use statistics”.
+iFanControl sends periodic anonymous user-count stats by default to improve product quality and stability. It only includes a random anonymous ID, version, and build; it does not send your name, email, serial number, device name, fan readings, or temperature readings. You can disable this in `About / Help -> Overview` by turning off “Anonymous user-count stats”.
 
 ## Repository Layout
 

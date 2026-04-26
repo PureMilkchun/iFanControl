@@ -649,9 +649,6 @@ class FanManager {
     private let minExecutionInterval: TimeInterval = 2.0
     private var fanCommandInFlight = false
     
-    // 温度历史记录
-    private var temperatureHistory: [Double] = []
-    private let maxHistoryCount: Int = 3
     
     // 动态滞后控制
     private func getMinRPMChange(currentRPM: Int) -> Int {
@@ -952,13 +949,7 @@ class FanManager {
         }
         
         temperatureReadFailureCount = 0
-        
-        // 记录温度历史
-        temperatureHistory.append(temperature)
-        if temperatureHistory.count > maxHistoryCount {
-            temperatureHistory.removeFirst()
-        }
-        
+
         // 找到温度所在的区间
         var lowerPoint = curve[0]
         var upperPoint = curve.last!
@@ -1409,6 +1400,17 @@ class MenuBarManager {
     private var fanCurveWindowController: FanCurveWindowController?
     private var helpWindowController: HelpWindowController?
 
+    // 菜单项引用（用于原地更新，避免每 2 秒重建整个菜单）
+    private var menu: NSMenu?
+    private var hardwareItem: NSMenuItem?
+    private var currentSensorItem: NSMenuItem?
+    private var modeItem: NSMenuItem?
+    private var speedItem: NSMenuItem?
+    private var autoStartItem: NSMenuItem?
+    private var sensorMenuItems: [NSMenuItem] = []
+    private var zhItem: NSMenuItem?
+    private var enItem: NSMenuItem?
+
     private func groupedTemperatureReadings(_ readings: [TemperatureReading]) -> [(category: TemperatureSensorCategory, readings: [TemperatureReading])] {
         TemperatureSensorCategory.allCases.compactMap { category in
             let grouped = readings.filter { $0.sensor.category == category }
@@ -1434,13 +1436,14 @@ class MenuBarManager {
     
     func setupMenuBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        updateMenu()
-        
+        buildMenuOnce()
+        updateDynamicMenuItems()
+
         NotificationCenter.default.addObserver(self, selector: #selector(handleCurveSaved), name: NSNotification.Name("FanCurveDidSave"), object: nil)
-        
+
         Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
             Task { @MainActor in
-                self.updateMenu()
+                self.updateDynamicMenuItems()
             }
         }
 
@@ -1453,7 +1456,148 @@ class MenuBarManager {
         }
     }
     
-    func updateMenu() {
+    /// 构建菜单结构（仅在启动时调用一次）
+    private func buildMenuOnce() {
+        guard let statusItem = statusItem else { return }
+
+        let config = ConfigManager.shared.loadConfig()
+        let readings = FanManager.shared.availableTemperatureReadings()
+
+        let menu = NSMenu()
+
+        // 硬件信息
+        let hwItem = NSMenuItem(
+            title: FanManager.shared.fanCount > 0 ?
+                appL10n("风扇 \(FanManager.shared.fanCount) | 上限 \(FanManager.shared.currentMaxRPM)", "Fans \(FanManager.shared.fanCount) | Max \(FanManager.shared.currentMaxRPM)") :
+                appL10n("无可控风扇", "No controllable fan"),
+            action: nil, keyEquivalent: ""
+        )
+        hwItem.isEnabled = false
+        menu.addItem(hwItem)
+        self.hardwareItem = hwItem
+
+        // 温度源信息
+        let sensorItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        sensorItem.isEnabled = false
+        menu.addItem(sensorItem)
+        self.currentSensorItem = sensorItem
+        menu.addItem(NSMenuItem.separator())
+
+        // 温度源子菜单
+        let temperatureSourceItem = NSMenuItem(title: appL10n("选择温度源", "Select Temperature Source"), action: nil, keyEquivalent: "")
+        let temperatureSourceMenu = NSMenu()
+
+        let hottestItem = NSMenuItem(title: appL10n("自动选择（最热）", "Auto (Hottest)"), action: #selector(selectAutomaticTemperatureSource), keyEquivalent: "")
+        hottestItem.target = self
+        hottestItem.state = config.temperatureSourceMode == "manual" ? .off : .on
+        temperatureSourceMenu.addItem(hottestItem)
+
+        sensorMenuItems.removeAll()
+        if !readings.isEmpty {
+            temperatureSourceMenu.addItem(NSMenuItem.separator())
+            for section in groupedTemperatureReadings(readings) {
+                let header = NSMenuItem(title: section.category.title, action: nil, keyEquivalent: "")
+                header.isEnabled = false
+                temperatureSourceMenu.addItem(header)
+
+                for (index, reading) in section.readings.enumerated() {
+                    let item = NSMenuItem(
+                        title: shortTitle(for: reading, index: index),
+                        action: #selector(selectTemperatureSource(_:)),
+                        keyEquivalent: ""
+                    )
+                    item.target = self
+                    item.toolTip = "\(reading.sensor.name) (\(reading.sensor.key))  \(String(format: "%.1f℃", reading.value))"
+                    item.representedObject = reading.sensor.key
+                    item.state = (config.temperatureSourceMode == "manual" && config.selectedTemperatureSensorKey == reading.sensor.key) ? .on : .off
+                    temperatureSourceMenu.addItem(item)
+                    sensorMenuItems.append(item)
+                }
+
+                temperatureSourceMenu.addItem(NSMenuItem.separator())
+            }
+
+            if temperatureSourceMenu.items.last?.isSeparatorItem == true {
+                temperatureSourceMenu.removeItem(at: temperatureSourceMenu.items.count - 1)
+            }
+        }
+
+        if readings.isEmpty {
+            let emptyItem = NSMenuItem(title: appL10n("暂未探测到温度传感器", "No temperature sensor detected"), action: nil, keyEquivalent: "")
+            emptyItem.isEnabled = false
+            temperatureSourceMenu.addItem(emptyItem)
+        }
+
+        menu.setSubmenu(temperatureSourceMenu, for: temperatureSourceItem)
+        menu.addItem(temperatureSourceItem)
+
+        // 编辑曲线
+        let curveItem = NSMenuItem(title: appL10n("编辑曲线...", "Edit Curve..."), action: #selector(showFanCurveEditor), keyEquivalent: "c")
+        curveItem.target = self
+        menu.addItem(curveItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        // 模式切换
+        let modeItem = NSMenuItem(title: "", action: #selector(toggleMode), keyEquivalent: "m")
+        modeItem.target = self
+        menu.addItem(modeItem)
+        self.modeItem = modeItem
+
+        // 手动转速（仅手动模式显示）
+        let spdItem = NSMenuItem(title: appL10n("设置转速...", "Set Speed..."), action: #selector(showSpeedSetting), keyEquivalent: "")
+        spdItem.target = self
+        spdItem.isHidden = true
+        menu.addItem(spdItem)
+        self.speedItem = spdItem
+
+        // 开机自启动
+        let autoItem = NSMenuItem(title: appL10n("开机自启动", "Launch at Login"), action: #selector(toggleAutoStart), keyEquivalent: "")
+        autoItem.target = self
+        menu.addItem(autoItem)
+        self.autoStartItem = autoItem
+
+        // 安全兜底转速
+        let safetyItem = NSMenuItem(title: appL10n("安全兜底转速...", "Safety Floor RPM..."), action: #selector(showSafetyFloorSetting), keyEquivalent: "")
+        safetyItem.target = self
+        menu.addItem(safetyItem)
+
+        // 关于/帮助
+        let aboutItem = NSMenuItem(title: appL10n("关于/帮助...", "About / Help..."), action: #selector(showHelp), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+
+        // 语言
+        let languageItem = NSMenuItem(title: appL10n("语言", "Language"), action: nil, keyEquivalent: "")
+        let languageMenu = NSMenu()
+        let zh = NSMenuItem(title: "中文", action: #selector(switchToChinese), keyEquivalent: "")
+        zh.target = self
+        languageMenu.addItem(zh)
+        self.zhItem = zh
+        let en = NSMenuItem(title: "English", action: #selector(switchToEnglish), keyEquivalent: "")
+        en.target = self
+        languageMenu.addItem(en)
+        self.enItem = en
+        menu.setSubmenu(languageMenu, for: languageItem)
+        menu.addItem(languageItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        // 重启 / 退出
+        let restartItem = NSMenuItem(title: appL10n("重新启动", "Restart"), action: #selector(restartApp), keyEquivalent: "r")
+        restartItem.target = self
+        menu.addItem(restartItem)
+
+        let quitItem = NSMenuItem(title: appL10n("退出", "Quit"), action: #selector(quitApp), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
+
+        self.menu = menu
+        statusItem.menu = menu
+    }
+
+    /// 原地更新动态菜单项（每 2 秒调用，不重建菜单）
+    private func updateDynamicMenuItems() {
         guard let statusItem = statusItem else { return }
 
         let config = ConfigManager.shared.loadConfig()
@@ -1475,135 +1619,59 @@ class MenuBarManager {
         if let rpm = FanManager.shared.readPrimaryFanRPM(refresh: false) {
             currentFanRPM = rpm
         }
-        
+
+        // 状态栏标题
         let temperatureText = String(format: "%.0f℃", currentTemperature)
         let fanText = "\(currentFanRPM) RPM"
         let modeText = isAutoMode ? "[Auto]" : "[Manual]"
-        
         var statusIcon = ""
         if currentTemperature >= 90.0 {
             statusIcon = " 🔥"
         } else if currentTemperature >= 85.0 {
             statusIcon = " ⚠️"
         }
-        
         statusItem.button?.title = "\(temperatureText) | \(fanText) \(modeText)\(statusIcon)"
-        
-        let menu = NSMenu()
 
-        let hardwareItem = NSMenuItem(
-            title: FanManager.shared.fanCount > 0 ?
-                appL10n("风扇 \(FanManager.shared.fanCount) | 上限 \(FanManager.shared.currentMaxRPM)", "Fans \(FanManager.shared.fanCount) | Max \(FanManager.shared.currentMaxRPM)") :
-                appL10n("无可控风扇", "No controllable fan"),
-            action: nil,
-            keyEquivalent: ""
-        )
-        hardwareItem.isEnabled = false
-        menu.addItem(hardwareItem)
+        // 硬件信息
+        hardwareItem?.title = FanManager.shared.fanCount > 0 ?
+            appL10n("风扇 \(FanManager.shared.fanCount) | 上限 \(FanManager.shared.currentMaxRPM)", "Fans \(FanManager.shared.fanCount) | Max \(FanManager.shared.currentMaxRPM)") :
+            appL10n("无可控风扇", "No controllable fan")
 
-        let currentSensorItem = NSMenuItem(title: appL10n("温度源 \(currentTemperatureSensorName)", "Temperature Source \(currentTemperatureSensorName)"), action: nil, keyEquivalent: "")
-        currentSensorItem.isEnabled = false
-        menu.addItem(currentSensorItem)
-        menu.addItem(NSMenuItem.separator())
+        // 温度源
+        currentSensorItem?.title = appL10n("温度源 \(currentTemperatureSensorName)", "Temperature Source \(currentTemperatureSensorName)")
 
-        let temperatureSourceItem = NSMenuItem(title: appL10n("选择温度源", "Select Temperature Source"), action: nil, keyEquivalent: "")
-        let temperatureSourceMenu = NSMenu()
-
-        let hottestItem = NSMenuItem(title: appL10n("自动选择（最热）", "Auto (Hottest)"), action: #selector(selectAutomaticTemperatureSource), keyEquivalent: "")
-        hottestItem.target = self
-        hottestItem.state = config.temperatureSourceMode == "manual" ? .off : .on
-        temperatureSourceMenu.addItem(hottestItem)
-
-        if !readings.isEmpty {
-            temperatureSourceMenu.addItem(NSMenuItem.separator())
-            for section in groupedTemperatureReadings(readings) {
-                let header = NSMenuItem(title: section.category.title, action: nil, keyEquivalent: "")
-                header.isEnabled = false
-                temperatureSourceMenu.addItem(header)
-
-                for (index, reading) in section.readings.enumerated() {
-                    let item = NSMenuItem(
-                        title: shortTitle(for: reading, index: index),
-                        action: #selector(selectTemperatureSource(_:)),
-                        keyEquivalent: ""
-                    )
-                    item.target = self
+        // 温度源子菜单：更新传感器数值和选中态
+        var sensorIdx = 0
+        for section in groupedTemperatureReadings(readings) {
+            for (index, reading) in section.readings.enumerated() {
+                if sensorIdx < sensorMenuItems.count {
+                    let item = sensorMenuItems[sensorIdx]
+                    item.title = shortTitle(for: reading, index: index)
                     item.toolTip = "\(reading.sensor.name) (\(reading.sensor.key))  \(String(format: "%.1f℃", reading.value))"
-                    item.representedObject = reading.sensor.key
                     item.state = (config.temperatureSourceMode == "manual" && config.selectedTemperatureSensorKey == reading.sensor.key) ? .on : .off
-                    temperatureSourceMenu.addItem(item)
                 }
-
-                temperatureSourceMenu.addItem(NSMenuItem.separator())
-            }
-
-            if temperatureSourceMenu.items.last?.isSeparatorItem == true {
-                temperatureSourceMenu.removeItem(at: temperatureSourceMenu.items.count - 1)
+                sensorIdx += 1
             }
         }
 
-        if readings.isEmpty {
-            let emptyItem = NSMenuItem(title: appL10n("暂未探测到温度传感器", "No temperature sensor detected"), action: nil, keyEquivalent: "")
-            emptyItem.isEnabled = false
-            temperatureSourceMenu.addItem(emptyItem)
-        }
+        // 模式切换
+        modeItem?.title = isAutoMode ? appL10n("手动模式", "Manual Mode") : appL10n("自动模式", "Auto Mode")
 
-        menu.setSubmenu(temperatureSourceMenu, for: temperatureSourceItem)
-        menu.addItem(temperatureSourceItem)
-        
-        let curveItem = NSMenuItem(title: appL10n("编辑曲线...", "Edit Curve..."), action: #selector(showFanCurveEditor), keyEquivalent: "c")
-        curveItem.target = self
-        menu.addItem(curveItem)
-        
-        menu.addItem(NSMenuItem.separator())
-        
-        let modeItem = NSMenuItem(title: isAutoMode ? appL10n("手动模式", "Manual Mode") : appL10n("自动模式", "Auto Mode"), action: #selector(toggleMode), keyEquivalent: "m")
-        modeItem.target = self
-        menu.addItem(modeItem)
-        
-        if !isAutoMode {
-            let speedItem = NSMenuItem(title: appL10n("设置转速...", "Set Speed..."), action: #selector(showSpeedSetting), keyEquivalent: "")
-            speedItem.target = self
-            menu.addItem(speedItem)
-        }
-        
-        let autoStartItem = NSMenuItem(title: appL10n("开机自启动", "Launch at Login"), action: #selector(toggleAutoStart), keyEquivalent: "")
-        autoStartItem.target = self
-        autoStartItem.state = autoStartEnabled ? .on : .off
-        menu.addItem(autoStartItem)
+        // 手动转速项（仅手动模式可见）
+        speedItem?.isHidden = isAutoMode
 
-        let safetyFloorItem = NSMenuItem(title: appL10n("安全兜底转速...", "Safety Floor RPM..."), action: #selector(showSafetyFloorSetting), keyEquivalent: "")
-        safetyFloorItem.target = self
-        menu.addItem(safetyFloorItem)
+        // 开机自启动
+        autoStartItem?.state = autoStartEnabled ? .on : .off
 
-        let aboutItem = NSMenuItem(title: appL10n("关于/帮助...", "About / Help..."), action: #selector(showHelp), keyEquivalent: "")
-        aboutItem.target = self
-        menu.addItem(aboutItem)
+        // 语言选中态
+        zhItem?.state = currentLanguage == "zh" ? .on : .off
+        enItem?.state = currentLanguage == "en" ? .on : .off
+    }
 
-        let languageItem = NSMenuItem(title: appL10n("语言", "Language"), action: nil, keyEquivalent: "")
-        let languageMenu = NSMenu()
-        let zhItem = NSMenuItem(title: "中文", action: #selector(switchToChinese), keyEquivalent: "")
-        zhItem.target = self
-        zhItem.state = currentLanguage == "zh" ? .on : .off
-        languageMenu.addItem(zhItem)
-        let enItem = NSMenuItem(title: "English", action: #selector(switchToEnglish), keyEquivalent: "")
-        enItem.target = self
-        enItem.state = currentLanguage == "en" ? .on : .off
-        languageMenu.addItem(enItem)
-        menu.setSubmenu(languageMenu, for: languageItem)
-        menu.addItem(languageItem)
-
-        menu.addItem(NSMenuItem.separator())
-
-        let restartItem = NSMenuItem(title: appL10n("重新启动", "Restart"), action: #selector(restartApp), keyEquivalent: "r")
-        restartItem.target = self
-        menu.addItem(restartItem)
-        
-        let quitItem = NSMenuItem(title: appL10n("退出", "Quit"), action: #selector(quitApp), keyEquivalent: "q")
-        quitItem.target = self
-        menu.addItem(quitItem)
-        
-        statusItem.menu = menu
+    /// 完全重建菜单（仅在语言切换等需要重建结构时调用）
+    func updateMenu() {
+        buildMenuOnce()
+        updateDynamicMenuItems()
     }
     
     @objc func showFanCurveEditor() {
@@ -1619,7 +1687,7 @@ class MenuBarManager {
         newConfig.mode = isAutoMode ? "auto" : "manual"
         ConfigManager.shared.saveConfig(newConfig)
         logger.info("Control mode switched to \(newConfig.mode, privacy: .public)")
-        updateMenu()
+        updateDynamicMenuItems()
     }
     
     @objc func toggleAutoStart() {
@@ -1629,15 +1697,15 @@ class MenuBarManager {
         newConfig.autoStart = autoStartEnabled
         ConfigManager.shared.saveConfig(newConfig)
         logger.info("Auto start toggled. enabled=\(self.autoStartEnabled, privacy: .public)")
-        
+
         // 实际启用/禁用开机自启动
         if autoStartEnabled {
             enableAutoStart()
         } else {
             disableAutoStart()
         }
-        
-        updateMenu()
+
+        updateDynamicMenuItems()
     }
     
     // 启用开机自启动（创建 LaunchAgent）
@@ -1743,7 +1811,7 @@ class MenuBarManager {
         config.selectedTemperatureSensorKey = nil
         ConfigManager.shared.saveConfig(config)
         logger.info("Temperature source switched to automatic hottest sensor")
-        updateMenu()
+        updateDynamicMenuItems()
     }
 
     @objc func selectTemperatureSource(_ sender: NSMenuItem) {
@@ -1756,7 +1824,7 @@ class MenuBarManager {
         config.selectedTemperatureSensorKey = selectedKey
         ConfigManager.shared.saveConfig(config)
         logger.info("Temperature source switched to sensor key \(selectedKey, privacy: .public)")
-        updateMenu()
+        updateDynamicMenuItems()
     }
 
     private func maybeShowStartupGuidance() {

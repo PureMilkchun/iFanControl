@@ -3,6 +3,52 @@
 关联固定记忆：`/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_MEMORY.md`  
 读取建议：先读固定记忆，再读本文件，用本文件补足最近发生的变化。
 
+## 2026-04-26
+
+### 2026-04-26 15:00 左右
+- 诊断并修复统计后台数据为 0 的问题：
+  - 根因：`docs/` 目录中残留的 `_worker.bundle` 带有 `/functions/` 前缀路由表
+  - Cloudflare Pages 优先使用该 bundle，导致所有 API 请求路径不匹配，返回 HTML（405 或 200）
+  - 心跳上报 `/api/heartbeat` 实际命中了 `/functions/api/heartbeat`，被 Pages 当作静态文件处理
+- 修复动作：
+  - 删除 `docs/_worker.bundle`
+  - 用 `wrangler pages functions build --outdir /tmp/ifan-build` 从 `functions/` 目录构建正确的 `_worker.js`
+  - 部署时必须带 `--no-bundle --skip-caching`，否则 wrangler 会尝试重新打包或检测不到文件变化
+- 修复后验证：
+  - `/api/heartbeat` 返回 `{"ok":true}`
+  - `/api/stats` 返回正确 JSON 数据
+  - `/download` 正确 302 到 ZIP 并累计下载计数
+  - 心跳数据开始正常写入 KV
+
+### 2026-04-26 16:00 左右
+- 新增"下载活跃趋势"15 分钟粒度折线图，涉及 4 个文件：
+  - `docs/functions/download.js`：新增 `updateDownloadSeries15m()` 函数，写入 `download:series15m:{day}`（96 槽位 JSON 数组，TTL 7 天）
+  - `ifan-stats/functions/api/dashboard/summary.js`：新增 `readDownloadSeries15m()` 读取下载 15 分钟序列，响应新增 `downloads_15m` 字段
+  - `ifan-stats/index.html`：新增"下载活跃趋势"面板（`<canvas id="downloadChart">`）
+  - `ifan-stats/app.js`：新增 `getDownloadChartModel()`、`renderDownloadChart()`、`drawDownloadCanvasTooltip()`，蓝色折线，支持 hover tooltip
+- 前端 `drawHover()` 改为支持可选 `color` 参数，活跃用户用橙色 `#f97316`，下载用蓝色 `#2563eb`
+- 两个项目均已部署验证通过
+
+### 2026-04-26 16:30 左右
+- 将本次调试与开发经验写入 `PROJECT_MEMORY.md`：
+  - 新增"Cloudflare Pages Functions 部署纪律"章节，记录正确部署流程、禁止事项和原因
+  - 新增"5b. 统计后台（ifan-stats）"章节，记录项目位置、线上地址、架构、部署命令和功能列表
+
+### 2026-04-26 晚间
+- 内存优化工作：
+  - 分析发现 `updateMenu()` 每 2 秒重建整个 NSMenu 是内存飙升根因（~90MB）
+  - 实现 `buildMenuOnce()` + `updateDynamicMenuItems()` 模式：菜单结构只建一次，后续仅原地更新 title/state
+  - 删除 `temperatureHistory` 死代码（仅写入从未读取）
+  - 优化后内存稳定在 ~39MB，用户确认
+- 风扇曲线预设系统尝试：
+  - 完成方案设计：3 个 Tab 按钮、双击重命名、config.json 存储 `curvePresets`
+  - 代码实现并编译通过，但运行时 UI 未显示（原因未明）
+  - 用户决定回滚，保留方案规划
+- 回滚事故：
+  - `git checkout` 回滚预设代码时，连带回滚了未提交的内存优化
+  - 已重新应用内存优化（buildMenuOnce + updateDynamicMenuItems）
+  - 预设方案已记录到记忆文件 `project_fan_curve_presets_plan.md`
+
 ## 2026-04-24
 
 ### 2026-04-24 00:00 左右
@@ -190,6 +236,118 @@
   - `docs/update-manifest.json` 升到 `2.8.25 / 25`
   - `docs/iFanControl-macOS.zip` 已替换为 `2.8.25`，sha256 为 `553f9861894e65394fcaf911799d201412c927d5d56f798c8d248e169b22805c`
   - 官网页面下载入口改为 `./download`，构建标记更新为 `build 20260424b`
+
+## 2026-04-25
+
+### 2026-04-25 22:00 左右
+- 对 `main.swift` 和 `SensorCatalog.swift` 进行了代码质量审查，识别出多个内存优化机会：
+  - Config 每 2 秒从磁盘重新读取（应缓存）
+  - 温度读数每 2 秒重复构建（应缓存）
+  - NSMenu 每 2 秒完整重建（应原地更新）
+  - `temperatureHistory` 死代码
+  - HelpWindow 视图未在关闭时释放
+  - `category`/`sortKey` 计算属性应缓存
+  - `ISO8601DateFormatter` 应 lazy 初始化
+  - 心跳 Timer 双重注册
+- 完成了内存优化的代码实现并编译通过
+- 后因用户要求回滚，所有内存优化改动已 `git restore`，暂不发布
+
+### 2026-04-25 23:00 左右
+- 实现多语言切换功能：
+  - 将三个模块的 `private let` 布尔语言判断替换为从 `UserDefaults` 读取的 `currentLanguage`
+  - 涉及文件：`main.swift`、`SensorCatalog.swift`、`FanCurveWindow.swift`
+  - 菜单新增"语言 / Language"子菜单（位于"关于/帮助..."之后）
+  - 首次安装弹出语言选择弹窗（中文 / English）
+  - 切换后提示重启生效，可选"立即重启"或"稍后"
+- 版本号升级到 `2.8.28 / build 28`
+- 完成全链路发布：
+  - 官网 ZIP 替换（`docs/iFanControl-macOS.zip` + `docs/iFanControl-macOS-2.8.28.zip`）
+  - `update-manifest.json` 升到 `2.8.28 / 28`
+  - Cloudflare Pages 部署完成
+  - GitHub 代码推送（commit `52c014c`）
+  - GitHub Release `v2.8.28` 创建：
+    - `https://github.com/PureMilkchun/iFanControl/releases/tag/v2.8.28`
+- 新包校验值：
+  - `sha256 = 7b743bd8209686b6cfe732118b2d67b8e2717b8ea01d431f449915173abae1ad`
+  - `size = 5971567`
+
+### 2026-04-25 23:30 左右
+- 处理 PR #2（`lop1381997:codex/english-translation`，"add bilingual UI switcher"）：
+  - 该 PR 提出了 `LocalizationManager` 单例 + 即时切换方案（+351 行）
+  - 我们的 v2.8.28 已用更简单的方式覆盖核心需求（+66 行，重启生效）
+  - 已用得体英文回复作者并关闭 PR
+
+### 2026-04-25 14:10 左右
+- 统计后台 `stats` 继续迭代：
+  - 初步加入 12 小时活跃趋势图与时间范围切换
+  - 后续澄清需求后，改为“默认近 12 小时、15 分钟粒度”的真实活跃曲线
+- 底层数据口径统一为：
+  - 使用官网心跳写入的 `15 分钟聚合活跃值`
+  - 最近 `30 天` 的 15 分钟点位长期保留
+  - 统计后台再按所需范围读取并绘制
+
+### 2026-04-25 14:20 左右
+- 官网发布了 `2.8.26 / build 26`：
+  - `docs/update-manifest.json` 升到 `2.8.26 / 26`
+  - 官网 ZIP 与应用内更新 ZIP 保持一致
+- 随后确认：
+  - GitHub Release 侧当时还停留在 `v2.8.25`
+  - 需要单独补发 `v2.8.26` Release
+
+### 2026-04-25 14:30 左右
+- 补发 GitHub `v2.8.26` Release：
+  - 上传 `iFanControl-macOS-2.8.26.zip`
+  - 在 Release 说明中明确写入：
+    - 适配已覆盖 `M5`
+    - 已在真实 `MacBook Pro M5` 上完成运行验证
+
+### 2026-04-25 14:40 左右
+- 对匿名统计设置项做产品体验修正：
+  - 设置项名称统一改为 `匿名统计用户量`
+  - 在开关右侧新增 `?` 说明按钮
+  - 帮助文案改为更直白解释：
+    - 只统计有多少人在使用 iFanControl
+    - 仅上报随机安装 ID、版本号、build
+    - 不上传姓名、邮箱、序列号、设备名称
+  - 用户尝试关闭时，新增一次带幽默感的确认弹窗
+  - 若用户坚持关闭，仍然允许关闭
+- 对应代码已推送到 GitHub：
+  - commit `38a0f48`
+
+### 2026-04-25 14:50 左右
+- 修正了一个发布流程认知问题：
+  - 仅推 GitHub 代码并不能让用户收到 App 行为更新
+  - 如果变更要让用户真正拿到，必须同步：
+    - 新 ZIP 包
+    - 官网当前 ZIP
+    - `update-manifest.json`
+    - GitHub Release
+
+### 2026-04-25 14:55 左右
+- 重新打包并发布 `2.8.27 / build 27`，用于承载“匿名统计说明 + 关闭确认弹窗”这次真实用户可见改动：
+  - `Info.plist` 升到 `2.8.27 / 27`
+  - `install.sh` 标题同步升到 `2.8.27`
+  - 安装脚本兼容设备文案更新为 `(M1/M2/M3/M4/M5)`
+- 新 ZIP 产物：
+  - `docs/iFanControl-macOS-2.8.27.zip`
+  - `docs/iFanControl-macOS.zip`
+- 新包校验值：
+  - `sha256 = 811cc495bc2b03130d2d22b5395ed1267640a4b383aec5cabc56e39649352450`
+  - `size = 5972647`
+
+### 2026-04-25 15:00 左右
+- 官网与应用内更新链路同步到 `2.8.27`：
+  - `docs/update-manifest.json` 升到 `2.8.27 / 27`
+  - `notes` 更新为匿名统计说明与关闭确认弹窗相关内容
+  - `https://ifan-59w.pages.dev/update-manifest.json` 线上已验证为 `2.8.27`
+- GitHub Release 同步到 `v2.8.27`：
+  - Release 地址：`https://github.com/PureMilkchun/iFanControl/releases/tag/v2.8.27`
+  - 资产：`iFanControl-macOS-2.8.27.zip`
+- 主仓库代码同步：
+  - commit `f1e5ff9`
+- 结论：
+  - 官网 ZIP、应用内更新 ZIP、GitHub Release 三者已重新对齐
+  - `2.8.27` 才是这次匿名统计交互改动真正对用户可达的版本
 
 ## 2026-04-23
 
