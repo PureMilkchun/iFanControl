@@ -413,10 +413,32 @@ final class PrivacyStatsService: @unchecked Sendable {
     private let endpointURL = URL(string: "https://ifan-59w.pages.dev/api/heartbeat")!
     private let enabledKey = "ifancontrol.privacy_stats.enabled"
     private let installIDKey = "ifancontrol.privacy_stats.install_id"
-    private let lastHeartbeatAtKey = "ifancontrol.privacy_stats.last_heartbeat_at"
-    private let reportInterval: TimeInterval = 15 * 60
 
-    private init() {}
+    private let recordInterval: TimeInterval = 15 * 60   // 每 15 分钟入队一条
+    private let flushInterval: TimeInterval = 60 * 60     // 每小时批量上报一次
+    private let maxQueuedEvents = 96                       // 服务端上限
+
+    private let queueFileURL: URL = {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library")
+            .appendingPathComponent("Application Support")
+            .appendingPathComponent("MacFanControl")
+            .appendingPathComponent("heartbeat_queue.json")
+    }()
+
+    private let lock = NSLock()
+    private var pendingEvents: [HeartbeatEvent] = []
+    private var lastRecordAt: TimeInterval = 0
+    private var lastFlushAt: TimeInterval = 0
+
+    private struct HeartbeatEvent: Codable {
+        let ts: TimeInterval
+        let type: String
+    }
+
+    private init() {
+        loadQueue()
+    }
 
     var anonymousStatsEnabled: Bool {
         get {
@@ -431,49 +453,157 @@ final class PrivacyStatsService: @unchecked Sendable {
         }
     }
 
-    func sendHeartbeatIfNeeded(force: Bool = false) {
-        guard anonymousStatsEnabled else {
-            logger.info("Skipping anonymous heartbeat because the user disabled it.")
-            return
-        }
+    // MARK: - 公开接口
+
+    /// 每 15 分钟由 Timer 调用：入队一条事件，到时间则批量上报
+    func tick() {
+        guard anonymousStatsEnabled else { return }
 
         let now = Date().timeIntervalSince1970
-        let lastHeartbeatAt = UserDefaults.standard.double(forKey: lastHeartbeatAtKey)
-        if !force, lastHeartbeatAt > 0, now - lastHeartbeatAt < reportInterval {
-            return
+        var shouldEnqueue = false
+        var shouldFlush = false
+
+        lock.withLock {
+            shouldEnqueue = now - lastRecordAt >= recordInterval
+            if shouldEnqueue { lastRecordAt = now }
+            shouldFlush = now - lastFlushAt >= flushInterval
         }
 
+        if shouldEnqueue {
+            enqueueEvent(ts: now)
+        }
+        if shouldFlush {
+            Task { await flush() }
+        }
+    }
+
+    /// 启动时调用：先 flush 缓存，再入队一条新事件
+    func startup() {
+        guard anonymousStatsEnabled else { return }
+        Task { await flush() }
+        let now = Date().timeIntervalSince1970
+        enqueueEvent(ts: now)
+        lock.withLock { lastRecordAt = now }
+    }
+
+    /// 退出时调用：同步发送所有缓存事件（阻塞，最长 8 秒）
+    func shutdown() {
+        guard anonymousStatsEnabled else { return }
+        let events = lock.withLock {
+            let copy = pendingEvents
+            pendingEvents = []
+            saveQueue()
+            return copy
+        }
+        guard !events.isEmpty else { return }
+
+        let semaphore = DispatchSemaphore(value: 0)
+        Task {
+            await sendEvents(events)
+            semaphore.signal()
+        }
+        semaphore.wait()
+    }
+
+    // MARK: - 内部逻辑
+
+    private func enqueueEvent(ts: TimeInterval) {
+        lock.withLock {
+            // 去重：同一 15 分钟桶内不重复入队
+            let bucket = floor(ts / 900) * 900
+            if let last = pendingEvents.last, floor(last.ts / 900) * 900 == bucket {
+                return
+            }
+            if pendingEvents.count < maxQueuedEvents {
+                pendingEvents.append(HeartbeatEvent(ts: ts, type: "heartbeat"))
+                saveQueue()
+            }
+        }
+    }
+
+    private func flush() async {
+        let events = lock.withLock {
+            let copy = pendingEvents
+            pendingEvents = []
+            saveQueue()
+            return copy
+        }
+        guard !events.isEmpty else { return }
+        await sendEvents(events)
+    }
+
+    private func sendEvents(_ events: [HeartbeatEvent]) async {
         let installID = currentInstallID()
         let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
         let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
 
-        Task {
-            do {
-                var request = URLRequest(url: endpointURL)
-                request.httpMethod = "POST"
-                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                request.timeoutInterval = 8
+        let eventDicts = events.map { ["ts": $0.ts, "type": $0.type] as [String: Any] }
+        let payload: [String: Any] = [
+            "install_id": installID,
+            "version": shortVersion,
+            "build": buildVersion,
+            "events": eventDicts
+        ]
 
-                let payload: [String: String] = [
-                    "install_id": installID,
-                    "version": shortVersion,
-                    "build": buildVersion
-                ]
-                let body = try JSONSerialization.data(withJSONObject: payload)
-                let (_, response) = try await URLSession.shared.upload(for: request, from: body)
+        do {
+            var request = URLRequest(url: endpointURL)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.timeoutInterval = 8
 
-                guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                    logger.warning("Anonymous heartbeat was not accepted by the server.")
-                    return
-                }
+            let body = try JSONSerialization.data(withJSONObject: payload)
+            let (_, response) = try await URLSession.shared.upload(for: request, from: body)
 
-                UserDefaults.standard.set(now, forKey: lastHeartbeatAtKey)
-                logger.info("Anonymous heartbeat sent successfully.")
-            } catch {
-                logger.warning("Anonymous heartbeat failed: \(error.localizedDescription, privacy: .public)")
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                logger.warning("Heartbeat batch rejected by server, re-queuing \(events.count) events.")
+                requeueEvents(events)
+                return
             }
+
+            lock.withLock { lastFlushAt = Date().timeIntervalSince1970 }
+            logger.info("Heartbeat batch sent: \(events.count) events.")
+        } catch {
+            logger.warning("Heartbeat batch failed: \(error.localizedDescription, privacy: .public), re-queuing \(events.count) events.")
+            requeueEvents(events)
         }
     }
+
+    private func requeueEvents(_ events: [HeartbeatEvent]) {
+        lock.withLock {
+            pendingEvents.insert(contentsOf: events, at: 0)
+            // 超出上限时丢弃最旧的
+            if pendingEvents.count > maxQueuedEvents {
+                pendingEvents = Array(pendingEvents.suffix(maxQueuedEvents))
+            }
+            saveQueue()
+        }
+    }
+
+    // MARK: - 持久化
+
+    private func loadQueue() {
+        do {
+            let data = try Data(contentsOf: queueFileURL)
+            let events = try JSONDecoder().decode([HeartbeatEvent].self, from: data)
+            lock.withLock { pendingEvents = events }
+            logger.info("Loaded \(events.count) queued heartbeat events from disk.")
+        } catch {
+            // 文件不存在或格式错误，正常情况
+        }
+    }
+
+    private func saveQueue() {
+        do {
+            let dir = queueFileURL.deletingLastPathComponent()
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            let data = try JSONEncoder().encode(pendingEvents)
+            try data.write(to: queueFileURL, options: .atomic)
+        } catch {
+            logger.warning("Failed to save heartbeat queue: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    // MARK: - install_id
 
     private func currentInstallID() -> String {
         if let existing = UserDefaults.standard.string(forKey: installIDKey), !existing.isEmpty {
@@ -2122,22 +2252,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             UpdateService.shared.checkForUpdates(triggeredByUser: false)
         }
 
-        // 匿名运行反馈：启动后先上报一次，运行期间每 15 分钟尝试上报一次。
+        // 匿名运行反馈：启动时 flush 缓存 + 入队，之后每 15 分钟 tick（入队/批量上报）
         DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
-            PrivacyStatsService.shared.sendHeartbeatIfNeeded(force: true)
+            PrivacyStatsService.shared.startup()
         }
         statsHeartbeatTimer?.invalidate()
         statsHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) { _ in
-            PrivacyStatsService.shared.sendHeartbeatIfNeeded()
-        }
-        if let timer = statsHeartbeatTimer {
-            RunLoop.main.add(timer, forMode: .common)
+            PrivacyStatsService.shared.tick()
         }
     }
     
     func applicationWillTerminate(_ notification: Notification) {
         AppLog.shared.info("application will terminate")
         statsHeartbeatTimer?.invalidate()
+        PrivacyStatsService.shared.shutdown()
         _ = CommandExecutor.shared.setFanAuto()
     }
 
@@ -3564,7 +3692,7 @@ class HelpWindowController: NSWindowController {
 
         PrivacyStatsService.shared.anonymousStatsEnabled = shouldEnable
         if sender.state == .on {
-            PrivacyStatsService.shared.sendHeartbeatIfNeeded(force: true)
+            PrivacyStatsService.shared.startup()
         }
     }
 

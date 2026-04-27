@@ -65,6 +65,9 @@ class FanCurveView: NSView {
         
         // 绘制当前温度线
         drawCurrentTemperatureLine(context: context)
+
+        // 拖拽时右下角显示温度/RPM
+        drawEditingInfo()
     }
     
     private func drawAxes(context: CGContext) {
@@ -214,6 +217,25 @@ class FanCurveView: NSView {
         context.setLineDash(phase: 0, lengths: [4, 4])
         context.strokePath()
         context.setLineDash(phase: 0, lengths: [])
+    }
+
+    private func drawEditingInfo() {
+        guard let index = selectedPointIndex, index < fanCurve.count else { return }
+
+        let point = fanCurve[index]
+        let text = String(format: "%.1f°C · %d", point.temperature, point.rpm)
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 10),
+            .foregroundColor: NSColor.secondaryLabelColor
+        ]
+        let size = text.size(withAttributes: attributes)
+        let width = bounds.width - 2 * padding
+        let height = bounds.height - 2 * padding
+
+        let x = padding + width - size.width
+        let y = padding + 4
+        text.draw(at: CGPoint(x: x, y: y), withAttributes: attributes)
     }
     
     override func mouseDown(with event: NSEvent) {
