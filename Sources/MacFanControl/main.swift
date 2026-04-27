@@ -413,10 +413,10 @@ final class PrivacyStatsService: @unchecked Sendable {
     private let endpointURL = URL(string: "https://ifan-59w.pages.dev/api/heartbeat")!
     private let enabledKey = "ifancontrol.privacy_stats.enabled"
     private let installIDKey = "ifancontrol.privacy_stats.install_id"
+    private let flushDateKey = "ifancontrol.privacy_stats.last_flush_date"
 
     private let recordInterval: TimeInterval = 15 * 60   // 每 15 分钟入队一条
-    private let flushInterval: TimeInterval = 60 * 60     // 每小时批量上报一次
-    private let maxQueuedEvents = 96                       // 服务端上限
+    private let maxQueuedEvents = 192                      // 48 小时（192 × 15min）
 
     private let queueFileURL: URL = {
         FileManager.default.homeDirectoryForCurrentUser
@@ -429,9 +429,8 @@ final class PrivacyStatsService: @unchecked Sendable {
     private let lock = NSLock()
     private var pendingEvents: [HeartbeatEvent] = []
     private var lastRecordAt: TimeInterval = 0
-    private var lastFlushAt: TimeInterval = 0
 
-    private struct HeartbeatEvent: Codable {
+    struct HeartbeatEvent: Codable {
         let ts: TimeInterval
         let type: String
     }
@@ -453,9 +452,35 @@ final class PrivacyStatsService: @unchecked Sendable {
         }
     }
 
+    // MARK: - 日期辅助
+
+    private func todayString() -> String {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        fmt.timeZone = TimeZone.current
+        return fmt.string(from: Date())
+    }
+
+    private func localDateString(for ts: TimeInterval) -> String {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        fmt.timeZone = TimeZone.current
+        return fmt.string(from: Date(timeIntervalSince1970: ts))
+    }
+
+    private var lastFlushDate: String? {
+        get { UserDefaults.standard.string(forKey: flushDateKey) }
+        set { UserDefaults.standard.set(newValue, forKey: flushDateKey) }
+    }
+
+    /// 判断事件是否是昨天或更早（本地时间）
+    private func isYesterdayOrEarlier(_ event: HeartbeatEvent) -> Bool {
+        localDateString(for: event.ts) < todayString()
+    }
+
     // MARK: - 公开接口
 
-    /// 每 15 分钟由 Timer 调用：入队一条事件，到时间则批量上报
+    /// 每 15 分钟由 Timer 调用：入队一条事件，到时间则上报昨天的事件
     func tick() {
         guard anonymousStatsEnabled else { return }
 
@@ -466,7 +491,8 @@ final class PrivacyStatsService: @unchecked Sendable {
         lock.withLock {
             shouldEnqueue = now - lastRecordAt >= recordInterval
             if shouldEnqueue { lastRecordAt = now }
-            shouldFlush = now - lastFlushAt >= flushInterval
+            // 今天还没 flush 过，且队列中有昨天的事件
+            shouldFlush = lastFlushDate != todayString() && pendingEvents.contains { isYesterdayOrEarlier($0) }
         }
 
         if shouldEnqueue {
@@ -477,7 +503,7 @@ final class PrivacyStatsService: @unchecked Sendable {
         }
     }
 
-    /// 启动时调用：先 flush 缓存，再入队一条新事件
+    /// 启动时调用：先 flush 昨天的缓存，再入队一条新事件
     func startup() {
         guard anonymousStatsEnabled else { return }
         Task { await flush() }
@@ -486,23 +512,35 @@ final class PrivacyStatsService: @unchecked Sendable {
         lock.withLock { lastRecordAt = now }
     }
 
-    /// 退出时调用：同步发送所有缓存事件（阻塞，最长 8 秒）
+    /// 退出时调用：同步发送昨天及更早的事件（阻塞，最长 8 秒）
     func shutdown() {
         guard anonymousStatsEnabled else { return }
-        let events = lock.withLock {
-            let copy = pendingEvents
-            pendingEvents = []
-            saveQueue()
-            return copy
-        }
+        let events = lock.withLock { extractYesterdayEvents() }
         guard !events.isEmpty else { return }
 
         let semaphore = DispatchSemaphore(value: 0)
         Task {
-            await sendEvents(events)
+            await sendEventsToHeartbeat(events)
             semaphore.signal()
         }
         semaphore.wait()
+    }
+
+    /// 取出昨天及更早的事件（供反馈携带），不从队列移除
+    func dequeueYesterdayEvents() -> [HeartbeatEvent] {
+        lock.withLock {
+            pendingEvents.filter { isYesterdayOrEarlier($0) }
+        }
+    }
+
+    /// 标记事件已成功上报，从队列中移除
+    func markEventsSent(_ events: [HeartbeatEvent]) {
+        guard !events.isEmpty else { return }
+        let sentTimestamps = Set(events.map { $0.ts })
+        lock.withLock {
+            pendingEvents.removeAll { sentTimestamps.contains($0.ts) }
+            saveQueue()
+        }
     }
 
     // MARK: - 内部逻辑
@@ -521,18 +559,27 @@ final class PrivacyStatsService: @unchecked Sendable {
         }
     }
 
-    private func flush() async {
-        let events = lock.withLock {
-            let copy = pendingEvents
-            pendingEvents = []
-            saveQueue()
-            return copy
+    /// 提取昨天及更早的事件并从队列移除，保留今天的
+    private func extractYesterdayEvents() -> [HeartbeatEvent] {
+        let (yesterday, today) = pendingEvents.reduce(into: ([HeartbeatEvent](), [HeartbeatEvent]())) { result, event in
+            if isYesterdayOrEarlier(event) {
+                result.0.append(event)
+            } else {
+                result.1.append(event)
+            }
         }
-        guard !events.isEmpty else { return }
-        await sendEvents(events)
+        pendingEvents = today
+        saveQueue()
+        return yesterday
     }
 
-    private func sendEvents(_ events: [HeartbeatEvent]) async {
+    private func flush() async {
+        let events = lock.withLock { extractYesterdayEvents() }
+        guard !events.isEmpty else { return }
+        await sendEventsToHeartbeat(events)
+    }
+
+    private func sendEventsToHeartbeat(_ events: [HeartbeatEvent]) async {
         let installID = currentInstallID()
         let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
         let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
@@ -560,8 +607,8 @@ final class PrivacyStatsService: @unchecked Sendable {
                 return
             }
 
-            lock.withLock { lastFlushAt = Date().timeIntervalSince1970 }
-            logger.info("Heartbeat batch sent: \(events.count) events.")
+            lock.withLock { lastFlushDate = todayString() }
+            logger.info("Heartbeat daily batch sent: \(events.count) events.")
         } catch {
             logger.warning("Heartbeat batch failed: \(error.localizedDescription, privacy: .public), re-queuing \(events.count) events.")
             requeueEvents(events)
@@ -605,7 +652,7 @@ final class PrivacyStatsService: @unchecked Sendable {
 
     // MARK: - install_id
 
-    private func currentInstallID() -> String {
+    func currentInstallID() -> String {
         if let existing = UserDefaults.standard.string(forKey: installIDKey), !existing.isEmpty {
             return existing
         }
@@ -1606,6 +1653,7 @@ class MenuBarManager {
     private var safetyFloorWindowController: SafetyFloorWindowController?
     private var fanCurveWindowController: NSWindowController?
     private var helpWindowController: HelpWindowController?
+    private var feedbackWindowController: FeedbackWindowController?
 
     // 菜单项引用（用于原地更新，避免每 2 秒重建整个菜单）
     private var menu: NSMenu?
@@ -1800,6 +1848,35 @@ class MenuBarManager {
         let aboutItem = NSMenuItem(title: appL10n("关于/帮助...", "About / Help..."), action: #selector(showHelp), keyEquivalent: "")
         aboutItem.target = self
         menu.addItem(aboutItem)
+
+        // 反馈入口
+        menu.addItem(NSMenuItem.separator())
+
+        // 标题（标准菜单项，自然对齐）
+        let feedbackTitleItem = NSMenuItem(title: appL10n("告诉开发者 👋", "Talk to Dev 👋"), action: #selector(showFeedback), keyEquivalent: "")
+        feedbackTitleItem.target = self
+        menu.addItem(feedbackTitleItem)
+
+        // 模拟输入框（自定义视图）
+        let feedbackItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        let feedbackContainer = NSView(frame: NSRect(x: 0, y: 0, width: 240, height: 76))
+        let feedbackField = NSTextField(frame: NSRect(x: 20, y: 6, width: 200, height: 64))
+        feedbackField.isEditable = false
+        feedbackField.isBezeled = true
+        feedbackField.bezelStyle = .roundedBezel
+        feedbackField.font = NSFontManager.shared.convert(.systemFont(ofSize: 13), toHaveTrait: .italicFontMask)
+        feedbackField.textColor = .placeholderTextColor
+        feedbackField.stringValue = appL10n("找作者聊聊，随便说两句...", "Just say anything...")
+        feedbackField.alignment = .left
+        feedbackField.lineBreakMode = .byWordWrapping
+        feedbackField.maximumNumberOfLines = 2
+        feedbackContainer.addSubview(feedbackField)
+        let clickGesture = NSClickGestureRecognizer(target: self, action: #selector(showFeedback))
+        feedbackContainer.addGestureRecognizer(clickGesture)
+        feedbackItem.view = feedbackContainer
+        menu.addItem(feedbackItem)
+
+        menu.addItem(NSMenuItem.separator())
 
         // 语言
         let languageItem = NSMenuItem(title: appL10n("语言", "Language"), action: nil, keyEquivalent: "")
@@ -2128,6 +2205,17 @@ class MenuBarManager {
         }
         helpWindowController?.showWindow(nil)
         presentWindowFront(helpWindowController?.window)
+    }
+
+    @objc func showFeedback() {
+        // 先关闭菜单，避免遮挡弹窗
+        self.menu?.cancelTracking()
+
+        if feedbackWindowController == nil {
+            feedbackWindowController = FeedbackWindowController()
+        }
+        feedbackWindowController?.showWindow(nil)
+        presentWindowFront(feedbackWindowController?.window)
     }
 
     @objc func restartApp() {
@@ -2626,6 +2714,230 @@ class SpeedSettingWindowController: NSWindowController {
         }
         applyStatusResetWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: workItem)
+    }
+}
+
+@MainActor
+class FeedbackWindowController: NSWindowController {
+    private var contentTextView: NSTextView?
+    private var emailField: NSTextField?
+    private var sendButton: NSButton?
+    private var statusLabel: NSTextField?
+
+    init() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 320),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = appL10n("告诉开发者", "Talk to Dev")
+        window.center()
+
+        super.init(window: window)
+
+        applyWindowMaterialStyle(window)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func setupUI() {
+        guard let contentView = window?.contentView else { return }
+
+        // 标题提示
+        let hintLabel = NSTextField(labelWithString: appL10n("有什么想告诉我的？随便说两句就行", "Got something to tell me? Just say anything."))
+        hintLabel.textColor = .secondaryLabelColor
+        hintLabel.font = .systemFont(ofSize: 13)
+        hintLabel.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(hintLabel)
+
+        // 多行文本输入
+        let scrollView = NSScrollView()
+        scrollView.hasVerticalScroller = true
+        scrollView.borderType = .bezelBorder
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(scrollView)
+
+        let textView = NSTextView()
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.font = .systemFont(ofSize: 14)
+        textView.isVerticallyResizable = true
+        textView.autoresizingMask = [.width]
+        textView.textContainer?.containerSize = NSSize(width: 340, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainer?.widthTracksTextView = true
+        scrollView.documentView = textView
+        self.contentTextView = textView
+
+        // 邮箱
+        let emailLabel = NSTextField(labelWithString: appL10n("邮箱（选填，方便我回复你）", "Email (optional, so I can reply)"))
+        emailLabel.textColor = .secondaryLabelColor
+        emailLabel.font = .systemFont(ofSize: 12)
+        emailLabel.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(emailLabel)
+
+        let emailField = NSTextField()
+        emailField.placeholderString = appL10n("your@email.com", "your@email.com")
+        emailField.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(emailField)
+        self.emailField = emailField
+
+        // 发送按钮
+        let sendButton = NSButton(title: appL10n("发送", "Send"), target: self, action: #selector(sendFeedback))
+        sendButton.bezelStyle = .rounded
+        sendButton.keyEquivalent = "\r"
+        sendButton.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(sendButton)
+        self.sendButton = sendButton
+
+        // 状态标签
+        let statusLabel = NSTextField(labelWithString: "")
+        statusLabel.textColor = .systemGreen
+        statusLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        statusLabel.alignment = .center
+        statusLabel.alphaValue = 0
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(statusLabel)
+        self.statusLabel = statusLabel
+
+        NSLayoutConstraint.activate([
+            hintLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 16),
+            hintLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            hintLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+
+            scrollView.topAnchor.constraint(equalTo: hintLabel.bottomAnchor, constant: 10),
+            scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            scrollView.heightAnchor.constraint(equalToConstant: 120),
+
+            emailLabel.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
+            emailLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+
+            emailField.topAnchor.constraint(equalTo: emailLabel.bottomAnchor, constant: 4),
+            emailField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            emailField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            emailField.heightAnchor.constraint(equalToConstant: 24),
+
+            statusLabel.topAnchor.constraint(equalTo: emailField.bottomAnchor, constant: 10),
+            statusLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+
+            sendButton.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 8),
+            sendButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            sendButton.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -16),
+        ])
+    }
+
+    @objc private func sendFeedback() {
+        let content = contentTextView?.string.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !content.isEmpty else {
+            showStatus(appL10n("请输入内容", "Please enter something"), isError: true)
+            return
+        }
+
+        guard FeedbackService.shared.canSend() else {
+            showStatus(appL10n("服务器压力大，请一小时后再试", "Server busy, please try again in an hour"), isError: true)
+            return
+        }
+
+        let email = emailField?.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        sendButton?.isEnabled = false
+        sendButton?.title = appL10n("发送中...", "Sending...")
+
+        Task {
+            let success = await FeedbackService.shared.sendFeedback(content: content, email: email)
+            if success {
+                showStatus(appL10n("收到！我会尽快回复你", "Got it! I'll reply soon"), isError: false)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                    self?.window?.close()
+                }
+            } else {
+                showStatus(appL10n("发送失败，请稍后再试", "Failed, please try later"), isError: true)
+                sendButton?.isEnabled = true
+                sendButton?.title = appL10n("发送", "Send")
+            }
+        }
+    }
+
+    private func showStatus(_ text: String, isError: Bool) {
+        statusLabel?.stringValue = text
+        statusLabel?.textColor = isError ? .systemRed : .systemGreen
+        statusLabel?.alphaValue = 1
+    }
+}
+
+final class FeedbackService: @unchecked Sendable {
+    static let shared = FeedbackService()
+
+    private let endpointURL = URL(string: "https://ifan-59w.pages.dev/api/feedback")!
+    private let timestampsKey = "ifancontrol.feedback.send_timestamps"
+    private let maxPerHour = 5
+
+    /// 检查是否超过频率限制，返回 true 表示可以发送
+    func canSend() -> Bool {
+        let now = Date().timeIntervalSince1970
+        let cutoff = now - 3600
+        var timestamps = UserDefaults.standard.array(forKey: timestampsKey) as? [TimeInterval] ?? []
+        timestamps = timestamps.filter { $0 > cutoff }
+        return timestamps.count < maxPerHour
+    }
+
+    /// 记录一次发送时间戳
+    private func recordSend() {
+        let now = Date().timeIntervalSince1970
+        let cutoff = now - 3600
+        var timestamps = UserDefaults.standard.array(forKey: timestampsKey) as? [TimeInterval] ?? []
+        timestamps = timestamps.filter { $0 > cutoff }
+        timestamps.append(now)
+        UserDefaults.standard.set(timestamps, forKey: timestampsKey)
+    }
+
+    func sendFeedback(content: String, email: String) async -> Bool {
+        guard canSend() else { return false }
+
+        let installID = PrivacyStatsService.shared.currentInstallID()
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+
+        // 取出昨天及更早的心跳事件，顺便带上报
+        let pendingEvents = PrivacyStatsService.shared.dequeueYesterdayEvents()
+        let eventDicts = pendingEvents.map { ["ts": $0.ts, "type": $0.type] as [String: Any] }
+
+        var payload: [String: Any] = [
+            "install_id": installID,
+            "content": content,
+            "email": email,
+            "version": shortVersion,
+            "build": buildVersion,
+        ]
+        if !eventDicts.isEmpty {
+            payload["events"] = eventDicts
+        }
+
+        do {
+            var request = URLRequest(url: endpointURL)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.timeoutInterval = 8
+
+            let body = try JSONSerialization.data(withJSONObject: payload)
+            let (_, response) = try await URLSession.shared.upload(for: request, from: body)
+
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                return false
+            }
+            recordSend()
+            // 反馈成功，标记心跳事件已上报
+            if !pendingEvents.isEmpty {
+                PrivacyStatsService.shared.markEventsSent(pendingEvents)
+            }
+            return true
+        } catch {
+            return false
+        }
     }
 }
 
