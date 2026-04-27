@@ -3,7 +3,82 @@
 关联固定记忆：`/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_MEMORY.md`  
 读取建议：先读固定记忆，再读本文件，用本文件补足最近发生的变化。
 
+## 2026-04-27
+
+### 2026-04-27 — v33 风扇曲线预设系统（两次尝试均失败，已回滚）
+
+#### 第一次尝试（早些时候）
+- 目标：3 个预设 Tab 切换，一键在安静/均衡/性能场景间切换
+- 编译通过，二进制已替换
+- 运行时 UI 未显示，`showFanCurveEditor()` 从未被调用
+- 已回滚
+
+#### 第二次尝试（晚间）
+- 采用分阶段增量策略：
+  - 阶段 1：Config 数据层 + NSLog 调试日志 → 编译通过，NSLog 确认 showFanCurveEditor 被调用
+  - 阶段 2：预设 Tab UI → 编译通过，但 UI 不显示
+- 尝试了多种 UI 方案均不显示：
+  - NSSegmentedControl
+  - NSStackView + NSButton (recessed)
+  - 自定义 PresetTabButton (NSView 子类)
+  - 替换 contentView 为新 NSView
+- 原始 UI（FanCurveView + 按钮）始终正常，但任何新增 addSubview 都不可见
+- clean build、codesign 重签均无效
+- 已完全回滚到 build 32
+
+#### 关键发现
+- `setupUI()` 确实被调用（日志证实）
+- 菜单 action 正常连接（`sendAction:` 日志出现）
+- 二进制 MD5 验证一致（替换成功）
+- 但新增的子视图在运行时不可见，原因未明
+- 可能与 `@MainActor` 隔离、AppKit 内部缓存、或 window.contentView 生命周期有关
+
+#### 下次实现建议
+1. 不修改现有 FanCurveWindowController，创建全新的 NSWindowController 子类
+2. 或用 SwiftUI 替代 AppKit 实现预设 UI
+3. 或在 FanCurveView 内部直接绘制预设 Tab（避免 addSubview 问题）
+4. 先做最小可行测试：在 setupUI 中添加一个最简单的 NSView，确认能显示后再逐步构建
+
 ## 2026-04-26
+
+### 2026-04-26 晚间 — 登录故障排查与统计后台大改
+
+#### 登录故障排查（3 个根因）
+1. **`_worker.bundle` 覆盖 functions/ 目录**：
+   - `ifan-stats/` 中残留的 `_worker.bundle` 带有旧 KV 路由表
+   - Cloudflare Pages 优先使用该 bundle，导致所有 API 请求走旧代码
+   - 修复：删除 `_worker.bundle`，重新部署
+2. **`drawTrendTooltip` 重复声明**：
+   - `app.js` 中存在两个同名函数声明，导致 SyntaxError
+   - 整个 JS 无法执行（包括登录表单的事件绑定），页面闪烁后输入清空
+   - 修复：删除重复的函数声明
+3. **Cloudflare WAF 自定义域名拦截**：
+   - `stats.puremilkchun.top` 被 Cloudflare managed challenge 拦截，返回 403
+   - `pages.dev` 地址可正常访问
+   - 用户已设置 WAF 例外规则，但未完全解决
+   - 当前状态：使用 `ifan-stats.pages.dev` 访问
+
+#### 会话有效期延长
+- `SESSION_TTL_SECONDS` 从 12 小时改为 365 天
+- 登录 cookie `Max-Age` 同步改为 365 天
+- 用户需求："只要登录，就不需要重新登录了"
+
+#### 趋势图 hover 版本分布
+- 为近 30 天趋势图添加鼠标事件监听（mousemove / mouseleave）
+- hover 浮窗显示每日各版本的去重用户数
+- 版本数量右对齐
+
+#### 活跃度图每桶版本分布（重大改动）
+- **数据库**：`bucket_activity` 表新增 `version TEXT` 列
+- **心跳端点**：`INSERT INTO bucket_activity` 增加 `version` 字段（格式 `2.9.1-32`）
+- **老数据回填**：从 `flags` 表的 `version:{day}:{versionBuild}:{installHash}` 模式提取版本信息，回填 32 行
+- **后端查询**：改为单源查询 `GROUP BY bucket_index, version`，同时计算活跃用户数和版本分布
+- **前端改动**：移除 `dailyVersionsMap`，改从 `point.versions` 读取每个桶的版本分布
+- **active_users 一致性修复**：hover 中的活跃人数 = 各版本人数之和（均来自同一查询）
+
+#### 版本数量右对齐
+- `drawCanvasTooltip` 和 `drawTrendTooltip` 中，版本行改为版本号左对齐、数量右对齐
+- 宽度计算拆分为 `verWidth + gap + cntWidth`
 
 ### 2026-04-26 15:00 左右
 - 诊断并修复统计后台数据为 0 的问题：
@@ -67,6 +142,47 @@
 - 收到 Cloudflare 邮件：Workers KV 免费层已达 50%
 - 免费层限制：每天 1,000 次写入；当前约 5 个日活用户（每人每天 96 次心跳写入）
 - 结论：暂不需要升级，但用户继续增长时需注意（$5/月付费计划可支撑 ~10,000 日活）
+
+### 2026-04-26 深夜 — KV 迁移 D1 + 批量心跳系统
+
+#### 背景
+- KV 免费层 1,000 次写入/天，5 个日活用户已接近 50%
+- D1 免费层提供 100,000 行写入/天 + 1,000 次查询/天
+- 决定将统计后端从 KV 迁移到 D1，并重新设计心跳上报机制
+
+#### D1 迁移
+- 创建 D1 数据库 `ifan-stats-db`（database_id: `383dadba-cf12-47f1-bf53-dbf2f087458f`）
+- 新建 `wrangler.toml` 配置 D1 绑定（docs + ifan-stats 两个项目）
+- 重写 `docs/functions/api/heartbeat.js`：KV → D1，支持批量事件格式
+- 重写 `docs/functions/download.js`：KV → D1
+- 重写 `docs/functions/api/stats.js`：KV → D1
+- 重写 `ifan-stats/functions/api/dashboard/summary.js`：KV → D1
+- 重写 `ifan-stats/functions/api/_lib/auth.js`：KV → D1（登录限流）
+- D1 表结构：`counters`、`flags`（替代旧 `seen`）、`bucket_activity`、`series_15m`
+- 删除 `docs/_worker.js`（旧打包文件会覆盖 functions/ 目录），保留 `.bak`
+
+#### 批量心跳系统
+- 问题：即使迁移到 D1，每个用户每天仍产生 ~96 次查询（每 15 分钟 1 次心跳 × 每次 ~4 条 SQL）
+- 解决方案：App 端本地缓存心跳事件，每小时批量上报
+- App 端改动（`PrivacyStatsService`）：
+  - 每 15 分钟记录一条带时间戳的事件到本地队列
+  - 每小时通过 `POST /api/heartbeat` 批量上报所有缓存事件
+  - 离线事件缓存在 `~/Library/Application Support/iFanControl/heartbeat_queue.json`
+  - 启动时先 flush 缓存事件，再记录新心跳
+  - 退出时 flush 所有待上报事件
+- 服务器端改动（`heartbeat.js`）：
+  - 接收 `{install_id, version, build, events: [{ts, type}, ...]}` 格式
+  - 按 (day, bucket_index) 去重，批量写入 D1
+  - 从 `bucket_activity` 重新聚合 `series_15m` 活跃用户数
+- 查询量估算：~5 次查询/批 × 每天 24 批/用户 × 5 用户 ≈ 600 次/天（远低于 1,000 免费上限）
+
+#### 前端改动
+- `ifan-stats/index.html`：卡片区"最近刷新"下方注明"每小时更新"
+
+#### 部署验证
+- 两个项目均部署到 Cloudflare Pages
+- 本地测试通过（heartbeat、stats、download 三个接口）
+- 远程测试通过
 
 ## 2026-04-24
 

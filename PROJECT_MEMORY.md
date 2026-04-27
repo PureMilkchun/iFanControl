@@ -3,7 +3,7 @@
 关联时间戳记忆：`/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_TIMELINE.md`  
 读取建议：先读本文件，再读时间戳记忆，避免遗漏最新变更。
 
-更新时间：2026-04-26
+更新时间：2026-04-26（晚间更新）
 
 ## 1. 项目当前基线
 
@@ -102,29 +102,22 @@ npx wrangler pages deploy docs --project-name ifan
 
 ### Cloudflare Pages Functions 部署纪律（重要）
 
-**核心教训**：`docs/functions/` 目录中的 JS 文件不会被 Cloudflare Pages 自动处理。必须通过显式构建生成 `_worker.js`，然后用 `--no-bundle` 部署。
+**核心教训**：`docs/_worker.js` 存在时，Cloudflare Pages 会跳过 `functions/` 目录，直接使用该文件。已删除 `_worker.js`（保留 `.bak`），让 Pages 自动从 `functions/` 构建。
 
 **正确部署流程**：
 ```bash
-# 1. 编译 functions → _worker.js
 cd '/Users/puremilk/Documents/mac fancontrol/docs'
-npx wrangler pages functions build --outdir /tmp/ifan-build
-cp /tmp/ifan-build/_worker.js _worker.js
-
-# 2. 部署（必须带 --no-bundle --skip-caching）
-cd '/Users/puremilk/Documents/mac fancontrol'
-npx wrangler pages deploy docs --project-name ifan --no-bundle --skip-caching --commit-dirty=true
+npx wrangler pages deploy ./ --project-name ifan --commit-dirty=true
 ```
 
 **禁止事项**：
-- 不要在 `docs/` 中放置手动生成的 `_worker.bundle`（会导致路由错误）
-- 不要不带 `--no-bundle` 部署已存在 `_worker.js` 的目录（会尝试重新打包并失败）
-- 不要不带 `--skip-caching` 部署（wrangler 可能检测不到文件变化，显示 “0 files uploaded”）
+- 不要在 `docs/` 中放置 `_worker.js` 或 `_worker.bundle`（会覆盖 functions/ 目录的自动构建）
+- 不要手动编译 functions 到 _worker.js（已不再需要）
 
 **原因**：
-- `_worker.bundle` 或 `_worker.js` 存在时，Cloudflare Pages 会跳过自动构建，直接使用该文件
-- 旧的 `_worker.bundle` 路由表带有 `/functions/` 前缀，与实际请求路径不匹配，导致所有 API 返回 HTML
-- 没有 `_worker.js` 时，`wrangler pages deploy` 不会自动从 `functions/` 目录构建，函数静默失效
+- `_worker.js` 存在时，Cloudflare Pages 会跳过 `functions/` 目录，直接使用该文件
+- 删除 `_worker.js` 后，Pages 自动从 `functions/` 目录编译并部署
+- D1 绑定通过 `wrangler.toml` 配置，无需手动设置
 
 ## 5b. 统计后台（ifan-stats）
 
@@ -136,15 +129,24 @@ npx wrangler pages deploy docs --project-name ifan --no-bundle --skip-caching --
 - 自定义域名：`https://stats.puremilkchun.top`
 
 ### 架构
-- 独立的 Cloudflare Pages 项目，与主站 `ifan` 共享同一个 KV 命名空间 `IFAN_STATS`
+- 独立的 Cloudflare Pages 项目，与主站 `ifan` 共享同一个 D1 数据库 `ifan-stats-db`
+- D1 database_id: `383dadba-cf12-47f1-bf53-dbf2f087458f`
 - 主站写入数据（heartbeat、download），统计后台读取数据
 - 后端 API：`/api/dashboard/summary`（需要登录）
 - 登录认证：用户名 + 密码 + TOTP 动态码
+- 登录限流使用 D1 counters 表（key 前缀 `statsauth:fail:`）
+- 会话有效期：365 天（登录后无需频繁重新登录）
+
+### D1 数据库表结构
+- `counters`：通用计数器（每日下载、活跃用户、版本计数、登录限流等）
+- `flags`：去重标记（每日唯一用户、安装唯一标识、版本唯一标识）
+- `bucket_activity`：15 分钟桶活跃记录（install_hash + day + bucket_index + version）
+- `series_15m`：15 分钟粒度时序数据（active / download 两种 kind）
 
 ### 部署命令
 ```bash
 cd '/Users/puremilk/Documents/mac fancontrol/ifan-stats'
-npx wrangler pages deploy . --project-name ifan-stats --no-bundle --skip-caching --commit-dirty=true
+npx wrangler pages deploy ./ --project-name ifan-stats --commit-dirty=true
 ```
 
 ### 当前功能
@@ -154,6 +156,9 @@ npx wrangler pages deploy . --project-name ifan-stats --no-bundle --skip-caching
 - 下载活跃趋势图（15 分钟粒度，数据保留 7 天）
 - 近 30 天趋势图（每日下载 + 每日活跃用户）
 - 近 30 天明细表
+- 前端注明"每小时更新"
+- **hover 版本分布**：两个图表的 hover 浮窗均显示各版本的去重用户数（版本号左对齐，数量右对齐）
+- **数据一致性**：活跃用户数与版本分布来自同一 `bucket_activity` 查询，确保 hover 中活跃人数 = 各版本人数之和
 
 ## 6. 图标与资源规则
 
@@ -272,16 +277,22 @@ npx wrangler pages deploy . --project-name ifan-stats --no-bundle --skip-caching
   - 但用户坚持关闭时仍然允许关闭
 
 ### 匿名统计当前技术行为
-- 旧逻辑“每天最多一次”已替换为：
-  - 启动后延迟上报一次
-  - 运行期间每 `15 分钟` 尝试上报一次
-- App 端 key 已切换为：
-  - `ifancontrol.privacy_stats.last_heartbeat_at`
+- 批量心跳系统（2026-04-26）：
+  - App 每 15 分钟在本地记录一条心跳事件（含时间戳）
+  - 每小时集中上报一批事件到服务器
+  - 离线事件缓存在 `heartbeat_queue.json`，下次在线时自动上报
+  - 启动时先 flush 缓存事件，再记录新心跳
+  - 退出时 flush 所有待上报事件
+- App 端相关 key：
+  - `ifancontrol.privacy_stats.last_upload_at`（上次上传时间）
+  - `ifancontrol.privacy_stats.install_id`（匿名安装 ID）
+  - `ifancontrol.privacy_stats.enabled`（是否开启）
 - 官网端已开始长期保存：
   - 最近 `30 天` 的 `15 分钟聚合活跃值`
 - 统计后台当前正确口径：
-  - 默认显示“近 12 小时”
+  - 默认显示”近 12 小时”
   - 每个点代表一个 `15 分钟活跃用户值`
+  - 前端注明”每小时更新”
 
 ### 当前发布纪律（再次强调）
 - 只要 App 行为改动会影响用户实际体验，就不能只推代码：
@@ -337,8 +348,19 @@ npx wrangler pages deploy . --project-name ifan-stats --no-bundle --skip-caching
 - `BackgroundHardwareReader` 必须是非 MainActor 的独立类，否则 `Task.detached` 调用仍会跳回主线程
 - 两个定时器（菜单 2s + 控温 2s）都需要避免在主线程做硬件 I/O
 
-### Cloudflare KV 用量
-- 免费层每日 1,000 次写入，当前约 5 个日活用户
-- 每个用户每 15 分钟心跳 = 每天 96 次写入
-- 50% 预警时约 500 次/天，暂无需升级
-- 增长到 ~10 个日活时需考虑 $5/月付费计划
+### 统计后端从 KV 迁移到 D1（2026-04-26）
+- 原因：KV 免费层每日 1,000 次写入上限太低，D1 免费层提供 100,000 行写入/天
+- 迁移范围：`docs/functions/` 下 heartbeat.js、download.js、stats.js + ifan-stats 的 summary.js、auth.js
+- 新增 D1 表：`bucket_activity`、`flags`（替代旧 `seen` 表）
+- `docs/_worker.js` 已删除（旧打包文件会覆盖 functions/ 目录），保留 `.bak` 备份
+- `bucket_activity` 表已新增 `version` 列，心跳端点写入版本信息（格式 `2.9.1-32`）
+- 老数据已从 `flags` 表回填版本信息（32 行）
+
+### 批量心跳系统（2026-04-26）
+- App 端每 15 分钟在本地记录一条心跳事件（含时间戳）
+- 每小时集中上报一批事件到服务器（`POST /api/heartbeat`，`events` 数组）
+- 离线事件缓存在 `~/Library/Application Support/iFanControl/heartbeat_queue.json`
+- 启动时先尝试上报缓存事件，再记录新心跳
+- 退出时 flush 所有待上报事件
+- 服务器端 `heartbeat.js` 按 (day, bucket_index) 去重，批量写入 D1
+- 免费层查询用量估算：~5 次查询/批 × 每天 24 批/用户 × 5 用户 ≈ 600 次/天（远低于 1,000 免费上限）

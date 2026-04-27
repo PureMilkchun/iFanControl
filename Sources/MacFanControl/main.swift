@@ -1119,22 +1119,17 @@ class ConfigManager {
             return config
         }
 
+        let maxRPM = FanManager.shared.currentMaxRPM
         return Config(
             version: "1.0",
-            curve: [
-                FanPoint(temperature: 20, rpm: 0),
-                FanPoint(temperature: 47.3547794117647, rpm: 650),
-                FanPoint(temperature: 68.21691176470588, rpm: 1642),
-                FanPoint(temperature: 86.18520220588235, rpm: 2997),
-                FanPoint(temperature: 100, rpm: FanManager.shared.currentMaxRPM)
-            ],
+            curve: defaultFanCurve(maxRPM: maxRPM),
             mode: "auto",
             autoStart: true,
-            maxRPM: FanManager.shared.currentMaxRPM,
-            manualRPM: min(2168, FanManager.shared.currentMaxRPM),
+            maxRPM: maxRPM,
+            manualRPM: min(2168, maxRPM),
             manualRPMControlMode: ManualRPMControlMode.continuous.rawValue,
             manualRPMStep: defaultManualRPMStep,
-            safetyFloorRPM: min(FanManager.shared.defaultSafetyRPM, FanManager.shared.currentMaxRPM),
+            safetyFloorRPM: min(FanManager.shared.defaultSafetyRPM, maxRPM),
             temperatureSourceMode: "hottest",
             selectedTemperatureSensorKey: nil
         )
@@ -1479,7 +1474,7 @@ class MenuBarManager {
     
     private var speedSettingWindowController: SpeedSettingWindowController?
     private var safetyFloorWindowController: SafetyFloorWindowController?
-    private var fanCurveWindowController: FanCurveWindowController?
+    private var fanCurveWindowController: NSWindowController?
     private var helpWindowController: HelpWindowController?
 
     // 菜单项引用（用于原地更新，避免每 2 秒重建整个菜单）
@@ -1522,6 +1517,7 @@ class MenuBarManager {
         updateDynamicMenuItems()
 
         NotificationCenter.default.addObserver(self, selector: #selector(handleCurveSaved), name: NSNotification.Name("FanCurveDidSave"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleCurveSwitched), name: NSNotification.Name("FanCurveDidSwitch"), object: nil)
 
         // 后台轮询硬件（避免主线程阻塞导致菜单点击延迟）
         Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
@@ -1543,6 +1539,22 @@ class MenuBarManager {
     }
     
     @objc private func handleCurveSaved(_ notification: Notification) {
+        if let curve = notification.userInfo?["curve"] as? [FanPoint] {
+            fanCurve = curve
+        }
+        // 同步预设数据到 config
+        if let names = notification.userInfo?["curvePresetNames"] as? [String],
+           let presets = notification.userInfo?["curvePresets"] as? [[FanPoint]],
+           let active = notification.userInfo?["activeCurvePreset"] as? Int {
+            var config = ConfigManager.shared.loadConfig()
+            config.curvePresetNames = names
+            config.curvePresets = presets
+            config.activeCurvePreset = active
+            ConfigManager.shared.saveConfig(config)
+        }
+    }
+
+    @objc private func handleCurveSwitched(_ notification: Notification) {
         if let curve = notification.userInfo?["curve"] as? [FanPoint] {
             fanCurve = curve
         }
@@ -1776,7 +1788,15 @@ class MenuBarManager {
     }
     
     @objc func showFanCurveEditor() {
-        fanCurveWindowController = FanCurveWindowController(fanCurve: fanCurve, maxRPM: FanManager.shared.currentMaxRPM)
+        NSLog("iFanControl: showFanCurveEditor - creating FanCurvePresetWindowController")
+        let config = ConfigManager.shared.loadConfig()
+        fanCurveWindowController = FanCurvePresetWindowController(
+            fanCurve: fanCurve,
+            maxRPM: FanManager.shared.currentMaxRPM,
+            presetNames: config.curvePresetNames,
+            presets: config.curvePresets,
+            activePresetIndex: config.activeCurvePreset
+        )
         fanCurveWindowController?.showWindow(nil)
         presentWindowFront(fanCurveWindowController?.window)
     }
@@ -2055,6 +2075,10 @@ class MenuBarManager {
     func setFanCurve(_ curve: [FanPoint]) {
         fanCurve = curve
     }
+
+    var currentFanCurve: [FanPoint] {
+        return fanCurve
+    }
     
     func setIsAutoMode(_ auto: Bool) {
         isAutoMode = auto
@@ -2155,7 +2179,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
             Task { @MainActor in
                 let config = ConfigManager.shared.loadConfig()
-                let curve = config.curve
+                let curve = MenuBarManager.shared.currentFanCurve
                 let isAutoMode = config.mode == "auto"
 
                 // 从后台读取器缓存读取（不触发主线程硬件 I/O）
