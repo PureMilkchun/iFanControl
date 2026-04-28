@@ -1,366 +1,178 @@
 # iFanControl 固定记忆
 
-关联时间戳记忆：`/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_TIMELINE.md`  
+关联时间戳记忆：`/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_TIMELINE.md`
 读取建议：先读本文件，再读时间戳记忆，避免遗漏最新变更。
 
-更新时间：2026-04-26（晚间更新）
+更新时间：2026-04-28（审查 + 修复）
 
 ## 1. 项目当前基线
 
-iFanControl 是一个面向 Apple Silicon 带风扇机型的风扇控制工具，当前长期方向是：
+iFanControl 是一个面向 Apple Silicon 带风扇机型的风扇控制工具。
 
-- 仅面向带风扇的 M 系列 Mac
-- 支持自动 / 手动模式
-- 支持 5 点风扇曲线编辑
-- 支持温度源选择
-- 支持安全兜底转速
-- 支持应用内自动更新
-- 支持中英文切换（菜单切换，重启生效）
-- 首次安装与应用内更新统一走 ZIP 链路
+核心功能：
+- 自动 / 手动模式
+- 5 点风扇曲线编辑 + 3 预设 Tab 切换（双击重命名，切换即时生效，关闭自动保存）+ 拖拽时实时显示温度/RPM
+- 温度源选择 + 安全兜底转速
+- 应用内自动更新（ZIP 链路）
+- 中英文切换（菜单切换，重启生效）
+- 匿名活跃统计（每日上报，可关闭）
+- 告诉开发者（菜单栏反馈入口，发送时顺便上报心跳）
+
+当前版本：`2.9.5` / build 37
 
 ## 2. 真实工作目录
 
-### App 主工程
-- `/Users/puremilk/Documents/mac fancontrol/macfan-control-v2`
+| 用途 | 路径 |
+|------|------|
+| App 主工程 | `/Users/puremilk/Documents/mac fancontrol/macfan-control-v2` |
+| 官网 | `/Users/puremilk/Documents/mac fancontrol/docs` |
+| 统计后台 | `/Users/puremilk/Documents/mac fancontrol/ifan-stats` |
+| 安装体验实验线（仅实验） | `/Users/puremilk/Documents/mac fancontrol/distribution-a` |
+| ~~不要当主工程~~ | `/Users/puremilk/Downloads/iFanControl-2.8` |
 
-这是当前可信的正式 App 开发基线。  
-应用代码、正式打包、正式版本迭代，默认都应以这里为准。
+## 3. 分发策略
 
-### 官网目录
-- `/Users/puremilk/Documents/mac fancontrol/docs`
+- **首装走 ZIP，更新走 ZIP**（全链路 ZIP）
+- 安装指导：将 `install.sh` 拖入终端执行
+- 官网下载入口：`https://ifan-59w.pages.dev/download`（302 到 ZIP）
+- 自动更新 manifest：`https://ifan-59w.pages.dev/update-manifest.json`
+- GitHub Release：`https://github.com/PureMilkchun/iFanControl/releases`
 
-这是 Cloudflare Pages 当前实际发布目录。
+## 4. 官网部署纪律
 
-### DMG 实验线
-- `/Users/puremilk/Documents/mac fancontrol/distribution-a`
+详细部署规范见 `docs/DEPLOY.md`。
 
-这是安装体验实验目录，只用于验证，不再作为当前正式分发主线：
-- DMG 外壳
-- `Install.command` 入口行为
-- App 首次启动引导页
-- App 内完整卸载
-
-### 不要作为主工作目录的地方
-- `/Users/puremilk/Downloads/iFanControl-2.8`
-
-这个目录只是下载包/测试包所在位置，不应再作为真正开发基线。
-
-## 3. 当前版本与分发策略
-
-### 当前正式稳定版本
-- 正式版本：`2.9.1`
-
-### 当前实验产物
-- 实验 DMG：`/Users/puremilk/Documents/mac fancontrol/distribution-a/dist/iFanControl-experimental.dmg`
-
-### 当前官网下载产物（固定文件名）
-- `/Users/puremilk/Documents/mac fancontrol/docs/iFanControl-macOS.zip`
-
-### 当前推荐分发策略
-- 首次安装：使用 `ZIP`
-- 自动更新：使用 `ZIP`
-
-一句话：
-- **首装走 ZIP**
-- **更新走 ZIP**
-
-## 4. 自动更新当前事实
-
-当前自动更新仍使用 ZIP，而不是 DMG。
-
-相关事实：
-- Manifest：`https://ifan-59w.pages.dev/update-manifest.json`
-- ZIP：`https://ifan-59w.pages.dev/iFanControl-macOS.zip`
-
-代码位置：
-- `/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/Sources/MacFanControl/main.swift`
-
-当前判断：
-- 官网下载与应用内更新统一走 ZIP，减少 Gatekeeper 对 `.command` 的阻断影响
-- 安装指导统一推荐“将 `install.sh` 拖入终端执行”
-
-## 5. 官网当前事实
-
-### 当前稳定上线地址
-- `https://ifan-59w.pages.dev`
-
-### 当前发布命令
-```bash
-cd '/Users/puremilk/Documents/mac fancontrol'
-npx wrangler pages deploy docs --project-name ifan
-```
-
-### 官网关键规则
-- `docs` 是唯一真实发布源
-- 官网大改版式时，CSS 文件名必须升级，不要复用旧文件名
-- 官网下载入口当前固定指向：`./download`（由 Pages Functions 302 到 ZIP 并累计下载计数）
-- 应用内更新链路从 `update-manifest.json` 读取 ZIP
-- 当前正式策略是”首装与更新均走 ZIP”（全链路 ZIP）
-- 官网统计接口：
-  - 心跳上报：`POST /api/heartbeat`（匿名活跃统计）
-  - 统计查看：`GET /api/stats`（需 `Authorization: Bearer <STATS_ADMIN_TOKEN>`）
-
-### Cloudflare Pages Functions 部署纪律（重要）
-
-**核心教训**：`docs/_worker.js` 存在时，Cloudflare Pages 会跳过 `functions/` 目录，直接使用该文件。已删除 `_worker.js`（保留 `.bak`），让 Pages 自动从 `functions/` 构建。
-
-**正确部署流程**：
 ```bash
 cd '/Users/puremilk/Documents/mac fancontrol/docs'
-npx wrangler pages deploy ./ --project-name ifan --commit-dirty=true
+npx wrangler pages deploy ./ --project-name ifan --no-bundle --skip-caching
 ```
 
-**禁止事项**：
-- 不要在 `docs/` 中放置 `_worker.js` 或 `_worker.bundle`（会覆盖 functions/ 目录的自动构建）
-- 不要手动编译 functions 到 _worker.js（已不再需要）
+**禁止**：不要在 `docs/` 放 `_worker.js` 或 `_worker.bundle`（会覆盖 functions/ 自动构建）
 
-**原因**：
-- `_worker.js` 存在时，Cloudflare Pages 会跳过 `functions/` 目录，直接使用该文件
-- 删除 `_worker.js` 后，Pages 自动从 `functions/` 目录编译并部署
-- D1 绑定通过 `wrangler.toml` 配置，无需手动设置
+### 官网板块结构
 
-## 5b. 统计后台（ifan-stats）
+1. Landing Screen（首页）
+2. Iteration Section（开发者也是用户本身）
+3. **Timeline Section（项目时间线）** — 默认展示最近 1 天，可展开查看全部
+4. Showcase Section（界面展示）
+5. Support Modal（支持作者）
 
-### 项目位置
-- `/Users/puremilk/Documents/mac fancontrol/ifan-stats`
+### 时间线维护规范
 
-### 当前线上地址
-- `https://ifan-stats.pages.dev`
-- 自定义域名：`https://stats.puremilkchun.top`
+- 数据文件：`docs/timeline.json`，JS 通过 `fetch("./timeline.json")` 加载，失败时静默不显示
+- 发布新版本时，在 `timeline.json` 对应日期的 `entries` 开头插入新条目；新的一天则新建日期组放在数组最前面
+- **文案规范**：`desc` 直接使用 GitHub Release Notes 的内容，面向用户的正式表述，不暴露内部实现细节
+- 时间用 GitHub Release 的 `published_at` 转换为本地时间（HH:MM）
+- HTML/CSS 不需要改动
+- 默认展示天数：`TIMELINE_RECENT_DAYS = 1`（在 `index.html` 的 JS 中配置）
 
-### 架构
-- 独立的 Cloudflare Pages 项目，与主站 `ifan` 共享同一个 D1 数据库 `ifan-stats-db`
-- D1 database_id: `383dadba-cf12-47f1-bf53-dbf2f087458f`
-- 主站写入数据（heartbeat、download），统计后台读取数据
-- 后端 API：`/api/dashboard/summary`（需要登录）
-- 登录认证：用户名 + 密码 + TOTP 动态码
-- 登录限流使用 D1 counters 表（key 前缀 `statsauth:fail:`）
-- 会话有效期：365 天（登录后无需频繁重新登录）
+### CSS 缓存策略
 
-### D1 数据库表结构
-- `counters`：通用计数器（每日下载、活跃用户、版本计数、登录限流等）
-- `flags`：去重标记（每日唯一用户、安装唯一标识、版本唯一标识）
-- `bucket_activity`：15 分钟桶活跃记录（install_hash + day + bucket_index + version）
-- `series_15m`：15 分钟粒度时序数据（active / download 两种 kind）
+CSS 文件名包含日期（如 `styles.20260427a.css`）。CSS 有改动时需重命名文件并更新 `index.html` 中的 `<link>` 引用，避免 Cloudflare CDN 缓存旧版本。
 
-### 部署命令
+## 5. 统计后台（ifan-stats）
+
+- 位置：`/Users/puremilk/Documents/mac fancontrol/ifan-stats`
+- 线上：`https://ifan-stats.pages.dev`（自定义域名 `stats.puremilkchun.top`）
+- 架构：Cloudflare Pages + D1（database_id: `383dadba-cf12-47f1-bf53-dbf2f087458f`）
+- 部署：`npx wrangler pages deploy ./ --project-name ifan-stats --no-bundle --skip-caching`
+
+### 数据库表
+- `counters`：通用计数器（每日下载、活跃用户、版本计数、登录限流）
+- `flags`：去重标记（INSERT OR IGNORE）
+- `bucket_activity`：15 分钟桶活跃（install_hash + day + bucket_index + version）
+- `series_15m`：15 分钟时序（active / download）
+- `feedback`：用户反馈（install_hash + content + email + version + created_at）
+
+### 后台面板顺序
+1. 卡片数据（当前用户/下载/累计/刷新时间）
+2. 当前版本分布
+3. **用户反馈**（带勾选框，勾选后变灰+删除线，移到末尾；状态存 localStorage）
+4. 用户活跃趋势
+5. 近 30 天趋势
+6. 近 30 天明细
+
+### 版本统计口径
+- 版本分布表：使用 `ROW_NUMBER() OVER (PARTITION BY install_hash ORDER BY day DESC, bucket_index DESC)` 确保每个用户只计一次（取最新版本），避免升级用户被重复计数
+- hover 版本分布：每个桶/每天按 `install_hash` 去重
+- 隐私设计：用户 UUID 仅存 SHA-256 哈希，服务端无法反推原始 ID
+
+## 6. App 构建与打包
+
+### iFanControl.app 是构建产物
+
+`macfan-control-v2/iFanControl.app/` 从 `.build/` 复制，不是源码。重建方法：
 ```bash
-cd '/Users/puremilk/Documents/mac fancontrol/ifan-stats'
-npx wrangler pages deploy ./ --project-name ifan-stats --commit-dirty=true
+swift build -c release
+mkdir -p iFanControl.app/Contents/MacOS iFanControl.app/Contents/Resources
+cp .build/release/MacFanControl iFanControl.app/Contents/MacOS/iFanControl
+cp iFanControl-2.8.27/iFanControl.app/Contents/Resources/icon.png iFanControl.app/Contents/Resources/
+git checkout iFanControl.app/Contents/Info.plist  # 然后改版本号
+codesign --force --sign - iFanControl.app
 ```
 
-### 当前功能
-- 当前用户量（近 15 分钟）
-- 累计下载 / 累计用户量
-- 用户活跃趋势图（15 分钟粒度，支持 12h/24h/3d/7d/30d 范围选择）
-- 下载活跃趋势图（15 分钟粒度，数据保留 7 天）
-- 近 30 天趋势图（每日下载 + 每日活跃用户）
-- 近 30 天明细表
-- 前端注明"每小时更新"
-- **hover 版本分布**：两个图表的 hover 浮窗均显示各版本的去重用户数（版本号左对齐，数量右对齐）
-- **数据一致性**：活跃用户数与版本分布来自同一 `bucket_activity` 查询，确保 hover 中活跃人数 = 各版本人数之和
+### ZIP 打包规范
 
-## 6. 图标与资源规则
+完整安装包必须包含（参考 `iFanControl-2.8.27/`）：
+- `iFanControl.app/`（binary + icon.png + Info.plist，**不含 config.json**）
+- `install.sh`、`kentsmc`
+- `Install.command`、`diagnose.command`、`diagnose.sh`、`uninstall.command`、`uninstall.sh`
+- `LICENSE`、`README.md`、`README_EN.md`、`安装说明.html`
 
-### 当前正确 App 图标
-- `/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/icon.png`
+打包命令：
+```bash
+mkdir /tmp/staging && cp -R iFanControl.app /tmp/staging/
+cp install.sh kentsmc LICENSE README.md README_EN.md Install.command diagnose.command diagnose.sh uninstall.command uninstall.sh iFanControl-2.8.27/安装说明.html /tmp/staging/
+cd /tmp/staging && zip -r /tmp/iFanControl-macOS-X.Y.Z.zip .
+```
 
-### 旧图标
-- `/Users/puremilk/Documents/mac fancontrol/icon.png`
+### config.json 教训（重要）
 
-继续工作时不要再误用旧图标。
+**ZIP 包的 app bundle 里绝不能包含 config.json。** 2026-04-27 实测：打包时误带了旧 config.json，导致应用读到错误配置，误判为"无风扇"。应用应在首次运行时自动生成 config.json。
 
-## 7. 当前安装 / 卸载设计规则
+## 7. 性能架构要点
 
-### 正式主线
-- 现有稳定链路为 ZIP（首装） + ZIP（自动更新）
-- 安装指导统一为：终端拖拽 `install.sh`，不依赖双击 `.command`
+- 菜单：一次性构建 + 原地更新（`buildMenuOnce` + `updateDynamicMenuItems`），内存 ~39MB
+- 硬件 I/O：`BackgroundHardwareReader` 在后台线程执行，NSLock 保护缓存
+- 控温循环：从 `MenuBarManager.currentFanCurve` 读内存曲线，不轮询 config.json
+- `ConfigManager.loadConfig()` 检查 mtime，未变化返回缓存
+- `FanManager` 是 `@MainActor`，硬件调用必须在后台线程
+- **Process 超时保护**：所有 `kentsmc` 子进程调用均有 8 秒超时（`DispatchSemaphore`），超时后 `terminate()` 防止永久阻塞
+- **菜单栏恢复**：监听 `NSApplication.didChangeScreenParametersNotification` 检测 SystemUIServer 重启，自动重建 `NSStatusItem`；2 秒轮询中也做健康检查兜底
 
-### 实验线
-- DMG 顶层保留：
-  - `iFanControl.app`
-  - `Applications`
-  - `Install.command`
-  - `Uninstall.command`
-  - `README｜安装指南.txt`
-- 目前仅用于实验验证，不作为官网主分发来源
+## 7b. 心跳上报架构（v2.9.5 重构 + 热修复）
 
-### 卸载的长期正确方向
-- 长期应以 **App 内完整卸载** 为主入口
-- 不应依赖用户保留 DMG 才能卸载
+- **每日上报**：15 分钟入队一条事件，每天上报**昨天**的事件（本地日期判断）
+- **离线缓存**：`~/Library/Application Support/MacFanControl/heartbeat_queue.json`，最大 192 条（48 小时）
+- **启动**：`startup()` 入队今天的事件 → `flushAll()` 异步发送所有积压事件（含今天），首次安装也能立即上报
+- **tick**：`tick()` 检查 `lastFlushDate != 今天 && 有昨天事件` 才 flush（只取昨天的）
+- **退出**：`shutdown()` 同步发送昨天及更早的事件，保留今天的
+- **反馈携带**：`dequeueAllPendingEvents()` 取出**所有**待上报事件（不限于昨天），反馈失败时 `requeueEvents()` 放回队列
+- **防丢数据**：tick flush 只取昨天的；反馈携带全部但失败会 requeue；shutdown 只发昨天的
+- **payload 格式**：`{install_id, version, build, events: [{ts, type}]}`
+- **并发安全**：`pendingEvents`、`lastRecordAt` 在 NSLock 内读写
+- **install_id**：随机 UUID，存 UserDefaults，跨卸载/重装保持不变；SHA-256 由服务端做
+- **服务端**：`heartbeat.js` 不动（兼容老版本）；`feedback.js` 也处理 events（复用 heartbeat 逻辑）
+- **series_15m 修复**：两个端点处理批量事件时，改为遍历 `uniqueBuckets` 逐个重算活跃用户数，确保历史桶数据不丢失
 
-## 8. 目录与操作纪律
+## 8. 多语言
 
-继续工作时请优先守住：
+- 支持中文 / English，存储在 `UserDefaults("ifancontrol.ui.language")`
+- 切换后需重启，三个模块各自定义 `currentLanguage`（main.swift / SensorCatalog.swift / FanCurveWindow.swift）
 
-- 不误改历史目录
-- 不误用旧图标
-- 不把 Downloads 里的测试包目录当主工程
-- 官网改动只动 `docs`
-- App 正式改动只动 `macfan-control-v2`
-- 安装体验实验只动 `distribution-a`
+## 9. 操作纪律
 
-## 9. 新窗口接手建议
+- 不误改历史目录、不误用旧图标
+- App 改动只动 `macfan-control-v2`，官网只动 `docs`，实验只动 `distribution-a`
+- 发布必须同步：新包 + 官网 ZIP + update-manifest.json + GitHub Release
+- `iFanControl-2.8.27/` 是打包参考目录（含 kentsmc、icon.png、安装说明.html 等）
 
-如果在新窗口继续接力，建议先阅读：
+## 10. 新窗口接手建议
 
-1. `/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_MEMORY.md`
-2. `/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_TIMELINE.md`
-3. 如继续做 App：`/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/Sources/MacFanControl/main.swift`
-4. 如继续做实验安装线：`/Users/puremilk/Documents/mac fancontrol/distribution-a/README.md`
-5. 如继续做官网：`/Users/puremilk/Documents/mac fancontrol/docs/index.html`
-
-## 10. 一句话总结
-
-当前最重要的三个真实工作目录是：
-
-- App 正式工程：`/Users/puremilk/Documents/mac fancontrol/macfan-control-v2`
-- Web 正式工程：`/Users/puremilk/Documents/mac fancontrol/docs`
-- 安装体验实验线：`/Users/puremilk/Documents/mac fancontrol/distribution-a`
-
-## 11. GitHub 与 CI 当前事实
-
-- 主仓库：`https://github.com/PureMilkchun/iFanControl`
-- `v2.8.24` Release 现已改为 ZIP-only，现已提供：
-  - `iFanControl-macOS.zip`
-  - `iFanControl-macOS-2.8.24.zip`
-- `v2.8.25` 已发布为统计能力版本，核心变化：
-  - App 新增匿名活跃统计（默认开启，可在 `关于/帮助 -> 简介` 关闭）
-  - 官网下载入口改为 `/download`，仅统计用户主动下载
-  - 应用内更新 manifest 仍保持 ZIP，不改变更新契约
-- CI `Swift` 工作流当前已恢复绿色，关键状态为：
-  - 无测试文件时不再强制失败
-  - `Package.swift` 已兼容 GitHub Runner 的 Swift 版本
-  - `actions/checkout` 已升级到 `v5`
-
-## 12. 当下结论（重要）
-
-- 实测结论：DMG 路径下双击 `.command` 在网络下载场景容易被系统持续拦截，安装成功率不稳定。
-- 当前最终策略：**全链路 ZIP**（官网 ZIP 下载 + 应用内 ZIP 更新）。
-- 文档与更新器都已对齐到“拖拽 `install.sh` 到终端执行”。
-- 当前 `2.8.25` 重点包含：
-  - 自动检查更新不再被 24 小时 `last_check` 节流挡住
-  - 启动后只要开启自动检查，就会请求 manifest，确保新版本能及时弹窗
-  - 新增隐私优先统计：随机匿名 ID + version/build，每天最多一次，用户可关闭
-
-## 13. 2026-04-25 新增事实（2026-04-26 更新）
-
-### GitHub Release 当前状态
-- GitHub 最新正式 Release 已提升到 `v2.9.1`
-- `v2.9.1` Release 地址：
-  - `https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.1`
-
-### 当前线上更新状态
-- 官网当前自动更新 manifest：
-  - `https://ifan-59w.pages.dev/update-manifest.json`
-- 当前线上正式版本：
-  - `2.9.1 / build 31`
-- 当前线上 ZIP：
-  - `https://ifan-59w.pages.dev/iFanControl-macOS.zip`
-- 当前 `2.9.1` ZIP 校验：
-  - `sha256 = c957446d2c2762c19b614cb0ce653a76bdfbd4c501d100666e19ab1b5658ad1f`
-  - `size = 5974786`
-
-### 匿名统计当前产品设计
-- 设置项名称已统一为：
-  - 中文：`匿名统计用户量`
-  - 英文：`Anonymous user-count stats`
-- 设置项右侧新增 `?` 说明按钮
-- 点击 `?` 会弹出解释：
-  - 只统计“有多少人在使用 iFanControl”
-  - 仅发送随机安装 ID、版本号和 build
-  - 不发送姓名、邮箱、序列号、设备名称
-  - 文案允许适度幽默，明确说明开发者会因为有人在用而更开心
-- 当用户尝试关闭匿名统计时：
-  - 不直接关闭
-  - 先弹出一次带幽默感的确认弹窗
-  - 但用户坚持关闭时仍然允许关闭
-
-### 匿名统计当前技术行为
-- 批量心跳系统（2026-04-26）：
-  - App 每 15 分钟在本地记录一条心跳事件（含时间戳）
-  - 每小时集中上报一批事件到服务器
-  - 离线事件缓存在 `heartbeat_queue.json`，下次在线时自动上报
-  - 启动时先 flush 缓存事件，再记录新心跳
-  - 退出时 flush 所有待上报事件
-- App 端相关 key：
-  - `ifancontrol.privacy_stats.last_upload_at`（上次上传时间）
-  - `ifancontrol.privacy_stats.install_id`（匿名安装 ID）
-  - `ifancontrol.privacy_stats.enabled`（是否开启）
-- 官网端已开始长期保存：
-  - 最近 `30 天` 的 `15 分钟聚合活跃值`
-- 统计后台当前正确口径：
-  - 默认显示”近 12 小时”
-  - 每个点代表一个 `15 分钟活跃用户值`
-  - 前端注明”每小时更新”
-
-### 当前发布纪律（再次强调）
-- 只要 App 行为改动会影响用户实际体验，就不能只推代码：
-  - 必须同步新包
-  - 必须同步官网 ZIP
-  - 必须同步 `update-manifest.json`
-  - 必须同步 GitHub Release
-- 否则用户不会真正收到更新，自动更新链路也不会生效
-
-## 14. 多语言切换功能（2026-04-25 新增）
-
-### 当前多语言方案
-- 支持语言：中文 / English
-- 存储位置：`UserDefaults`，key 为 `"ifancontrol.ui.language"`，值为 `"zh"` 或 `"en"`
-- 生效方式：切换后需重启应用
-- 首次安装时弹出语言选择弹窗（硬编码双语，不走 `appL10n`）
-
-### 技术实现
-- 三个模块各自定义 `currentLanguage` 变量（`private let`，无法跨模块共享）：
-  - `main.swift`：`appL10n()`
-  - `SensorCatalog.swift`：`sensorL10n()`
-  - `FanCurveWindow.swift`：`fanCurveL10n()`
-- 三处逻辑完全一致，都读取同一个 `UserDefaults` key
-- 菜单中新增"语言 / Language"子菜单，位于"关于/帮助..."之后
-- 切换后弹出"重启生效"提示，可选"立即重启"或"稍后"
-
-### 已关闭的 PR
-- PR #2（`lop1381997:codex/english-translation`，"add bilingual UI switcher"）已关闭
-  - 该 PR 提出了更复杂的方案（`LocalizationManager` 单例 + 即时切换），但我们的 v2.8.28 已覆盖核心需求
-  - 已用得体英文回复作者并关闭
-
-## 15. 性能优化架构（2026-04-26 新增）
-
-### 内存优化
-- 核心改动：菜单从每 2 秒重建改为一次性构建 + 原地更新
-- `buildMenuOnce()`：启动时构建完整菜单结构，存储所有 NSMenuItem 引用
-- `updateDynamicMenuItems()`：每 2 秒原地更新 title/state，不创建新对象
-- 效果：内存从 ~90MB 降至 ~39MB
-
-### 菜单响应优化
-- 核心改动：硬件 I/O 从主线程移到后台线程
-- `BackgroundHardwareReader`：独立的非 MainActor 类（`@unchecked Sendable`）
-  - 在私有 DispatchQueue 上执行 `kentsmc` 子进程调用
-  - 通过 NSLock 保护缓存字典的读写
-  - `refresh(sensors:fans:)` 异步派发，立即返回
-- `ConfigManager` 增加缓存：`loadConfig()` 检查文件 mtime，未变化时返回缓存
-- `startAutoControlLoop()` 改为从 BackgroundHardwareReader 缓存读取温度
-- 效果：菜单点击从有延迟变为即时响应
-
-### 关键架构约束
-- `FanManager` 是 `@MainActor`，其方法默认在主线程执行
-- `refreshTelemetry()` 每个传感器调用一次 `kentsmc` 子进程（`Process` + `waitUntilExit()`），是主线程阻塞的根因
-- `BackgroundHardwareReader` 必须是非 MainActor 的独立类，否则 `Task.detached` 调用仍会跳回主线程
-- 两个定时器（菜单 2s + 控温 2s）都需要避免在主线程做硬件 I/O
-
-### 统计后端从 KV 迁移到 D1（2026-04-26）
-- 原因：KV 免费层每日 1,000 次写入上限太低，D1 免费层提供 100,000 行写入/天
-- 迁移范围：`docs/functions/` 下 heartbeat.js、download.js、stats.js + ifan-stats 的 summary.js、auth.js
-- 新增 D1 表：`bucket_activity`、`flags`（替代旧 `seen` 表）
-- `docs/_worker.js` 已删除（旧打包文件会覆盖 functions/ 目录），保留 `.bak` 备份
-- `bucket_activity` 表已新增 `version` 列，心跳端点写入版本信息（格式 `2.9.1-32`）
-- 老数据已从 `flags` 表回填版本信息（32 行）
-
-### 批量心跳系统（2026-04-26）
-- App 端每 15 分钟在本地记录一条心跳事件（含时间戳）
-- 每小时集中上报一批事件到服务器（`POST /api/heartbeat`，`events` 数组）
-- 离线事件缓存在 `~/Library/Application Support/iFanControl/heartbeat_queue.json`
-- 启动时先尝试上报缓存事件，再记录新心跳
-- 退出时 flush 所有待上报事件
-- 服务器端 `heartbeat.js` 按 (day, bucket_index) 去重，批量写入 D1
-- 免费层查询用量估算：~5 次查询/批 × 每天 24 批/用户 × 5 用户 ≈ 600 次/天（远低于 1,000 免费上限）
+1. 本文件（PROJECT_MEMORY.md）
+2. `PROJECT_TIMELINE.md`
+3. App：`Sources/MacFanControl/main.swift`
+4. 官网：`docs/index.html`
+5. 官网部署规范：`docs/DEPLOY.md`
+6. 统计后台：`ifan-stats/functions/api/dashboard/summary.js`
+7. 代码审查经验：`CODE_AUDIT.md`

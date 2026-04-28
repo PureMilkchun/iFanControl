@@ -4,10 +4,6 @@
 <dict>
 	<key>files</key>
 	<dict>
-		<key>Resources/config.json</key>
-		<data>
-		WsBCzdlOj0GZxVGR49KH1vCHzXA=
-		</data>
 		<key>Resources/icon.png</key>
 		<data>
 		B9FxiCLiY0oY90L+6tsyjO5Iguk=
@@ -15,13 +11,6 @@
 	</dict>
 	<key>files2</key>
 	<dict>
-		<key>Resources/config.json</key>
-		<dict>
-			<key>hash2</key>
-			<data>
-			/vXaTenDmZXPjRRLd3+w4l482XqnG9P/eQ/guDRJsOQ=
-			</data>
-		</dict>
 		<key>Resources/icon.png</key>
 		<dict>
 			<key>hash2</key>

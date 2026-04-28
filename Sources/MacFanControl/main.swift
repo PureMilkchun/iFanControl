@@ -503,13 +503,13 @@ final class PrivacyStatsService: @unchecked Sendable {
         }
     }
 
-    /// 启动时调用：先 flush 昨天的缓存，再入队一条新事件
+    /// 启动时调用：入队一条新事件，然后立即上报所有积压事件
     func startup() {
         guard anonymousStatsEnabled else { return }
-        Task { await flush() }
         let now = Date().timeIntervalSince1970
         enqueueEvent(ts: now)
         lock.withLock { lastRecordAt = now }
+        Task { await flushAll() }
     }
 
     /// 退出时调用：同步发送昨天及更早的事件（阻塞，最长 8 秒）
@@ -530,6 +530,16 @@ final class PrivacyStatsService: @unchecked Sendable {
     func dequeueYesterdayEvents() -> [HeartbeatEvent] {
         lock.withLock {
             pendingEvents.filter { isYesterdayOrEarlier($0) }
+        }
+    }
+
+    /// 取出所有待上报事件（供反馈携带），从队列移除
+    func dequeueAllPendingEvents() -> [HeartbeatEvent] {
+        lock.withLock {
+            let events = pendingEvents
+            pendingEvents.removeAll()
+            saveQueue()
+            return events
         }
     }
 
@@ -579,6 +589,18 @@ final class PrivacyStatsService: @unchecked Sendable {
         await sendEventsToHeartbeat(events)
     }
 
+    /// 启动时调用：上报所有积压事件（含今天），用于首次安装立即上报
+    private func flushAll() async {
+        let events = lock.withLock {
+            let all = pendingEvents
+            pendingEvents.removeAll()
+            saveQueue()
+            return all
+        }
+        guard !events.isEmpty else { return }
+        await sendEventsToHeartbeat(events)
+    }
+
     private func sendEventsToHeartbeat(_ events: [HeartbeatEvent]) async {
         let installID = currentInstallID()
         let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
@@ -615,7 +637,7 @@ final class PrivacyStatsService: @unchecked Sendable {
         }
     }
 
-    private func requeueEvents(_ events: [HeartbeatEvent]) {
+    func requeueEvents(_ events: [HeartbeatEvent]) {
         lock.withLock {
             pendingEvents.insert(contentsOf: events, at: 0)
             // 超出上限时丢弃最旧的
@@ -726,11 +748,17 @@ final class CommandExecutor: @unchecked Sendable {
         
         do {
             try task.run()
-            task.waitUntilExit()
-            
+            let semaphore = DispatchSemaphore(value: 0)
+            DispatchQueue.global().async { task.waitUntilExit(); semaphore.signal() }
+            if semaphore.wait(timeout: .now() + 8) == .timedOut {
+                task.terminate(); task.waitUntilExit()
+                AppLog.shared.warning("sudo kentsmc timeout args=\(args.joined(separator: " "))")
+                return (false, "", "timeout")
+            }
+
             let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
             let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-            
+
             let output = String(data: outputData, encoding: .utf8) ?? ""
             let error = String(data: errorData, encoding: .utf8) ?? ""
             let success = (task.terminationStatus == 0)
@@ -826,7 +854,13 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
         task.standardError = Pipe()
         do {
             try task.run()
-            task.waitUntilExit()
+            let semaphore = DispatchSemaphore(value: 0)
+            DispatchQueue.global().async { task.waitUntilExit(); semaphore.signal() }
+            if semaphore.wait(timeout: .now() + 8) == .timedOut {
+                task.terminate(); task.waitUntilExit()
+                AppLog.shared.warning("kentsmc read timeout args=\(args.joined(separator: " "))")
+                return nil
+            }
             guard task.terminationStatus == 0 else { return nil }
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -920,7 +954,13 @@ class FanManager {
         do {
             let startedAt = Date()
             try task.run()
-            task.waitUntilExit()
+            let semaphore = DispatchSemaphore(value: 0)
+            DispatchQueue.global().async { task.waitUntilExit(); semaphore.signal() }
+            if semaphore.wait(timeout: .now() + 8) == .timedOut {
+                task.terminate(); task.waitUntilExit()
+                AppLog.shared.warning("kentsmc read timeout args=\(args.joined(separator: " "))")
+                return nil
+            }
             let elapsed = Date().timeIntervalSince(startedAt)
 
             let outputData = pipe.fileHandleForReading.readDataToEndOfFile()
@@ -1005,7 +1045,6 @@ class FanManager {
     }
 
     func refreshHardwareProfile() {
-        hasProbedHardware = true
         fanCount = readIntValue(forKey: "FNum") ?? 0
         fans = buildFanList(fanCount: fanCount)
 
@@ -1041,7 +1080,11 @@ class FanManager {
         let sensorKeys = availableTemperatureSensors.map(\.key).joined(separator: ",")
         AppLog.shared.info("hardware profile refreshed fans=\(fanCount) maxRPM=\(currentMaxRPM) sensors=\(availableTemperatureSensors.count) keys=[\(sensorKeys)]")
 
+        hasProbedHardware = true
         refreshTelemetry(force: true)
+        if let initialRPM = cachedFanRPMs.values.max(), initialRPM > 0 {
+            lastSetRPM = initialRPM
+        }
     }
 
     func refreshTelemetry(force: Bool = false) {
@@ -1690,17 +1733,29 @@ class MenuBarManager {
     }
     
     func setupMenuBar() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        buildMenuOnce()
-        updateDynamicMenuItems()
+        createStatusItem()
 
         NotificationCenter.default.addObserver(self, selector: #selector(handleCurveSaved), name: NSNotification.Name("FanCurveDidSave"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleCurveSwitched), name: NSNotification.Name("FanCurveDidSwitch"), object: nil)
+
+        // 监听 SystemUIServer 重启（macOS 菜单栏图标丢失的常见原因）
+        // didChangeScreenParametersNotification 在显示器变更和 SystemUIServer 重启时都会触发
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleScreenOrDisplayChange),
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
 
         // 后台轮询硬件（避免主线程阻塞导致菜单点击延迟）
         Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor in
+                // 健康检查：如果 statusItem 因 SystemUIServer 重启而丢失，自动恢复
+                if self.statusItem?.button?.window == nil {
+                    self.logger.warning("statusItem lost, recreating")
+                    self.createStatusItem()
+                }
                 let fm = FanManager.shared
                 fm.probeHardwareIfNeeded()
                 // 后台线程读取传感器 + 风扇（真正非阻塞）
@@ -1714,6 +1769,24 @@ class MenuBarManager {
         }
 
         maybeShowStartupGuidance()
+    }
+
+    private func createStatusItem() {
+        // 清理旧的 statusItem（如果存在）
+        if let old = statusItem {
+            NSStatusBar.system.removeStatusItem(old)
+        }
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        buildMenuOnce()
+        updateDynamicMenuItems()
+    }
+
+    @objc private func handleScreenOrDisplayChange() {
+        // SystemUIServer 重启后，statusItem 会失效，需要重建
+        if statusItem?.button?.window == nil {
+            logger.warning("screen/display change detected stale statusItem, recreating")
+            createStatusItem()
+        }
     }
     
     @objc private func handleCurveSaved(_ notification: Notification) {
@@ -2036,8 +2109,11 @@ class MenuBarManager {
         updateDynamicMenuItems()
     }
     
-    // 启用开机自启动（创建 LaunchAgent）
+    // 启用开机自启动（创建 LaunchAgent 并加载到 launchd）
     private func enableAutoStart() {
+        let bundlePath = Bundle.main.bundlePath
+        let binaryPath = bundlePath + "/Contents/MacOS/iFanControl"
+
         let plistContent = """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -2047,7 +2123,7 @@ class MenuBarManager {
             <string>com.ifancontrol.app</string>
             <key>ProgramArguments</key>
             <array>
-                <string>/Applications/iFanControl.app/Contents/MacOS/iFanControl</string>
+                <string>\(binaryPath)</string>
             </array>
             <key>RunAtLoad</key>
             <true/>
@@ -2056,36 +2132,99 @@ class MenuBarManager {
         </dict>
         </plist>
         """
-        
+
         let launchAgentsDir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library")
             .appendingPathComponent("LaunchAgents")
-        
+
         let plistPath = launchAgentsDir.appendingPathComponent("com.ifancontrol.app.plist")
-        
+
         // 创建目录（如果不存在）
         try? FileManager.default.createDirectory(at: launchAgentsDir, withIntermediateDirectories: true)
-        
+
         // 写入 plist 文件
         do {
             try plistContent.write(to: plistPath, atomically: true, encoding: .utf8)
-            print("LaunchAgent plist created at: \(plistPath.path)")
+            logger.info("LaunchAgent plist created at: \(plistPath.path, privacy: .public)")
         } catch {
-            print("Failed to create LaunchAgent plist: \(error)")
+            logger.error("Failed to create LaunchAgent plist: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+
+        // 加载到 launchd
+        bootstrapLaunchAgent(plistPath: plistPath)
+    }
+
+    // 确保 LaunchAgent 已存在并已加载（启动时调用）
+    func ensureAutoStartEnabled() {
+        let launchAgentsDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library")
+            .appendingPathComponent("LaunchAgents")
+        let plistPath = launchAgentsDir.appendingPathComponent("com.ifancontrol.app.plist")
+
+        // 如果 plist 不存在，创建并加载
+        if !FileManager.default.fileExists(atPath: plistPath.path) {
+            enableAutoStart()
+            return
+        }
+
+        // plist 存在但可能未加载，尝试 bootstrap（已加载时会失败，忽略错误）
+        bootstrapLaunchAgent(plistPath: plistPath)
+    }
+
+    // 将 LaunchAgent 加载到 launchd
+    private func bootstrapLaunchAgent(plistPath: URL) {
+        let uid = getuid()
+        let process = Process()
+        process.launchPath = "/bin/launchctl"
+        process.arguments = ["bootstrap", "gui/\(uid)", plistPath.path]
+
+        let semaphore = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in
+            semaphore.signal()
+        }
+
+        do {
+            try process.run()
+            _ = semaphore.wait(timeout: .now() + 5)
+            if process.terminationStatus == 0 {
+                logger.info("LaunchAgent bootstrapped successfully")
+            } else {
+                // 可能已经加载，不是致命错误
+                logger.info("LaunchAgent bootstrap returned non-zero (may already be loaded)")
+            }
+        } catch {
+            logger.error("Failed to run launchctl bootstrap: \(error.localizedDescription, privacy: .public)")
         }
     }
-    
-    // 禁用开机自启动（删除 LaunchAgent）
+
+    // 禁用开机自启动（从 launchd 卸载并删除 LaunchAgent）
     private func disableAutoStart() {
         let launchAgentsDir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library")
             .appendingPathComponent("LaunchAgents")
-        
         let plistPath = launchAgentsDir.appendingPathComponent("com.ifancontrol.app.plist")
-        
+
+        // 先从 launchd 卸载
+        let uid = getuid()
+        let process = Process()
+        process.launchPath = "/bin/launchctl"
+        process.arguments = ["bootout", "gui/\(uid)/com.ifancontrol.app"]
+
+        let semaphore = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in semaphore.signal() }
+
+        do {
+            try process.run()
+            _ = semaphore.wait(timeout: .now() + 5)
+            logger.info("LaunchAgent booted out")
+        } catch {
+            logger.info("launchctl bootout: \(error.localizedDescription, privacy: .public)")
+        }
+
         // 删除 plist 文件
         try? FileManager.default.removeItem(at: plistPath)
-        print("LaunchAgent plist removed")
+        logger.info("LaunchAgent plist removed")
     }
     
     @objc func showSpeedSetting() {
@@ -2326,7 +2465,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         MenuBarManager.shared.setFanCurve(config.curve)
         MenuBarManager.shared.setIsAutoMode(config.mode == "auto")
         MenuBarManager.shared.setAutoStartEnabled(config.autoStart)
-        
+
+        // 确保 LaunchAgent plist 存在并加载到 launchd
+        if config.autoStart {
+            MenuBarManager.shared.ensureAutoStartEnabled()
+        }
+
         MenuBarManager.shared.setupMenuBar()
         
         // 解锁风扇
@@ -2902,8 +3046,8 @@ final class FeedbackService: @unchecked Sendable {
         let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
         let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
 
-        // 取出昨天及更早的心跳事件，顺便带上报
-        let pendingEvents = PrivacyStatsService.shared.dequeueYesterdayEvents()
+        // 取出所有待上报的心跳事件，顺便带上报
+        let pendingEvents = PrivacyStatsService.shared.dequeueAllPendingEvents()
         let eventDicts = pendingEvents.map { ["ts": $0.ts, "type": $0.type] as [String: Any] }
 
         var payload: [String: Any] = [
@@ -2927,15 +3071,17 @@ final class FeedbackService: @unchecked Sendable {
             let (_, response) = try await URLSession.shared.upload(for: request, from: body)
 
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                if !pendingEvents.isEmpty {
+                    PrivacyStatsService.shared.requeueEvents(pendingEvents)
+                }
                 return false
             }
             recordSend()
-            // 反馈成功，标记心跳事件已上报
-            if !pendingEvents.isEmpty {
-                PrivacyStatsService.shared.markEventsSent(pendingEvents)
-            }
             return true
         } catch {
+            if !pendingEvents.isEmpty {
+                PrivacyStatsService.shared.requeueEvents(pendingEvents)
+            }
             return false
         }
     }

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# iFanControl 一键安装脚本 v2.9.4
+# iFanControl 一键安装脚本 v2.9.5
 # 用户友好版本 - 拖拽安装
 
 # ============================================
@@ -38,7 +38,7 @@ clear 2>/dev/null || true
 echo ""
 echo -e "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${CYAN}║                                                            ║${NC}"
-echo -e "${CYAN}║          🌬️  iFanControl v2.9.4 安装程序                 ║${NC}"
+echo -e "${CYAN}║          🌬️  iFanControl v2.9.5 安装程序                 ║${NC}"
 echo -e "${CYAN}║                                                            ║${NC}"
 echo -e "${CYAN}║   适用于带风扇的 Apple Silicon Mac (M1/M2/M3/M4/M5)    ║${NC}"
 echo -e "${CYAN}║                                                            ║${NC}"
@@ -192,6 +192,14 @@ if [ -d "/Applications/iFanControl.app" ]; then
     echo -e "  ${BLUE}→${NC} 移除旧版本..."
     rm -rf /Applications/iFanControl.app
 fi
+
+# 清理历史残留的备份文件
+for old in /Applications/iFanControl.app.backup-* /Applications/iFanControl.app.malformed-*; do
+    if [ -e "$old" ]; then
+        echo -e "  ${BLUE}→${NC} 清理旧备份: $(basename "$old")"
+        rm -rf "$old"
+    fi
+done
 
 echo -e "  ${BLUE}→${NC} 复制到 /Applications/..."
 cp -R "${SCRIPT_DIR}/iFanControl.app" /Applications/

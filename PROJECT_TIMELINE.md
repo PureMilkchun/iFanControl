@@ -3,7 +3,115 @@
 关联固定记忆：`/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_MEMORY.md`  
 读取建议：先读固定记忆，再读本文件，用本文件补足最近发生的变化。
 
+## 2026-04-28
+
+### 2026-04-28 — 代码审查 + 多项修复（build 37，本地测试中）
+
+- **全面代码审计**：对 Swift 前端和 Cloudflare Workers 后端进行系统性审查
+- **修复 1：series_15m 历史桶数据丢失**（heartbeat.js / feedback.js）
+  - 每日批量上报时，原代码只为当前时间桶更新 `series_15m`，历史桶的活跃用户数永远为零
+  - 改为遍历 `uniqueBuckets` 逐个重算，确保所有桶的活跃用户数完整
+- **修复 2：版本分布重复计数**（summary.js）
+  - 原查询 `COUNT(DISTINCT install_hash) GROUP BY version` 导致升级用户在多个版本中都被计入
+  - 改用 `ROW_NUMBER() OVER (PARTITION BY install_hash ORDER BY day DESC, bucket_index DESC)` 确保每个用户只计一次
+- **修复 3：Process.waitUntilExit() 超时保护**（main.swift）
+  - `kentsmc` 子进程调用均添加 8 秒 DispatchSemaphore 超时，超时后 `terminate()` 防止永久阻塞硬件监控
+  - 涉及 `BackgroundHardwareReader.executeRead`、`FanManager.executeReadCommand`、`CommandExecutor.executeCommand`
+- **修复 4：lastSetRPM 初始化为 0**（main.swift）
+  - 应用启动时 `lastSetRPM` 从 0 起步，导致风扇可能先骤降到最低再爬升到目标值
+  - 改为硬件探测完成后从实际 RPM 读取初始值：`if let initialRPM = cachedFanRPMs.values.max(), initialRPM > 0 { lastSetRPM = initialRPM }`
+- **修复 5：菜单栏图标随机消失**（main.swift）
+  - macOS SystemUIServer 崩溃后 NSStatusItem 失效，进程仍在但图标消失
+  - 新增 `createStatusItem()` 方法和 `handleScreenOrDisplayChange()` handler
+  - 监听 `NSApplication.didChangeScreenParametersNotification` 自动恢复
+  - 2 秒轮询中增加 `statusItem.button?.window == nil` 健康检查兜底
+- **审查经验**：见 `CODE_AUDIT.md`（本次审查中的误判与教训）
+- **当前状态**：build 37 在 `/Applications` 本地运行测试中（版本号未升，仍为 2.9.5）
+
+### 2026-04-28 — v2.9.5 / build 35 发布（含热修复，ZIP 已覆盖）
+
+- **告诉开发者**：菜单栏新增反馈入口（灰色斜体输入框样式），点击弹出反馈窗口
+  - 支持多行内容 + 邮箱（选填），发送后提示"收到！我会尽快回复你"
+  - 客户端限流：每小时最多 5 条，服务端同样限流
+  - 发送反馈时顺便带上积压的心跳事件，一次请求干两件事
+- **心跳上报改为每日上报**：从每小时批量上报改为每天上报昨天的事件，请求量减少 96%
+  - 离线缓存从 24h 扩展到 48h（192 条事件）
+  - `lastFlushDate` 存 UserDefaults，发送成功才标记，失败 tick 会重试
+  - flush 只取昨天的事件，今天的始终保留
+- **服务端**：feedback.js 处理反馈 + 心跳事件，heartbeat.js 完全不动（兼容老版本）
+- **热修复（覆盖 build 35 ZIP，未升版本号）**：
+  - install.sh 增加旧备份清理：更新前自动删除 `iFanControl.app.backup-*` 和 `iFanControl.app.malformed-*`
+  - 反馈携带心跳 bug 修复：`dequeueYesterdayEvents()` 改为 `dequeueAllPendingEvents()`，新用户首天反馈也能带上心跳
+  - 首次启动立即上报：`startup()` 入队今天事件后调用 `flushAll()` 发送所有积压，不再等到第二天
+  - 反馈失败时 `requeueEvents()` 把事件放回队列，不丢数据
+- **统计后台（ifan-stats）**：
+  - 用户反馈板块移到第三个位置（当前版本分布之后、用户活跃趋势之前）
+  - 反馈记录增加勾选框：勾选后变灰+删除线，移到列表末尾；取消勾选恢复原位
+  - 勾选状态存 localStorage，刷新不丢
+- **公开文案规范**：心跳上报相关改动对外一律称为"Bug 修复与性能优化"，不暴露实现细节
+- GitHub Release: https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.5
+- 官网已部署: https://ifan-59w.pages.dev
+
 ## 2026-04-27
+
+### 2026-04-27 — 官网新增「项目时间线」板块
+
+- 在官网 iteration-section（开发者也是用户）和 showcase-section（界面展示）之间新增时间线板块
+- 数据文件：`docs/timeline.json`，JS 通过 fetch 加载，失败时静默不显示
+- 默认展示最近 1 天的条目，点击「展开完整时间线」可查看全部（目前 5 天共 17 条）
+- 文案采用 GitHub Release Notes 风格，不暴露内部实现细节
+- CSS 文件名改为 `styles.20260427a.css`（从 `20260424a` 改名），解决 Cloudflare CDN 缓存问题
+- 新建 `docs/DEPLOY.md` 部署规范文档，记录发版流程、timeline.json 维护方法、CSS 缓存策略
+- 部署规范：以后每次发版只需更新 timeline.json + manifest + ZIP，HTML/CSS 不动
+- 时间线中去掉了所有统计后台相关条目，只保留 App 本身的更新
+- 初始数据从 PROJECT_TIMELINE.md 提取，覆盖 v2.8.21 ~ v2.9.4
+
+### 2026-04-27 — v2.9.4 / build 34 发布
+
+- **风扇曲线编辑器优化**：拖拽控制点时右下角实时显示当前温度和转速（`drawEditingInfo()` 方法，灰色小字，与坐标轴风格一致）
+- **心跳上报重构**：从旧版"每 15 分钟发一条 HTTP"升级为批量架构
+  - 本地事件队列 + `heartbeat_queue.json` 文件持久化
+  - 15 分钟入队 + 每小时批量上报
+  - 启动 flush 缓存 + 退出 flush（同步发送，Semaphore 等待）
+  - `events` 数组格式 payload，与服务端匹配
+  - 并发安全：关键状态变量加 NSLock 保护
+- **修复 Timer 双注册 bug**：移除了重复的 `RunLoop.main.add(timer, forMode: .common)`
+- 发现旧版 PrivacyStatsService 实际从未升级过（服务端已改造，App 端遗漏）
+- install_id 仍发送原始 UUID（SHA-256 由服务端做，改动需服务端配合，当前 HTTPS 保护足够）
+- GitHub Release: https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.4
+- 官网已部署: https://ifan-59w.pages.dev
+
+### 2026-04-27 — 统计后台版本分布去重修复
+
+- `version_breakdown` 原从 `counters` 表加总每日计数，同一用户跨天重复计数
+- 改为从 `bucket_activity` 表 `COUNT(DISTINCT install_hash)` 跨整个时间段去重
+- 标签从"版本分布（近 30 天累计）"改为"当前版本分布"
+- 涉及文件：`ifan-stats/functions/api/dashboard/summary.js`（后端查询）、`ifan-stats/index.html`（标签文案）
+- 确认隐私设计有效：7 位用户各有唯一 UUID，服务端仅存 SHA-256 哈希，无法反推原始 ID
+
+### 2026-04-27 — v2.9.3 ZIP 包内容修复 + config.json 教训
+
+- 第一次打包只含 iFanControl.app + install.sh，缺少 kentsmc、diagnose、uninstall、LICENSE、README 等
+- 参照 `iFanControl-2.8.27/` 目录补全了所有文件
+- 打包过程中意外删除了项目根目录的 `iFanControl.app/`，已从 `.build/release/` 重建
+- **config.json 教训**：第一次打包的 app bundle 误带了旧 config.json，用户安装后应用读到错误配置，误判为"无风扇"。卸载后从官网重新安装（无 bundled config.json）恢复正常
+- **结论**：ZIP 包的 app bundle 里绝不能包含 config.json，应用应在首次运行时自动生成
+- 教训写入 PROJECT_MEMORY.md 的"ZIP 打包规范"和"config.json 教训"
+
+### 2026-04-27 — v2.9.3 / build 33 风扇曲线预设系统（第三次尝试，成功发布）
+
+- 采用纯 AppKit 架构（NSStackView + NSButton），彻底避免 addSubview 不可见问题
+- 3 个预设 Tab 按钮横排在底部，左侧预设 + 右侧重置/关闭
+- 双击预设名称弹出 NSAlert 重命名
+- 切换预设立即通过 FanCurveDidSwitch 通知应用曲线
+- 控温循环改为从 MenuBarManager.currentFanCurve 读取内存曲线（不再轮询 config.json）
+- 窗口关闭自动静默保存（windowWillClose 通知）
+- 移除保存按钮和保存成功弹窗
+- 重置按钮恢复所有预设到官方默认曲线（预设 A）
+- 官方默认曲线 `defaultFanCurve(maxRPM:)` 作为首次启动和重置的基准
+- 底部提示："双击预设名称可重命名 · 关闭窗口自动保存"
+- GitHub Release: https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.3
+- 官网已部署: https://ifan-59w.pages.dev
 
 ### 2026-04-27 — v33 风扇曲线预设系统（两次尝试均失败，已回滚）
 
