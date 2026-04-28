@@ -12,6 +12,7 @@ import CryptoKit
 import Foundation
 import FanCurveEditor
 import OSLog
+import ServiceManagement
 
 // 使用 FanCurveEditor 中的类型
 typealias FanPoint = FanCurveEditor.FanPoint
@@ -2109,103 +2110,51 @@ class MenuBarManager {
         updateDynamicMenuItems()
     }
     
-    // 启用开机自启动（创建 LaunchAgent 并加载到 launchd）
+    // 启用开机自启动（SMAppService）
     private func enableAutoStart() {
-        let bundlePath = Bundle.main.bundlePath
-        let binaryPath = bundlePath + "/Contents/MacOS/iFanControl"
+        migrateFromLegacyLaunchAgent()
 
-        let plistContent = """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>Label</key>
-            <string>com.ifancontrol.app</string>
-            <key>ProgramArguments</key>
-            <array>
-                <string>\(binaryPath)</string>
-            </array>
-            <key>RunAtLoad</key>
-            <true/>
-            <key>KeepAlive</key>
-            <false/>
-        </dict>
-        </plist>
-        """
-
-        let launchAgentsDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library")
-            .appendingPathComponent("LaunchAgents")
-
-        let plistPath = launchAgentsDir.appendingPathComponent("com.ifancontrol.app.plist")
-
-        // 创建目录（如果不存在）
-        try? FileManager.default.createDirectory(at: launchAgentsDir, withIntermediateDirectories: true)
-
-        // 写入 plist 文件
         do {
-            try plistContent.write(to: plistPath, atomically: true, encoding: .utf8)
-            logger.info("LaunchAgent plist created at: \(plistPath.path, privacy: .public)")
+            try SMAppService.mainApp.register()
+            logger.info("SMAppService registered")
         } catch {
-            logger.error("Failed to create LaunchAgent plist: \(error.localizedDescription, privacy: .public)")
-            return
+            logger.error("SMAppService register failed: \(error.localizedDescription, privacy: .public)")
         }
-
-        // 加载到 launchd
-        bootstrapLaunchAgent(plistPath: plistPath)
     }
 
-    // 确保 LaunchAgent 已存在并已加载（启动时调用）
+    // 启动时确保自启动状态与配置一致
     func ensureAutoStartEnabled() {
-        let launchAgentsDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library")
-            .appendingPathComponent("LaunchAgents")
-        let plistPath = launchAgentsDir.appendingPathComponent("com.ifancontrol.app.plist")
+        migrateFromLegacyLaunchAgent()
 
-        // 如果 plist 不存在，创建并加载
-        if !FileManager.default.fileExists(atPath: plistPath.path) {
-            enableAutoStart()
-            return
-        }
-
-        // plist 存在但可能未加载，尝试 bootstrap（已加载时会失败，忽略错误）
-        bootstrapLaunchAgent(plistPath: plistPath)
-    }
-
-    // 将 LaunchAgent 加载到 launchd
-    private func bootstrapLaunchAgent(plistPath: URL) {
-        let uid = getuid()
-        let process = Process()
-        process.launchPath = "/bin/launchctl"
-        process.arguments = ["bootstrap", "gui/\(uid)", plistPath.path]
-
-        let semaphore = DispatchSemaphore(value: 0)
-        process.terminationHandler = { _ in
-            semaphore.signal()
-        }
-
-        do {
-            try process.run()
-            _ = semaphore.wait(timeout: .now() + 5)
-            if process.terminationStatus == 0 {
-                logger.info("LaunchAgent bootstrapped successfully")
-            } else {
-                // 可能已经加载，不是致命错误
-                logger.info("LaunchAgent bootstrap returned non-zero (may already be loaded)")
+        if SMAppService.mainApp.status != .enabled {
+            do {
+                try SMAppService.mainApp.register()
+                logger.info("SMAppService registered (startup sync)")
+            } catch {
+                logger.error("SMAppService register failed: \(error.localizedDescription, privacy: .public)")
             }
-        } catch {
-            logger.error("Failed to run launchctl bootstrap: \(error.localizedDescription, privacy: .public)")
         }
     }
 
-    // 禁用开机自启动（从 launchd 卸载并删除 LaunchAgent）
+    // 禁用开机自启动
     private func disableAutoStart() {
-        let launchAgentsDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library")
-            .appendingPathComponent("LaunchAgents")
-        let plistPath = launchAgentsDir.appendingPathComponent("com.ifancontrol.app.plist")
+        do {
+            try SMAppService.mainApp.unregister()
+            logger.info("SMAppService unregistered")
+        } catch {
+            logger.error("SMAppService unregister failed: \(error.localizedDescription, privacy: .public)")
+        }
 
-        // 先从 launchd 卸载
+        migrateFromLegacyLaunchAgent()
+    }
+
+    // 迁移旧的 LaunchAgent → SMAppService
+    private func migrateFromLegacyLaunchAgent() {
+        let plistPath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/LaunchAgents/com.ifancontrol.app.plist")
+
+        guard FileManager.default.fileExists(atPath: plistPath.path) else { return }
+
         let uid = getuid()
         let process = Process()
         process.launchPath = "/bin/launchctl"
@@ -2217,14 +2166,10 @@ class MenuBarManager {
         do {
             try process.run()
             _ = semaphore.wait(timeout: .now() + 5)
-            logger.info("LaunchAgent booted out")
-        } catch {
-            logger.info("launchctl bootout: \(error.localizedDescription, privacy: .public)")
-        }
+        } catch {}
 
-        // 删除 plist 文件
         try? FileManager.default.removeItem(at: plistPath)
-        logger.info("LaunchAgent plist removed")
+        logger.info("Migrated from legacy LaunchAgent to SMAppService")
     }
     
     @objc func showSpeedSetting() {
@@ -2516,6 +2461,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        try? SMAppService.mainApp.unregister()
         let launched = InstallationCoordinator.shared.launchSelfContainedUninstaller()
         if launched {
             AppLog.shared.info("self-contained full uninstall launched")
