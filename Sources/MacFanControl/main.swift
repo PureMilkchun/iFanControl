@@ -1532,10 +1532,6 @@ class UpdateService {
                 logger.info("Downloading update archive from \(zipURL.absoluteString, privacy: .public)")
                 let (data, _) = try await URLSession.shared.data(from: zipURL)
 
-                if let expectedSize = manifest.assets?.size, data.count != expectedSize {
-                    throw NSError(domain: "UpdateService", code: 1001, userInfo: [NSLocalizedDescriptionKey: appL10n("安装包大小校验失败。", "Package size verification failed.")])
-                }
-
                 if let expectedSHA = manifest.assets?.sha256?.lowercased(), !expectedSHA.isEmpty {
                     let actualSHA = sha256Hex(data)
                     if expectedSHA != actualSHA {
