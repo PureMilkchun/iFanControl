@@ -5,7 +5,28 @@
 
 ## 2026-04-28
 
-### 2026-04-28 — 代码审查 + 多项修复（build 37，本地测试中）
+### 2026-04-28 — 统计后台版本分布面板重构
+
+- **双面板并排布局**：版本分布拆为两个对称面板 — 左侧版本列表，右侧环形饼图
+- **饼图交互**：鼠标悬停切片向外弹出 + 放大，对应图例高亮，其他切片淡出
+- **响应式**：窄屏（≤860px）自动纵向堆叠
+- **饼图设计**：暖灰色调，环形（donut）样式，中心显示总用户数，透明背景无边框，retina 高清渲染
+- 版本排序改为新版在上
+
+### 2026-04-28 — v2.9.5 / build 38 发布（SMAppService 登录项 + 更新校验修复）
+
+- **开机自启动改用 SMAppService**：从 LaunchAgent plist 迁移到 `SMAppService.mainApp.register()` 原生 API
+  - 在系统设置「登录项与扩展」中显示为 App 类型开关，不再是 hidden legacy agent
+  - 首次启动自动清理旧的 `~/Library/LaunchAgents/com.ifancontrol.app.plist`
+  - 卸载时调用 `SMAppService.mainApp.unregister()`
+- **更新校验修复**：移除文件大小校验，仅保留 SHA256
+  - Cloudflare CDN 传输 ZIP 时大小会变动 5 字节（6008350 → 6008345），但内容不变
+  - 大小校验导致更新误报失败，用户被导向 GitHub Release
+- **发布渠道同步**：GitHub Release ZIP、官网 manifest（build 38）、timeline.json 三者一致
+- 版本号：v2.9.5 / build 38
+- GitHub Release: https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.5
+
+### 2026-04-28 — 代码审查 + 多项修复（build 37，已合并到 build 38）
 
 - **全面代码审计**：对 Swift 前端和 Cloudflare Workers 后端进行系统性审查
 - **修复 1：series_15m 历史桶数据丢失**（heartbeat.js / feedback.js）
