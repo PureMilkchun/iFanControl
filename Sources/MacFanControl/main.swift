@@ -749,13 +749,7 @@ final class CommandExecutor: @unchecked Sendable {
         
         do {
             try task.run()
-            let semaphore = DispatchSemaphore(value: 0)
-            DispatchQueue.global().async { task.waitUntilExit(); semaphore.signal() }
-            if semaphore.wait(timeout: .now() + 8) == .timedOut {
-                task.terminate(); task.waitUntilExit()
-                AppLog.shared.warning("sudo kentsmc timeout args=\(args.joined(separator: " "))")
-                return (false, "", "timeout")
-            }
+            task.waitUntilExit()
 
             let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
             let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
@@ -855,13 +849,7 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
         task.standardError = Pipe()
         do {
             try task.run()
-            let semaphore = DispatchSemaphore(value: 0)
-            DispatchQueue.global().async { task.waitUntilExit(); semaphore.signal() }
-            if semaphore.wait(timeout: .now() + 8) == .timedOut {
-                task.terminate(); task.waitUntilExit()
-                AppLog.shared.warning("kentsmc read timeout args=\(args.joined(separator: " "))")
-                return nil
-            }
+            task.waitUntilExit()
             guard task.terminationStatus == 0 else { return nil }
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -946,22 +934,16 @@ class FanManager {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: kentsmcPath)
         task.arguments = args
-        
+
         let pipe = Pipe()
         let errorPipe = Pipe()
         task.standardOutput = pipe
         task.standardError = errorPipe
-        
+
         do {
             let startedAt = Date()
             try task.run()
-            let semaphore = DispatchSemaphore(value: 0)
-            DispatchQueue.global().async { task.waitUntilExit(); semaphore.signal() }
-            if semaphore.wait(timeout: .now() + 8) == .timedOut {
-                task.terminate(); task.waitUntilExit()
-                AppLog.shared.warning("kentsmc read timeout args=\(args.joined(separator: " "))")
-                return nil
-            }
+            task.waitUntilExit()
             let elapsed = Date().timeIntervalSince(startedAt)
 
             let outputData = pipe.fileHandleForReading.readDataToEndOfFile()

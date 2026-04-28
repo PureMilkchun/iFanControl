@@ -142,7 +142,7 @@ cd /tmp/staging && zip -r /tmp/iFanControl-macOS-X.Y.Z.zip .
 - 控温循环：从 `MenuBarManager.currentFanCurve` 读内存曲线，不轮询 config.json
 - `ConfigManager.loadConfig()` 检查 mtime，未变化返回缓存
 - `FanManager` 是 `@MainActor`，硬件调用必须在后台线程
-- **Process 超时保护**：所有 `kentsmc` 子进程调用均有 8 秒超时（`DispatchSemaphore`），超时后 `terminate()` 防止永久阻塞
+- **Process 超时保护（已撤回）**：v2.9.5/build 37 曾添加 `DispatchSemaphore` 8 秒超时，但实际导致温度读取变慢/卡住。已撤回为原始 `waitUntilExit()` 直接等待。教训见 `CODE_AUDIT.md#6`
 - **菜单栏恢复**：监听 `NSApplication.didChangeScreenParametersNotification` 检测 SystemUIServer 重启，自动重建 `NSStatusItem`；2 秒轮询中也做健康检查兜底
 - **开机自启动**：使用 `SMAppService.mainApp.register()` 原生 API，在系统设置「登录项与扩展」中显示为 App 类型开关；旧的 LaunchAgent plist 在首次启动时自动迁移清理
 - **更新校验**：仅依赖 SHA256 校验，不校验文件大小（Cloudflare CDN 传输时大小可能变化 5 字节导致误判）

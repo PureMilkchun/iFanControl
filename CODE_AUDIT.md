@@ -106,6 +106,37 @@ refreshHardwareProfile()
 
 ---
 
+## 6. DispatchSemaphore 超时模式引入线程竞争，导致温度读取卡住
+
+**时间**：2026-04-28 build 38 热修复
+
+**错误操作**：
+- 为防止 kentsmc 子进程永久阻塞，在 `Process.waitUntilExit()` 外包了 `DispatchSemaphore` 超时机制
+- 模式：`DispatchQueue.global().async { task.waitUntilExit(); semaphore.signal() }` + `semaphore.wait(timeout:)`
+- 应用到三个调用点：`BackgroundHardwareReader.executeRead`、`FanManager.executeReadCommand`、`CommandExecutor.executeCommand`
+
+**后果**：
+- 温度/转速读取变慢，甚至完全卡住不动
+- 用户反馈：「前面读取的温度和速度变慢了，甚至有时候一直卡在那不动」
+
+**根因**：
+- `DispatchQueue.global().async` 为每个 kentsmc 子进程创建额外的线程跃点
+- 原始 `waitUntilExit()` 在调用线程直接阻塞，行为简单可靠
+- 超时模式的线程切换可能引入与 kentsmc 的 SMC 访问之间的竞争条件
+- 这是理论上的改进（超时保护）在实际中制造了新问题
+
+**修复**：
+- 全部撤回为直接 `task.waitUntilExit()`，恢复原始行为
+- 超时保护理论上正确，但 kentsmc 实际不会挂死，引入的复杂性大于收益
+
+**教训**：
+- 不要「预防性」地加固尚未出问题的代码路径
+- 引入线程/并发变化时，必须考虑与外部进程的交互
+- 如果原始代码工作正常，改动后出问题，先撤回改动再分析
+- 理论上的改进 != 实际上的改进
+
+---
+
 ## 总结
 
 1. **先理解，后判断** — 读调用链、数据流，再下定论
@@ -113,3 +144,4 @@ refreshHardwareProfile()
 3. **确认运行环境** — 部署前验证实际路径
 4. **区分确信度** — 报告问题时标明 certainty level
 5. **不依赖文件大小校验** — SHA256 足够，CDN 会改字节数
+6. **不要预防性加固** — 理论改进可能引入实际问题，先撤回再分析
