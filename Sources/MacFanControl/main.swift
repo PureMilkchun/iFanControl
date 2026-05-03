@@ -45,6 +45,35 @@ private func appL10n(_ zh: String, _ en: String) -> String {
     currentLanguage == "en" ? en : zh
 }
 
+private struct ControlStatusSnapshot {
+    let mode: String
+    let detail: String
+    let recordedAt: Date
+}
+
+private enum ControlStatusStore {
+    private static let modeKey = "ifancontrol.control_status.mode"
+    private static let detailKey = "ifancontrol.control_status.detail"
+    private static let recordedAtKey = "ifancontrol.control_status.recorded_at"
+
+    static func load() -> ControlStatusSnapshot? {
+        let defaults = UserDefaults.standard
+        guard let mode = defaults.string(forKey: modeKey),
+              let detail = defaults.string(forKey: detailKey),
+              let recordedAt = defaults.object(forKey: recordedAtKey) as? Date else {
+            return nil
+        }
+        return ControlStatusSnapshot(mode: mode, detail: detail, recordedAt: recordedAt)
+    }
+
+    static func save(mode: String, detail: String, recordedAt: Date = Date()) {
+        let defaults = UserDefaults.standard
+        defaults.set(mode, forKey: modeKey)
+        defaults.set(detail, forKey: detailKey)
+        defaults.set(recordedAt, forKey: recordedAtKey)
+    }
+}
+
 final class AppLog: @unchecked Sendable {
     static let shared = AppLog()
 
@@ -415,6 +444,7 @@ final class PrivacyStatsService: @unchecked Sendable {
     private let enabledKey = "ifancontrol.privacy_stats.enabled"
     private let installIDKey = "ifancontrol.privacy_stats.install_id"
     private let flushDateKey = "ifancontrol.privacy_stats.last_flush_date"
+    private let activationAckKey = "ifancontrol.privacy_stats.last_activation_ack_version_build"
 
     private let recordInterval: TimeInterval = 15 * 60   // 每 15 分钟入队一条
     private let maxQueuedEvents = 192                      // 48 小时（192 × 15min）
@@ -434,6 +464,31 @@ final class PrivacyStatsService: @unchecked Sendable {
     struct HeartbeatEvent: Codable {
         let ts: TimeInterval
         let type: String
+        let version: String
+        let build: String
+
+        init(ts: TimeInterval, type: String, version: String, build: String) {
+            self.ts = ts
+            self.type = type
+            self.version = version
+            self.build = build
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case ts
+            case type
+            case version
+            case build
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let current = PrivacyStatsService.currentVersionInfo()
+            ts = try container.decode(TimeInterval.self, forKey: .ts)
+            type = try container.decode(String.self, forKey: .type)
+            version = try container.decodeIfPresent(String.self, forKey: .version) ?? current.version
+            build = try container.decodeIfPresent(String.self, forKey: .build) ?? current.build
+        }
     }
 
     private init() {
@@ -474,6 +529,30 @@ final class PrivacyStatsService: @unchecked Sendable {
         set { UserDefaults.standard.set(newValue, forKey: flushDateKey) }
     }
 
+    private var lastActivationAckVersionBuild: String? {
+        get { UserDefaults.standard.string(forKey: activationAckKey) }
+        set { UserDefaults.standard.set(newValue, forKey: activationAckKey) }
+    }
+
+    static func currentVersionInfo() -> (version: String, build: String) {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+        return (version, build)
+    }
+
+    private func currentVersionInfo() -> (version: String, build: String) {
+        Self.currentVersionInfo()
+    }
+
+    private func currentVersionBuild() -> String {
+        let info = currentVersionInfo()
+        return "\(info.version)-\(info.build)"
+    }
+
+    private func activationAckedForCurrentBuild() -> Bool {
+        lastActivationAckVersionBuild == currentVersionBuild()
+    }
+
     /// 判断事件是否是昨天或更早（本地时间）
     private func isYesterdayOrEarlier(_ event: HeartbeatEvent) -> Bool {
         localDateString(for: event.ts) < todayString()
@@ -488,6 +567,7 @@ final class PrivacyStatsService: @unchecked Sendable {
         let now = Date().timeIntervalSince1970
         var shouldEnqueue = false
         var shouldFlush = false
+        let shouldRetryActivation = !activationAckedForCurrentBuild()
 
         lock.withLock {
             shouldEnqueue = now - lastRecordAt >= recordInterval
@@ -501,6 +581,9 @@ final class PrivacyStatsService: @unchecked Sendable {
         }
         if shouldFlush {
             Task { await flush() }
+        }
+        if shouldRetryActivation {
+            Task { await retryCurrentBuildActivation() }
         }
     }
 
@@ -516,78 +599,53 @@ final class PrivacyStatsService: @unchecked Sendable {
     /// 退出时调用：同步发送昨天及更早的事件（阻塞，最长 8 秒）
     func shutdown() {
         guard anonymousStatsEnabled else { return }
-        let events = lock.withLock { extractYesterdayEvents() }
+        let events = lock.withLock {
+            let current = currentVersionBuild()
+            return extractEvents { event in
+                isYesterdayOrEarlier(event) || "\(event.version)-\(event.build)" == current
+            }
+        }
         guard !events.isEmpty else { return }
 
         let semaphore = DispatchSemaphore(value: 0)
         Task {
-            await sendEventsToHeartbeat(events)
+            _ = await sendEventBatch(events, markFlushDateOnSuccess: events.contains(where: isYesterdayOrEarlier))
             semaphore.signal()
         }
         semaphore.wait()
     }
 
-    /// 取出昨天及更早的事件（供反馈携带），不从队列移除
-    func dequeueYesterdayEvents() -> [HeartbeatEvent] {
-        lock.withLock {
-            pendingEvents.filter { isYesterdayOrEarlier($0) }
-        }
-    }
-
-    /// 取出所有待上报事件（供反馈携带），从队列移除
-    func dequeueAllPendingEvents() -> [HeartbeatEvent] {
-        lock.withLock {
-            let events = pendingEvents
-            pendingEvents.removeAll()
-            saveQueue()
-            return events
-        }
-    }
-
-    /// 标记事件已成功上报，从队列中移除
-    func markEventsSent(_ events: [HeartbeatEvent]) {
-        guard !events.isEmpty else { return }
-        let sentTimestamps = Set(events.map { $0.ts })
-        lock.withLock {
-            pendingEvents.removeAll { sentTimestamps.contains($0.ts) }
-            saveQueue()
-        }
-    }
-
     // MARK: - 内部逻辑
 
     private func enqueueEvent(ts: TimeInterval) {
+        let current = currentVersionInfo()
         lock.withLock {
-            // 去重：同一 15 分钟桶内不重复入队
+            // 去重：同一 15 分钟桶内，同一版本不重复入队
             let bucket = floor(ts / 900) * 900
-            if let last = pendingEvents.last, floor(last.ts / 900) * 900 == bucket {
+            if let last = pendingEvents.last,
+               floor(last.ts / 900) * 900 == bucket,
+               last.version == current.version,
+               last.build == current.build {
                 return
             }
             if pendingEvents.count < maxQueuedEvents {
-                pendingEvents.append(HeartbeatEvent(ts: ts, type: "heartbeat"))
+                pendingEvents.append(HeartbeatEvent(ts: ts, type: "heartbeat", version: current.version, build: current.build))
                 saveQueue()
             }
         }
     }
 
-    /// 提取昨天及更早的事件并从队列移除，保留今天的
-    private func extractYesterdayEvents() -> [HeartbeatEvent] {
-        let (yesterday, today) = pendingEvents.reduce(into: ([HeartbeatEvent](), [HeartbeatEvent]())) { result, event in
-            if isYesterdayOrEarlier(event) {
-                result.0.append(event)
-            } else {
-                result.1.append(event)
-            }
-        }
-        pendingEvents = today
+    private func extractEvents(where predicate: (HeartbeatEvent) -> Bool) -> [HeartbeatEvent] {
+        let extracted = pendingEvents.filter(predicate)
+        pendingEvents.removeAll(where: predicate)
         saveQueue()
-        return yesterday
+        return extracted
     }
 
     private func flush() async {
-        let events = lock.withLock { extractYesterdayEvents() }
+        let events = lock.withLock { extractEvents(where: isYesterdayOrEarlier) }
         guard !events.isEmpty else { return }
-        await sendEventsToHeartbeat(events)
+        _ = await sendEventBatch(events, markFlushDateOnSuccess: true)
     }
 
     /// 启动时调用：上报所有积压事件（含今天），用于首次安装立即上报
@@ -599,19 +657,43 @@ final class PrivacyStatsService: @unchecked Sendable {
             return all
         }
         guard !events.isEmpty else { return }
-        await sendEventsToHeartbeat(events)
+        let containsYesterday = events.contains(where: isYesterdayOrEarlier)
+        _ = await sendEventBatch(events, markFlushDateOnSuccess: containsYesterday)
     }
 
-    private func sendEventsToHeartbeat(_ events: [HeartbeatEvent]) async {
-        let installID = currentInstallID()
-        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
-        let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+    private func retryCurrentBuildActivation() async {
+        let current = currentVersionBuild()
+        let events = lock.withLock {
+            extractEvents { "\( $0.version)-\($0.build)" == current }
+        }
+        guard !events.isEmpty else { return }
+        _ = await sendEventBatch(events, markFlushDateOnSuccess: false)
+    }
 
+    private func sendEventBatch(_ events: [HeartbeatEvent], markFlushDateOnSuccess: Bool) async -> Bool {
+        guard !events.isEmpty else { return true }
+
+        let grouped = Dictionary(grouping: events) { "\($0.version)-\($0.build)" }
+        var allSucceeded = true
+        for (_, group) in grouped {
+            guard let first = group.first else { continue }
+            let success = await sendEventsToHeartbeat(group, version: first.version, build: first.build)
+            allSucceeded = allSucceeded && success
+        }
+
+        if allSucceeded && markFlushDateOnSuccess {
+            lock.withLock { lastFlushDate = todayString() }
+        }
+        return allSucceeded
+    }
+
+    private func sendEventsToHeartbeat(_ events: [HeartbeatEvent], version: String, build: String) async -> Bool {
+        let installID = currentInstallID()
         let eventDicts = events.map { ["ts": $0.ts, "type": $0.type] as [String: Any] }
         let payload: [String: Any] = [
             "install_id": installID,
-            "version": shortVersion,
-            "build": buildVersion,
+            "version": version,
+            "build": build,
             "events": eventDicts
         ]
 
@@ -625,16 +707,20 @@ final class PrivacyStatsService: @unchecked Sendable {
             let (_, response) = try await URLSession.shared.upload(for: request, from: body)
 
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                logger.warning("Heartbeat batch rejected by server, re-queuing \(events.count) events.")
+                logger.warning("Heartbeat batch rejected by server, re-queuing \(events.count) events for \(version)-\(build).")
                 requeueEvents(events)
-                return
+                return false
             }
 
-            lock.withLock { lastFlushDate = todayString() }
-            logger.info("Heartbeat daily batch sent: \(events.count) events.")
+            if "\(version)-\(build)" == currentVersionBuild() {
+                lock.withLock { lastActivationAckVersionBuild = currentVersionBuild() }
+            }
+            logger.info("Heartbeat batch sent: \(events.count) events for \(version)-\(build).")
+            return true
         } catch {
-            logger.warning("Heartbeat batch failed: \(error.localizedDescription, privacy: .public), re-queuing \(events.count) events.")
+            logger.warning("Heartbeat batch failed: \(error.localizedDescription, privacy: .public), re-queuing \(events.count) events for \(version)-\(build).")
             requeueEvents(events)
+            return false
         }
     }
 
@@ -807,6 +893,18 @@ final class CommandExecutor: @unchecked Sendable {
         }
         return (result.success, result.success ? nil : result.error)
     }
+
+    func setFanAutoAsync(
+        completion: (@MainActor (_ success: Bool, _ error: String?) -> Void)? = nil
+    ) {
+        commandQueue.async {
+            let result = self.setFanAuto()
+            guard let completion else { return }
+            Task { @MainActor in
+                completion(result.success, result.error)
+            }
+        }
+    }
     
     // 解锁风扇
     func unlockFans() -> (success: Bool, error: String?) {
@@ -830,6 +928,16 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
     // 读取结果缓存（由后台线程写入，主线程读取）
     private var _temperatures: [String: Double] = [:]
     private var _fanRPMs: [Int: Int] = [:]
+    private var _lastSuccessfulTemperatureRefresh: Date?
+    private var _consecutiveTemperatureFailures: Int = 0
+    private var _refreshInFlight = false
+
+    struct Snapshot {
+        let temperatures: [String: Double]
+        let fanRPMs: [Int: Int]
+        let consecutiveTemperatureFailures: Int
+        let secondsSinceTemperatureSuccess: TimeInterval?
+    }
 
     var temperatures: [String: Double] {
         lock.lock(); defer { lock.unlock() }
@@ -838,6 +946,15 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
     var fanRPMs: [Int: Int] {
         lock.lock(); defer { lock.unlock() }
         return _fanRPMs
+    }
+    var snapshot: Snapshot {
+        lock.lock(); defer { lock.unlock() }
+        return Snapshot(
+            temperatures: _temperatures,
+            fanRPMs: _fanRPMs,
+            consecutiveTemperatureFailures: _consecutiveTemperatureFailures,
+            secondsSinceTemperatureSuccess: _lastSuccessfulTemperatureRefresh.map { Date().timeIntervalSince($0) }
+        )
     }
 
     private func executeRead(args: [String]) -> String? {
@@ -853,7 +970,10 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
             guard task.terminationStatus == 0 else { return nil }
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        } catch { return nil }
+        } catch {
+            AppLog.shared.error("kentsmc Process.run failed: \(error.localizedDescription) args=\(args.joined(separator: " "))")
+            return nil
+        }
     }
 
     private func readNumeric(forKey key: String) -> Double? {
@@ -866,7 +986,21 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
 
     /// 在后台队列执行一次完整的硬件轮询
     func refresh(sensors: [TemperatureSensorDefinition], fans: [FanInfo]) {
+        lock.lock()
+        if _refreshInFlight {
+            lock.unlock()
+            return
+        }
+        _refreshInFlight = true
+        lock.unlock()
+
         queue.async { [self] in
+            defer {
+                lock.lock()
+                _refreshInFlight = false
+                lock.unlock()
+            }
+
             var temps: [String: Double] = [:]
             for sensor in sensors {
                 if let val = readNumeric(forKey: sensor.key), val >= 0, val <= 120 {
@@ -879,11 +1013,39 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
                     rpms[fan.index] = Int(val.rounded())
                 }
             }
+            let finishedAt = Date()
             lock.lock()
-            if !temps.isEmpty { _temperatures = temps }
+            if !temps.isEmpty {
+                _temperatures = temps
+                _lastSuccessfulTemperatureRefresh = finishedAt
+                _consecutiveTemperatureFailures = 0
+            } else if !sensors.isEmpty {
+                _temperatures = [:]
+                _consecutiveTemperatureFailures += 1
+            }
             if !rpms.isEmpty { _fanRPMs = rpms }
+            let gotTemps = !temps.isEmpty
+            let consecutiveFailures = _consecutiveTemperatureFailures
             lock.unlock()
+
+            if !gotTemps && !sensors.isEmpty {
+                AppLog.shared.warning("bg refresh: all \(sensors.count) sensor reads failed consecutive=\(consecutiveFailures)")
+            }
         }
+    }
+
+    func replaceSnapshotFromMainThread(temperatures: [String: Double], fanRPMs: [Int: Int], reason: String) {
+        lock.lock()
+        if !temperatures.isEmpty {
+            _temperatures = temperatures
+            _lastSuccessfulTemperatureRefresh = Date()
+            _consecutiveTemperatureFailures = 0
+        }
+        if !fanRPMs.isEmpty {
+            _fanRPMs = fanRPMs
+        }
+        lock.unlock()
+        AppLog.shared.info("bg snapshot replaced reason=\(reason) temps=\(temperatures.count) rpms=\(fanRPMs.count)")
     }
 }
 
@@ -907,6 +1069,7 @@ class FanManager {
     private var lastTelemetryRefresh: Date?
     private var lastTelemetryLogTimestamp: Date?
     private var hasProbedHardware = false
+    private var lastHardwareReprobeAt: Date?
     private let logger = Logger(subsystem: appSubsystem, category: "Hardware")
     private let telemetryDetailLogInterval: TimeInterval = 10.0
     
@@ -915,6 +1078,7 @@ class FanManager {
     private var lastExecutionTime: Date?
     private let minExecutionInterval: TimeInterval = 2.0
     private var fanCommandInFlight = false
+    private let criticalTemp: Double = 110.0
     
     
     // 动态滞后控制
@@ -928,7 +1092,8 @@ class FanManager {
         }
     }
     
-    private let criticalTemp: Double = 95.0
+    private var lastFailSafeAutoReturnAt: Date?
+    private let failSafeAutoReturnInterval: TimeInterval = 15.0
     
     private func executeReadCommand(args: [String]) -> String? {
         let task = Process()
@@ -1064,10 +1229,22 @@ class FanManager {
         AppLog.shared.info("hardware profile refreshed fans=\(fanCount) maxRPM=\(currentMaxRPM) sensors=\(availableTemperatureSensors.count) keys=[\(sensorKeys)]")
 
         hasProbedHardware = true
+        lastHardwareReprobeAt = Date()
         refreshTelemetry(force: true)
         if let initialRPM = cachedFanRPMs.values.max(), initialRPM > 0 {
             lastSetRPM = initialRPM
         }
+    }
+
+    func reprobeHardware(reason: String, minimumInterval: TimeInterval = 15.0) {
+        if let lastHardwareReprobeAt,
+           minimumInterval > 0,
+           Date().timeIntervalSince(lastHardwareReprobeAt) < minimumInterval {
+            return
+        }
+        AppLog.shared.info("hardware reprobe requested reason=\(reason)")
+        hasProbedHardware = false
+        refreshHardwareProfile()
     }
 
     func refreshTelemetry(force: Bool = false) {
@@ -1139,7 +1316,11 @@ class FanManager {
         }
         return cachedFanRPMs.values.max()
     }
-    
+
+    func telemetrySnapshot() -> (temperatures: [String: Double], fanRPMs: [Int: Int]) {
+        (cachedTemperatures, cachedFanRPMs)
+    }
+
     func setFanRPM(rpm: Int) {
         if fanCommandInFlight {
             AppLog.shared.debug("setFanRPM skipped reason=in_flight requested=\(rpm)")
@@ -1180,8 +1361,30 @@ class FanManager {
             } else {
                 print("Error setting fan RPM: \(error ?? "Unknown error")")
                 AppLog.shared.error("setFanRPM apply failed smoothed=\(smoothedRPM) error=\(error ?? "unknown")")
+                self.returnControlToSystemFailSafe(reason: "setFanRPM_failed")
             }
         }
+    }
+
+    private func returnControlToSystemFailSafe(reason: String) {
+        if let lastFailSafeAutoReturnAt,
+           Date().timeIntervalSince(lastFailSafeAutoReturnAt) < failSafeAutoReturnInterval {
+            return
+        }
+        lastFailSafeAutoReturnAt = Date()
+        AppLog.shared.warning("returning control to system fail-safe reason=\(reason)")
+        Task { @MainActor in
+            AppDelegate.shared?.recordSystemAutoFallback(reason: reason)
+            AppDelegate.shared?.showSafetyAlert(
+                state: "system_auto_fallback_command_failure",
+                title: appL10n("风扇控制已交还系统", "Fan Control Returned to System"),
+                message: appL10n(
+                    "iFanControl 无法继续可靠地下发风扇命令，已自动将风扇控制权交还给系统。请检查日志或联系支持。",
+                    "iFanControl could not continue sending reliable fan commands, so control has been returned to the system. Please check the logs or contact support."
+                )
+            )
+        }
+        CommandExecutor.shared.setFanAutoAsync()
     }
     
     func unlockFans() {
@@ -1670,6 +1873,13 @@ class MenuBarManager {
     private var fanCurve: [FanPoint] = []
     private var isAutoMode: Bool = true
     private var autoStartEnabled: Bool = true
+    private let displayModeKey = "ifancontrol.ui.display_mode"
+    private var displayMode: String {
+        get { UserDefaults.standard.string(forKey: displayModeKey) ?? "full" }
+        set { UserDefaults.standard.set(newValue, forKey: displayModeKey) }
+    }
+    private var displayFullItem: NSMenuItem?
+    private var displayCompactItem: NSMenuItem?
     
     private var speedSettingWindowController: SpeedSettingWindowController?
     private var safetyFloorWindowController: SafetyFloorWindowController?
@@ -1677,13 +1887,27 @@ class MenuBarManager {
     private var helpWindowController: HelpWindowController?
     private var feedbackWindowController: FeedbackWindowController?
 
+    // GCD 定时器（不依赖 RunLoop，无显示器也能运行）
+    private var menuPollTimer: DispatchSourceTimer?
+
     // 菜单项引用（用于原地更新，避免每 2 秒重建整个菜单）
     private var menu: NSMenu?
     private var hardwareItem: NSMenuItem?
     private var currentSensorItem: NSMenuItem?
+    private var controlStatusItem: NSMenuItem?
+    private var controlStatusContainerView: NSView?
+    private var controlStatusBackgroundView: NSView?
+    private var controlStatusTopSeparator: NSBox?
+    private var controlStatusBottomSeparator: NSBox?
+    private var controlStatusDividerField: NSTextField?
+    private var controlStatusTopLeftField: NSTextField?
+    private var controlStatusTopRightField: NSTextField?
+    private var controlStatusBottomLeftField: NSTextField?
+    private var controlStatusBottomRightField: NSTextField?
     private var modeItem: NSMenuItem?
     private var speedItem: NSMenuItem?
     private var autoStartItem: NSMenuItem?
+    private var hottestItem: NSMenuItem?
     private var sensorMenuItems: [NSMenuItem] = []
     private var zhItem: NSMenuItem?
     private var enItem: NSMenuItem?
@@ -1726,26 +1950,28 @@ class MenuBarManager {
             object: nil
         )
 
-        // 后台轮询硬件（避免主线程阻塞导致菜单点击延迟）
-        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        // 后台轮询硬件（GCD 定时器，不依赖 RunLoop，无显示器也能运行）
+        let menuTimer = DispatchSource.makeTimerSource(queue: .main)
+        menuTimer.schedule(deadline: .now() + 2.0, repeating: 2.0)
+        menuTimer.setEventHandler { [weak self] in
             guard let self else { return }
-            Task { @MainActor in
-                // 健康检查：如果 statusItem 因 SystemUIServer 重启而丢失，自动恢复
-                if self.statusItem?.button?.window == nil {
-                    self.logger.warning("statusItem lost, recreating")
-                    self.createStatusItem()
-                }
-                let fm = FanManager.shared
-                fm.probeHardwareIfNeeded()
-                // 后台线程读取传感器 + 风扇（真正非阻塞）
-                BackgroundHardwareReader.shared.refresh(
-                    sensors: fm.availableTemperatureSensors,
-                    fans: fm.fans
-                )
-                // 主线程更新菜单 UI
-                self.updateDynamicMenuItems()
+            // 健康检查：如果 statusItem 因 SystemUIServer 重启而丢失，自动恢复
+            if self.statusItem?.button?.window == nil {
+                self.logger.warning("statusItem lost, recreating")
+                self.createStatusItem()
             }
+            let fm = FanManager.shared
+            fm.probeHardwareIfNeeded()
+            // 后台线程读取传感器 + 风扇（真正非阻塞）
+            BackgroundHardwareReader.shared.refresh(
+                sensors: fm.availableTemperatureSensors,
+                fans: fm.fans
+            )
+            // 主线程更新菜单 UI
+            self.updateDynamicMenuItems()
         }
+        menuTimer.resume()
+        self.menuPollTimer = menuTimer
 
         maybeShowStartupGuidance()
     }
@@ -1766,6 +1992,14 @@ class MenuBarManager {
             logger.warning("screen/display change detected stale statusItem, recreating")
             createStatusItem()
         }
+        if FanManager.shared.fanCount == 0 || FanManager.shared.availableTemperatureSensors.isEmpty {
+            FanManager.shared.reprobeHardware(reason: "screen_or_display_change_missing_profile", minimumInterval: 0)
+        }
+        BackgroundHardwareReader.shared.refresh(
+            sensors: FanManager.shared.availableTemperatureSensors,
+            fans: FanManager.shared.fans
+        )
+        updateDynamicMenuItems()
     }
     
     @objc private func handleCurveSaved(_ notification: Notification) {
@@ -1815,7 +2049,88 @@ class MenuBarManager {
         sensorItem.isEnabled = false
         menu.addItem(sensorItem)
         self.currentSensorItem = sensorItem
-        menu.addItem(NSMenuItem.separator())
+
+        let controlStatusItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        let controlStatusView = NSView(frame: NSRect(x: 0, y: 0, width: 210, height: 52))
+        let smallMenuFont = NSFont.systemFont(ofSize: 11)
+        let textColor = NSColor.textColor
+        let cardFrame = NSRect(x: 10, y: 4, width: 190, height: 44)
+        let leftX: CGFloat = cardFrame.minX + 14
+        let separatorX: CGFloat = cardFrame.midX
+        let rightX: CGFloat = separatorX + 10
+        let leftWidth: CGFloat = separatorX - leftX - 8
+        let rightWidth: CGFloat = cardFrame.maxX - rightX - 12
+        let topY: CGFloat = cardFrame.minY + 24
+        let bottomY: CGFloat = cardFrame.minY + 8
+
+        let cardBackground = NSView(frame: cardFrame)
+        cardBackground.wantsLayer = true
+        cardBackground.layer?.cornerRadius = 8
+        cardBackground.layer?.borderWidth = 1
+        controlStatusView.addSubview(cardBackground)
+
+        let topSeparator = NSBox(frame: NSRect(x: cardFrame.minX + 8, y: cardFrame.maxY - 1, width: cardFrame.width - 16, height: 1))
+        topSeparator.boxType = .separator
+        controlStatusView.addSubview(topSeparator)
+
+        let bottomSeparator = NSBox(frame: NSRect(x: cardFrame.minX + 8, y: cardFrame.minY, width: cardFrame.width - 16, height: 1))
+        bottomSeparator.boxType = .separator
+        controlStatusView.addSubview(bottomSeparator)
+
+        let topLeftField = NSTextField(labelWithString: "")
+        topLeftField.frame = NSRect(x: leftX, y: topY, width: leftWidth, height: 14)
+        topLeftField.font = smallMenuFont
+        topLeftField.textColor = .secondaryLabelColor
+        topLeftField.alignment = .left
+        topLeftField.lineBreakMode = .byTruncatingTail
+
+        let topRightField = NSTextField(labelWithString: "")
+        topRightField.frame = NSRect(x: rightX, y: topY, width: rightWidth, height: 14)
+        topRightField.font = smallMenuFont
+        topRightField.textColor = .secondaryLabelColor
+        topRightField.alignment = .right
+        topRightField.lineBreakMode = .byTruncatingHead
+
+        let bottomLeftField = NSTextField(labelWithString: "")
+        bottomLeftField.frame = NSRect(x: leftX, y: bottomY, width: leftWidth, height: 14)
+        bottomLeftField.font = NSFont.boldSystemFont(ofSize: 11)
+        bottomLeftField.textColor = textColor
+        bottomLeftField.alignment = .left
+        bottomLeftField.lineBreakMode = .byTruncatingTail
+
+        let bottomRightField = NSTextField(labelWithString: "")
+        bottomRightField.frame = NSRect(x: rightX, y: bottomY, width: rightWidth, height: 14)
+        bottomRightField.font = smallMenuFont
+        bottomRightField.textColor = .secondaryLabelColor
+        bottomRightField.alignment = .right
+        bottomRightField.lineBreakMode = .byTruncatingHead
+
+        let separatorField = NSTextField(labelWithString: "│")
+        separatorField.frame = NSRect(x: separatorX - 6, y: cardFrame.minY + 13, width: 12, height: 18)
+        separatorField.font = NSFont.systemFont(ofSize: 12)
+        separatorField.textColor = .separatorColor
+        separatorField.alignment = .center
+
+        controlStatusView.addSubview(topLeftField)
+        controlStatusView.addSubview(topRightField)
+        controlStatusView.addSubview(bottomLeftField)
+        controlStatusView.addSubview(bottomRightField)
+        controlStatusView.addSubview(separatorField)
+
+        controlStatusItem.view = controlStatusView
+        menu.addItem(controlStatusItem)
+        self.controlStatusItem = controlStatusItem
+        self.controlStatusContainerView = controlStatusView
+        self.controlStatusBackgroundView = cardBackground
+        self.controlStatusTopSeparator = topSeparator
+        self.controlStatusBottomSeparator = bottomSeparator
+        self.controlStatusDividerField = separatorField
+        self.controlStatusTopLeftField = topLeftField
+        self.controlStatusTopRightField = topRightField
+        self.controlStatusBottomLeftField = bottomLeftField
+        self.controlStatusBottomRightField = bottomRightField
+        layoutControlStatusView()
+        refreshControlStatusAppearance()
 
         // 温度源子菜单
         let temperatureSourceItem = NSMenuItem(title: appL10n("选择温度源", "Select Temperature Source"), action: nil, keyEquivalent: "")
@@ -1825,6 +2140,7 @@ class MenuBarManager {
         hottestItem.target = self
         hottestItem.state = config.temperatureSourceMode == "manual" ? .off : .on
         temperatureSourceMenu.addItem(hottestItem)
+        self.hottestItem = hottestItem
 
         sensorMenuItems.removeAll()
         if !readings.isEmpty {
@@ -1885,50 +2201,32 @@ class MenuBarManager {
         menu.addItem(spdItem)
         self.speedItem = spdItem
 
-        // 开机自启动
-        let autoItem = NSMenuItem(title: appL10n("开机自启动", "Launch at Login"), action: #selector(toggleAutoStart), keyEquivalent: "")
-        autoItem.target = self
-        menu.addItem(autoItem)
-        self.autoStartItem = autoItem
+        menu.addItem(NSMenuItem.separator())
 
         // 安全兜底转速
         let safetyItem = NSMenuItem(title: appL10n("安全兜底转速...", "Safety Floor RPM..."), action: #selector(showSafetyFloorSetting), keyEquivalent: "")
         safetyItem.target = self
         menu.addItem(safetyItem)
 
-        // 关于/帮助
-        let aboutItem = NSMenuItem(title: appL10n("关于/帮助...", "About / Help..."), action: #selector(showHelp), keyEquivalent: "")
-        aboutItem.target = self
-        menu.addItem(aboutItem)
+        // 开机自启动
+        let autoItem = NSMenuItem(title: appL10n("开机自启动", "Launch at Login"), action: #selector(toggleAutoStart), keyEquivalent: "")
+        autoItem.target = self
+        menu.addItem(autoItem)
+        self.autoStartItem = autoItem
 
-        // 反馈入口
-        menu.addItem(NSMenuItem.separator())
-
-        // 标题（标准菜单项，自然对齐）
-        let feedbackTitleItem = NSMenuItem(title: appL10n("告诉开发者 👋", "Talk to Dev 👋"), action: #selector(showFeedback), keyEquivalent: "")
-        feedbackTitleItem.target = self
-        menu.addItem(feedbackTitleItem)
-
-        // 模拟输入框（自定义视图）
-        let feedbackItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-        let feedbackContainer = NSView(frame: NSRect(x: 0, y: 0, width: 240, height: 76))
-        let feedbackField = NSTextField(frame: NSRect(x: 20, y: 6, width: 200, height: 64))
-        feedbackField.isEditable = false
-        feedbackField.isBezeled = true
-        feedbackField.bezelStyle = .roundedBezel
-        feedbackField.font = NSFontManager.shared.convert(.systemFont(ofSize: 13), toHaveTrait: .italicFontMask)
-        feedbackField.textColor = .placeholderTextColor
-        feedbackField.stringValue = appL10n("找作者聊聊，随便说两句...", "Just say anything...")
-        feedbackField.alignment = .left
-        feedbackField.lineBreakMode = .byWordWrapping
-        feedbackField.maximumNumberOfLines = 2
-        feedbackContainer.addSubview(feedbackField)
-        let clickGesture = NSClickGestureRecognizer(target: self, action: #selector(showFeedback))
-        feedbackContainer.addGestureRecognizer(clickGesture)
-        feedbackItem.view = feedbackContainer
-        menu.addItem(feedbackItem)
-
-        menu.addItem(NSMenuItem.separator())
+        // 信息栏展示
+        let displayItem = NSMenuItem(title: appL10n("信息栏展示", "Display"), action: nil, keyEquivalent: "")
+        let displayMenu = NSMenu()
+        let fullItem = NSMenuItem(title: appL10n("完整：65℃ | 2400 RPM [Auto]", "Full: 65℃ | 2400 RPM [Auto]"), action: #selector(switchToFullDisplay), keyEquivalent: "")
+        fullItem.target = self
+        displayMenu.addItem(fullItem)
+        self.displayFullItem = fullItem
+        let compactItem = NSMenuItem(title: appL10n("简洁：53｜981｜A", "Compact: 53｜981｜A"), action: #selector(switchToCompactDisplay), keyEquivalent: "")
+        compactItem.target = self
+        displayMenu.addItem(compactItem)
+        self.displayCompactItem = compactItem
+        menu.setSubmenu(displayMenu, for: displayItem)
+        menu.addItem(displayItem)
 
         // 语言
         let languageItem = NSMenuItem(title: appL10n("语言", "Language"), action: nil, keyEquivalent: "")
@@ -1946,6 +2244,39 @@ class MenuBarManager {
 
         menu.addItem(NSMenuItem.separator())
 
+        // 关于/帮助
+        let aboutItem = NSMenuItem(title: appL10n("关于/帮助...", "About / Help..."), action: #selector(showHelp), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        // 反馈入口（标准菜单项，自然对齐）
+        let feedbackTitleItem = NSMenuItem(title: appL10n("告诉开发者 👋", "Talk to Dev 👋"), action: #selector(showFeedback), keyEquivalent: "")
+        feedbackTitleItem.target = self
+        menu.addItem(feedbackTitleItem)
+
+        // 模拟输入框（自定义视图）
+        let feedbackItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        let feedbackContainer = NSView(frame: NSRect(x: 0, y: 0, width: 210, height: 76))
+        let feedbackField = NSTextField(frame: NSRect(x: 20, y: 6, width: 170, height: 64))
+        feedbackField.isEditable = false
+        feedbackField.isBezeled = true
+        feedbackField.bezelStyle = .roundedBezel
+        feedbackField.font = NSFontManager.shared.convert(.systemFont(ofSize: 13), toHaveTrait: .italicFontMask)
+        feedbackField.textColor = .placeholderTextColor
+        feedbackField.stringValue = appL10n("找作者聊聊，随便说两句...", "Just say anything...")
+        feedbackField.alignment = .left
+        feedbackField.lineBreakMode = .byWordWrapping
+        feedbackField.maximumNumberOfLines = 2
+        feedbackContainer.addSubview(feedbackField)
+        let clickGesture = NSClickGestureRecognizer(target: self, action: #selector(showFeedback))
+        feedbackContainer.addGestureRecognizer(clickGesture)
+        feedbackItem.view = feedbackContainer
+        menu.addItem(feedbackItem)
+
+        menu.addItem(NSMenuItem.separator())
+
         // 重启 / 退出
         let restartItem = NSMenuItem(title: appL10n("重新启动", "Restart"), action: #selector(restartApp), keyEquivalent: "r")
         restartItem.target = self
@@ -1960,8 +2291,10 @@ class MenuBarManager {
     }
 
     /// 原地更新动态菜单项（每 2 秒调用，不重建菜单）
-    private func updateDynamicMenuItems() {
+    func updateDynamicMenuItems() {
         guard let statusItem = statusItem else { return }
+        layoutControlStatusView()
+        refreshControlStatusAppearance()
 
         let config = ConfigManager.shared.loadConfig()
 
@@ -1993,16 +2326,24 @@ class MenuBarManager {
         }
 
         // 状态栏标题
-        let temperatureText = String(format: "%.0f℃", currentTemperature)
-        let fanText = "\(currentFanRPM) RPM"
-        let modeText = isAutoMode ? "[Auto]" : "[Manual]"
-        var statusIcon = ""
-        if currentTemperature >= 90.0 {
-            statusIcon = " 🔥"
-        } else if currentTemperature >= 85.0 {
-            statusIcon = " ⚠️"
+        if displayMode == "compact" {
+            let modeLetter = isAutoMode ? "A" : "M"
+            statusItem.button?.title = "\(String(format: "%.0f", currentTemperature))｜\(currentFanRPM)｜\(modeLetter)"
+        } else {
+            let temperatureText = String(format: "%.0f℃", currentTemperature)
+            let fanText = "\(currentFanRPM) RPM"
+            let modeText = isAutoMode ? "[Auto]" : "[Manual]"
+            var statusIcon = ""
+            if currentTemperature >= 90.0 {
+                statusIcon = " 🔥"
+            } else if currentTemperature >= 85.0 {
+                statusIcon = " ⚠️"
+            }
+            statusItem.button?.title = "\(temperatureText) | \(fanText) \(modeText)\(statusIcon)"
         }
-        statusItem.button?.title = "\(temperatureText) | \(fanText) \(modeText)\(statusIcon)"
+        // 信息栏展示菜单选中态
+        displayFullItem?.state = (displayMode == "compact") ? .off : .on
+        displayCompactItem?.state = (displayMode == "compact") ? .on : .off
 
         // 硬件信息
         hardwareItem?.title = FanManager.shared.fanCount > 0 ?
@@ -2011,8 +2352,15 @@ class MenuBarManager {
 
         // 温度源
         currentSensorItem?.title = appL10n("温度源 \(currentTemperatureSensorName)", "Temperature Source \(currentTemperatureSensorName)")
+        let controlStatus = currentControlStatusLine()
+        controlStatusTopLeftField?.stringValue = controlStatus.topLeft
+        controlStatusTopRightField?.stringValue = controlStatus.topRight
+        controlStatusBottomLeftField?.stringValue = controlStatus.bottomLeft
+        controlStatusBottomLeftField?.textColor = controlStatus.statusColor
+        controlStatusBottomRightField?.stringValue = controlStatus.bottomRight
 
         // 温度源子菜单：更新传感器数值和选中态
+        hottestItem?.state = config.temperatureSourceMode == "manual" ? .off : .on
         var sensorIdx = 0
         for section in groupedTemperatureReadings(readings) {
             for (index, reading) in section.readings.enumerated() {
@@ -2038,6 +2386,123 @@ class MenuBarManager {
         // 语言选中态
         zhItem?.state = currentLanguage == "zh" ? .on : .off
         enItem?.state = currentLanguage == "en" ? .on : .off
+    }
+
+    private func layoutControlStatusView() {
+        guard let containerView = controlStatusContainerView,
+              let cardBackground = controlStatusBackgroundView,
+              let topSeparator = controlStatusTopSeparator,
+              let bottomSeparator = controlStatusBottomSeparator,
+              let dividerField = controlStatusDividerField,
+              let topLeftField = controlStatusTopLeftField,
+              let topRightField = controlStatusTopRightField,
+              let bottomLeftField = controlStatusBottomLeftField,
+              let bottomRightField = controlStatusBottomRightField else { return }
+
+        let baseWidth: CGFloat = 210
+        let cardWidth: CGFloat = 190
+        let containerWidth = baseWidth
+        containerView.frame = NSRect(x: 0, y: 0, width: containerWidth, height: 52)
+
+        let cardX: CGFloat = 14
+        let cardFrame = NSRect(x: cardX, y: 4, width: cardWidth, height: 44)
+        let leftX: CGFloat = cardFrame.minX + 14
+        let separatorX: CGFloat = cardFrame.midX
+        let rightX: CGFloat = separatorX + 10
+        let leftWidth: CGFloat = separatorX - leftX - 8
+        let rightWidth: CGFloat = cardFrame.maxX - rightX - 12
+        let topY: CGFloat = cardFrame.minY + 24
+        let bottomY: CGFloat = cardFrame.minY + 8
+
+        cardBackground.frame = cardFrame
+        topSeparator.frame = NSRect(x: cardFrame.minX + 8, y: cardFrame.maxY - 1, width: cardFrame.width - 16, height: 1)
+        bottomSeparator.frame = NSRect(x: cardFrame.minX + 8, y: cardFrame.minY, width: cardFrame.width - 16, height: 1)
+        dividerField.frame = NSRect(x: separatorX - 6, y: cardFrame.minY + 13, width: 12, height: 18)
+
+        topLeftField.frame = NSRect(x: leftX, y: topY, width: leftWidth, height: 14)
+        topRightField.frame = NSRect(x: rightX, y: topY, width: rightWidth, height: 14)
+        bottomLeftField.frame = NSRect(x: leftX, y: bottomY, width: leftWidth, height: 14)
+        bottomRightField.frame = NSRect(x: rightX, y: bottomY, width: rightWidth, height: 14)
+    }
+
+    private func refreshControlStatusAppearance() {
+        guard let backgroundView = controlStatusBackgroundView else { return }
+        let appearance = statusItem?.button?.effectiveAppearance ?? NSApp.effectiveAppearance
+        let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+
+        let fillColor: NSColor = isDark
+            ? NSColor.white.withAlphaComponent(0.07)
+            : NSColor.black.withAlphaComponent(0.035)
+        let borderColor: NSColor = isDark
+            ? NSColor.white.withAlphaComponent(0.12)
+            : NSColor.black.withAlphaComponent(0.07)
+
+        backgroundView.layer?.backgroundColor = fillColor.cgColor
+        backgroundView.layer?.borderColor = borderColor.cgColor
+    }
+
+    private func currentControlStatusLine() -> (topLeft: String, topRight: String, bottomLeft: String, bottomRight: String, statusColor: NSColor, detailText: String) {
+        guard let snapshot = ControlStatusStore.load() else {
+            return (
+                appL10n("控制状态", "Status"),
+                appL10n("状态刷新", "Refresh"),
+                appL10n("启动中", "Starting"),
+                appL10n("刚刚", "Now"),
+                .secondaryLabelColor,
+                ""
+            )
+        }
+
+        let interval = Int(Date().timeIntervalSince(snapshot.recordedAt))
+        let ageText: String
+        if interval < 60 {
+            ageText = appL10n("\(max(interval, 0))秒前", "\(max(interval, 0))s ago")
+        } else {
+            ageText = appL10n("\(interval / 60)分钟前", "\(interval / 60)m ago")
+        }
+
+        let detailParts = snapshot.detail
+            .split(separator: "/", maxSplits: 1, omittingEmptySubsequences: true)
+            .map { String($0).trimmingCharacters(in: .whitespaces) }
+
+        let modeText: String
+        let statusColor: NSColor
+        switch snapshot.mode {
+        case "normal":
+            modeText = appL10n("正常", "Normal")
+            statusColor = .systemGreen
+        case "sensor_loss_fixed_rpm":
+            modeText = appL10n("⚠ 传感器丢失", "⚠ Sensor Lost")
+            statusColor = .systemRed
+        case "system_auto_fallback":
+            modeText = appL10n("⚠ 已交还系统", "⚠ System Fallback")
+            statusColor = .systemOrange
+        default:
+            modeText = snapshot.mode
+            statusColor = .secondaryLabelColor
+        }
+
+        let bottomLeft: String
+        if let firstPart = detailParts.first, !firstPart.isEmpty {
+            if detailParts.count == 2, !detailParts[1].isEmpty {
+                bottomLeft = "\(firstPart) / \(detailParts[1])"
+            } else {
+                bottomLeft = firstPart
+            }
+        } else {
+            bottomLeft = ""
+        }
+
+        let detailText = snapshot.mode == "normal" ? bottomLeft : ""
+
+        return (
+            appL10n("控制状态", "Status"),
+            appL10n("状态刷新", "Refresh"),
+            modeText,
+            ageText,
+            statusColor,
+            detailText
+        )
     }
 
     /// 完全重建菜单（仅在语言切换等需要重建结构时调用）
@@ -2181,6 +2646,16 @@ class MenuBarManager {
     @objc func switchToEnglish() {
         UserDefaults.standard.set("en", forKey: "ifancontrol.ui.language")
         showRestartRequiredAlert()
+    }
+
+    @objc func switchToFullDisplay() {
+        displayMode = "full"
+        updateDynamicMenuItems()
+    }
+
+    @objc func switchToCompactDisplay() {
+        displayMode = "compact"
+        updateDynamicMenuItems()
     }
 
     private func showRestartRequiredAlert() {
@@ -2375,13 +2850,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     static weak var shared: AppDelegate?
     private var lastControlLoopLogTime: Date?
     private let controlLoopLogInterval: TimeInterval = 10.0
-    private var statsHeartbeatTimer: Timer?
-    
+    private let bgTelemetryStaleThreshold: TimeInterval = 8.0
+    private let systemAutoFallbackInterval: TimeInterval = 30.0
+    private let sensorLossSafeRPM = 2200
+    private let startupTelemetryGracePeriod: TimeInterval = 12.0
+    private let missingTelemetryTriggerCount = 3
+    private var statsHeartbeatTimer: DispatchSourceTimer?
+    private var controlLoopTimer: DispatchSourceTimer?
+    private var lastDiagLogTime: TimeInterval = 0
+    private var lastSystemAutoFallbackAt: Date?
+    private var activeSafetyAlertState: String?
+    private var launchDate = Date()
+    private var consecutiveMissingTelemetryCount = 0
+    private var lastRecordedControlStatus: String?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
+        launchDate = Date()
         NSApp.setActivationPolicy(.accessory)
         AppLog.shared.bootstrapSession()
         AppLog.shared.info("application did finish launching")
+        updateControlStatus(mode: "normal", detail: appL10n("启动完成", "Startup complete"), force: true)
 
         FanManager.shared.refreshHardwareProfile()
         let config = ConfigManager.shared.syncHardwareProfile(maxRPM: FanManager.shared.currentMaxRPM)
@@ -2407,19 +2896,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             UpdateService.shared.checkForUpdates(triggeredByUser: false)
         }
 
-        // 匿名运行反馈：启动时 flush 缓存 + 入队，之后每 15 分钟 tick（入队/批量上报）
+        // 匿名运行反馈：启动后延迟入队并尝试上报一次，之后每 15 分钟 tick（入队/批量上报）
         DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
             PrivacyStatsService.shared.startup()
         }
-        statsHeartbeatTimer?.invalidate()
-        statsHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) { _ in
-            PrivacyStatsService.shared.tick()
-        }
+        statsHeartbeatTimer?.cancel()
+        let hbTimer = DispatchSource.makeTimerSource(queue: .main)
+        hbTimer.schedule(deadline: .now() + 15 * 60, repeating: 15 * 60)
+        hbTimer.setEventHandler { PrivacyStatsService.shared.tick() }
+        hbTimer.resume()
+        statsHeartbeatTimer = hbTimer
     }
     
     func applicationWillTerminate(_ notification: Notification) {
         AppLog.shared.info("application will terminate")
-        statsHeartbeatTimer?.invalidate()
+        statsHeartbeatTimer?.cancel()
         PrivacyStatsService.shared.shutdown()
         _ = CommandExecutor.shared.setFanAuto()
     }
@@ -2460,46 +2951,181 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func startAutoControlLoop() {
-        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-            Task { @MainActor in
-                let config = ConfigManager.shared.loadConfig()
-                let curve = MenuBarManager.shared.currentFanCurve
-                let isAutoMode = config.mode == "auto"
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now() + 2.0, repeating: 2.0)
+        timer.setEventHandler { [weak self] in
+            guard let self else { return }
+            let config = ConfigManager.shared.loadConfig()
+            let curve = MenuBarManager.shared.currentFanCurve
+            let isAutoMode = config.mode == "auto"
 
-                // 从后台读取器缓存读取（不触发主线程硬件 I/O）
-                let bgReader = BackgroundHardwareReader.shared
-                let readings: [TemperatureReading] = FanManager.shared.availableTemperatureSensors.compactMap { sensor in
-                    guard let value = bgReader.temperatures[sensor.key] else { return nil }
-                    return TemperatureReading(sensor: sensor, value: value)
+            // 从后台读取器缓存读取（不触发主线程硬件 I/O）
+            let bgSnapshot = BackgroundHardwareReader.shared.snapshot
+            let bgTemps = bgSnapshot.temperatures
+            let bgRPMs = bgSnapshot.fanRPMs
+            let readings: [TemperatureReading] = FanManager.shared.availableTemperatureSensors.compactMap { sensor in
+                guard let value = bgTemps[sensor.key] else { return nil }
+                return TemperatureReading(sensor: sensor, value: value)
+            }
+            var reading: TemperatureReading?
+            if config.temperatureSourceMode == "manual", let key = config.selectedTemperatureSensorKey {
+                reading = readings.first(where: { $0.sensor.key == key })
+            } else {
+                reading = readings.max(by: { $0.value < $1.value })
+            }
+
+            let backgroundDataIsStale = (bgSnapshot.secondsSinceTemperatureSuccess ?? .infinity) > bgTelemetryStaleThreshold
+            if reading == nil || backgroundDataIsStale || bgSnapshot.consecutiveTemperatureFailures >= 3 {
+                if backgroundDataIsStale || bgSnapshot.consecutiveTemperatureFailures >= 3 {
+                    AppLog.shared.warning("control loop detected stale background telemetry bgFail=\(bgSnapshot.consecutiveTemperatureFailures) bgAge=\(bgSnapshot.secondsSinceTemperatureSuccess ?? -1)")
                 }
-                let reading: TemperatureReading?
-                if config.temperatureSourceMode == "manual", let key = config.selectedTemperatureSensorKey {
-                    reading = readings.first(where: { $0.sensor.key == key })
+                BackgroundHardwareReader.shared.refresh(
+                    sensors: FanManager.shared.availableTemperatureSensors,
+                    fans: FanManager.shared.fans
+                )
+            }
+
+            // 诊断日志：每隔 30 秒报告一次状态
+            let now = Date().timeIntervalSince1970
+            if now - lastDiagLogTime >= 30 {
+                lastDiagLogTime = now
+                let sensorKeys = FanManager.shared.availableTemperatureSensors.map(\.key)
+                let bgAgeText = bgSnapshot.secondsSinceTemperatureSuccess.map { String(format: "%.1f", $0) } ?? "nil"
+                AppLog.shared.info("ctrl diag bgTemps=\(bgTemps.count) bgRPMs=\(bgRPMs.count) sensors=\(sensorKeys.count) readings=\(readings.count) hasReading=\(reading != nil) bgFail=\(bgSnapshot.consecutiveTemperatureFailures) bgAge=\(bgAgeText)")
+            }
+
+            guard let reading else {
+                consecutiveMissingTelemetryCount += 1
+                if !FanManager.shared.availableTemperatureSensors.isEmpty {
+                    AppLog.shared.warning("ctrl loop skip: no readable temperatures sensors=\(FanManager.shared.availableTemperatureSensors.count) bgFail=\(bgSnapshot.consecutiveTemperatureFailures) missingCount=\(consecutiveMissingTelemetryCount)")
+                }
+                let withinStartupGrace = Date().timeIntervalSince(launchDate) < startupTelemetryGracePeriod
+                if withinStartupGrace {
+                    AppLog.shared.info("startup telemetry grace active missingCount=\(consecutiveMissingTelemetryCount)")
+                    return
+                }
+                if consecutiveMissingTelemetryCount < missingTelemetryTriggerCount {
+                    return
+                }
+                self.handleMissingTemperatureTelemetry(hasFanTelemetry: !bgRPMs.isEmpty)
+                return
+            }
+            consecutiveMissingTelemetryCount = 0
+            self.clearSafetyAlertState(prefix: "sensor_loss")
+            self.clearSafetyAlertState(prefix: "system_auto_fallback")
+            self.updateControlStatus(
+                mode: "normal",
+                detail: isAutoMode
+                    ? appL10n("自动 / \(reading.sensor.compactName)", "Auto / \(reading.sensor.compactName)")
+                    : appL10n("手动 / \(config.manualRPM) RPM", "Manual / \(config.manualRPM) RPM")
+            )
+
+            if isAutoMode {
+                let safetyFloorRPM = min(max(config.safetyFloorRPM ?? FanManager.shared.defaultSafetyRPM, 2000), FanManager.shared.currentMaxRPM)
+                let targetRPM = FanManager.shared.calculateFanRPM(
+                    temperature: reading.value,
+                    curve: curve,
+                    safetyFloorRPM: safetyFloorRPM
+                )
+
+                if targetRPM == -1 {
+                    self.engageSystemAutoFallback(reason: "invalid_auto_target")
                 } else {
-                    reading = readings.max(by: { $0.value < $1.value })
+                    FanManager.shared.setFanRPM(rpm: targetRPM)
                 }
-                guard let reading else { return }
-
-                if isAutoMode {
-                    let safetyFloorRPM = min(max(config.safetyFloorRPM ?? FanManager.shared.defaultSafetyRPM, 2000), FanManager.shared.currentMaxRPM)
-                    let targetRPM = FanManager.shared.calculateFanRPM(
-                        temperature: reading.value,
-                        curve: curve,
-                        safetyFloorRPM: safetyFloorRPM
-                    )
-
-                    if targetRPM == -1 {
-                        _ = CommandExecutor.shared.setFanAuto()
-                    } else {
-                        FanManager.shared.setFanRPM(rpm: targetRPM)
-                    }
-                    self.logControlLoopSummaryIfNeeded(mode: "auto", reading: reading, targetRPM: targetRPM)
-                } else {
-                    FanManager.shared.setFanRPM(rpm: config.manualRPM)
-                    self.logControlLoopSummaryIfNeeded(mode: "manual", reading: reading, targetRPM: config.manualRPM)
-                }
+                self.logControlLoopSummaryIfNeeded(mode: "auto", reading: reading, targetRPM: targetRPM)
+            } else {
+                FanManager.shared.setFanRPM(rpm: config.manualRPM)
+                self.logControlLoopSummaryIfNeeded(mode: "manual", reading: reading, targetRPM: config.manualRPM)
             }
         }
+        timer.resume()
+        self.controlLoopTimer = timer
+    }
+
+    private func handleMissingTemperatureTelemetry(hasFanTelemetry: Bool) {
+        let safeRPM = min(sensorLossSafeRPM, FanManager.shared.currentMaxRPM)
+        if FanManager.shared.fanCount > 0 && safeRPM > 0 {
+            AppLog.shared.warning("temperature telemetry missing; applying fixed fail-safe rpm=\(safeRPM) hasFanTelemetry=\(hasFanTelemetry)")
+            FanManager.shared.setFanRPM(rpm: safeRPM)
+            updateControlStatus(
+                mode: "sensor_loss_fixed_rpm",
+                detail: hasFanTelemetry
+                    ? appL10n("温度丢失 / 2200 RPM", "Temp lost / 2200 RPM")
+                    : appL10n("温度风扇信息丢失 / 2200 RPM", "Temp+fan telemetry lost / 2200 RPM")
+            )
+            let state = hasFanTelemetry ? "sensor_loss_fixed_rpm" : "sensor_loss_fixed_rpm_no_fan_telemetry"
+            let message = hasFanTelemetry
+                ? appL10n(
+                    "iFanControl 当前读不到温度，但仍能读取风扇信息。已自动将目标转速设置为 2200 RPM 作为保守兜底。",
+                    "iFanControl cannot currently read temperatures, but fan telemetry is still available. The target speed has been set to 2200 RPM as a conservative fail-safe."
+                )
+                : appL10n(
+                    "iFanControl 当前读不到温度，也暂时读不到风扇信息。已先尝试将目标转速固定到 2200 RPM；如果控制失败，会自动交还系统。",
+                    "iFanControl cannot currently read temperatures and fan telemetry is also unavailable. It is first attempting to hold the target speed at 2200 RPM; if control fails, it will automatically return control to the system."
+                )
+            showSafetyAlert(
+                state: state,
+                title: appL10n("已启用保守兜底转速", "Conservative Fail-Safe RPM Enabled"),
+                message: message
+            )
+            return
+        }
+
+        engageSystemAutoFallback(reason: hasFanTelemetry ? "no_controllable_fan_on_sensor_loss" : "no_temp_no_fan_telemetry")
+    }
+
+    private func engageSystemAutoFallback(reason: String) {
+        if let lastSystemAutoFallbackAt,
+           Date().timeIntervalSince(lastSystemAutoFallbackAt) < systemAutoFallbackInterval {
+            return
+        }
+        lastSystemAutoFallbackAt = Date()
+        AppLog.shared.warning("engaging system auto fallback reason=\(reason)")
+        recordSystemAutoFallback(reason: reason)
+        showSafetyAlert(
+            state: "system_auto_fallback_\(reason)",
+            title: appL10n("风扇控制已交还系统", "Fan Control Returned to System"),
+            message: appL10n(
+                "iFanControl 当前无法可靠获取必要的硬件信息或维持安全控制，已自动将风扇控制权交还给系统。",
+                "iFanControl can no longer reliably obtain the required hardware telemetry or maintain safe control, so fan control has been returned to the system automatically."
+            )
+        )
+        CommandExecutor.shared.setFanAutoAsync()
+    }
+
+    func showSafetyAlert(state: String, title: String, message: String) {
+        if activeSafetyAlertState == state {
+            return
+        }
+        activeSafetyAlertState = state
+
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: appL10n("知道了", "OK"))
+        alert.runModal()
+    }
+
+    private func clearSafetyAlertState(prefix: String) {
+        if activeSafetyAlertState?.hasPrefix(prefix) == true {
+            activeSafetyAlertState = nil
+        }
+    }
+
+    private func updateControlStatus(mode: String, detail: String, force: Bool = false) {
+        let signature = "\(mode)|\(detail)"
+        if !force && lastRecordedControlStatus == signature {
+            return
+        }
+        lastRecordedControlStatus = signature
+        ControlStatusStore.save(mode: mode, detail: detail)
+        MenuBarManager.shared.updateDynamicMenuItems()
+    }
+
+    func recordSystemAutoFallback(reason: String) {
+        updateControlStatus(mode: "system_auto_fallback", detail: reason, force: true)
     }
 
     private func logControlLoopSummaryIfNeeded(mode: String, reading: TemperatureReading, targetRPM: Int) {
@@ -2970,20 +3596,13 @@ final class FeedbackService: @unchecked Sendable {
         let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
         let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
 
-        // 取出所有待上报的心跳事件，顺便带上报
-        let pendingEvents = PrivacyStatsService.shared.dequeueAllPendingEvents()
-        let eventDicts = pendingEvents.map { ["ts": $0.ts, "type": $0.type] as [String: Any] }
-
-        var payload: [String: Any] = [
+        let payload: [String: Any] = [
             "install_id": installID,
             "content": content,
             "email": email,
             "version": shortVersion,
             "build": buildVersion,
         ]
-        if !eventDicts.isEmpty {
-            payload["events"] = eventDicts
-        }
 
         do {
             var request = URLRequest(url: endpointURL)
@@ -2995,17 +3614,11 @@ final class FeedbackService: @unchecked Sendable {
             let (_, response) = try await URLSession.shared.upload(for: request, from: body)
 
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                if !pendingEvents.isEmpty {
-                    PrivacyStatsService.shared.requeueEvents(pendingEvents)
-                }
                 return false
             }
             recordSend()
             return true
         } catch {
-            if !pendingEvents.isEmpty {
-                PrivacyStatsService.shared.requeueEvents(pendingEvents)
-            }
             return false
         }
     }
