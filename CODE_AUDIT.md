@@ -135,6 +135,79 @@ refreshHardwareProfile()
 - 如果原始代码工作正常，改动后出问题，先撤回改动再分析
 - 理论上的改进 != 实际上的改进
 
+## 7. `const` 暂时性死区（TDZ）被 catch 吞掉，显示为"网络异常"
+
+**场景**：用户详情页活跃日历重写时，`const daysToRender` 在声明前被使用（同一函数作用域内，声明在第 330 行，使用在第 317 行）。JavaScript 的 `const`/`let` 存在暂时性死区，访问时抛出 `ReferenceError`。
+
+**错误表现**：该错误被上层 `loadUserData` 的 `catch` 块捕获，显示为"网络异常，请稍后重试"，与真实网络错误无法区分，误导调试方向。
+
+**根因**：编辑时移动了 `chartHeight` 计算到 `daysToRender` 声明之前，未注意 TDZ 约束。
+
+**教训**：
+- `const`/`let` 声明不会像 `var` 那样提升到作用域顶部，必须在使用前声明
+- 当 catch 块显示"网络异常"时，应先检查 `renderAll()` 内部是否抛出异常，而非只看 fetch 请求
+- 编辑代码时移动代码块的位置要检查变量声明顺序
+
+---
+
+## 8. NSStatusBarButton 不支持多行文字
+
+**时间**：2026-05-04 build 43 迷你模式开发
+
+**尝试方案**：用 `attributedTitle` + `\n` 换行显示两行文字
+
+**结果**：第二行被裁剪，完全不可见。`baselineOffset` 调整导致第一行也消失。
+
+**正确方案**：改用 `NSBitmapImageRep` 渲染文字为图片，设置 `button.image` + `button.imagePosition = .imageOnly`
+
+**教训**：
+- macOS 的 `NSStatusBarButton` 与普通 `NSButton` 行为不同，内部有裁剪限制
+- 菜单栏自定义显示走图片路线更可靠
+
+---
+
+## 9. `monospacedDigitSystemFont` 空格与数字宽度不一致
+
+**时间**：2026-05-04 build 43 迷你模式对齐
+
+**尝试方案**：测量两行宽度，给短行补前导空格使宽度一致
+
+**结果**：空格（`U+0020`）宽度与数字不同，补空格后两行视觉上仍然不等宽，转速"靠右"。
+
+**正确方案**：放弃空间填充，改为每行独立居中（`padding + (maxWidth - lineWidth) / 2`）
+
+**教训**：
+- `monospacedDigitSystemFont` 只保证数字等宽，不保证空格与数字等宽
+- 需要文字对齐时，用坐标计算替代空格填充
+
+---
+
+## 10. AppKit 坐标系非翻转，y=0 在底部
+
+**时间**：2026-05-04 build 43 迷你模式垂直定位
+
+**错误操作**：想把文字往下挪，却把 y 值增加了 1px（实际往上挪）
+
+**正确理解**：`NSBitmapImageRep` 使用 AppKit 默认坐标系，y=0 是底部，y 增加向上。想把文字往下挪应减少 y 值。
+
+**教训**：
+- AppKit（macOS）与 UIKit（iOS）坐标系相反：AppKit y=0 在底部，UIKit y=0 在顶部
+- 调整位置时先确认坐标系方向
+
+---
+
+## 11. ControlStatusStore.load() 首次启动返回 nil
+
+**时间**：2026-05-04 build 43 迷你模式颜色判断
+
+**错误操作**：`isAbnormal = snapshot?.mode != "normal"`，当 `snapshot` 为 nil 时返回 true，导致首次启动 A/M 显示红色
+
+**正确判断**：`snapshot != nil && snapshot?.mode != "normal"`
+
+**教训**：
+- Optional 与 nil 比较时，nil 不等于任何字符串，但不意味着"异常"
+- 首次启动场景（数据尚未写入）应作为正常状态处理
+
 ---
 
 ## 总结
@@ -145,3 +218,7 @@ refreshHardwareProfile()
 4. **区分确信度** — 报告问题时标明 certainty level
 5. **不依赖文件大小校验** — SHA256 足够，CDN 会改字节数
 6. **不要预防性加固** — 理论改进可能引入实际问题，先撤回再分析
+7. **菜单栏自定义走图片** — NSStatusBarButton 不支持多行文字，用 NSBitmapImageRep 渲染
+8. **等宽字体不保证空格等宽** — 需要对齐时用坐标计算，不补空格
+9. **AppKit y=0 在底部** — 与 UIKit 相反，调位置前确认坐标系
+10. **Optional nil ≠ 异常** — 首次启动无数据时应视为正常状态

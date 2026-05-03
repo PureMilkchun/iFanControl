@@ -1,9 +1,151 @@
 # iFanControl 时间戳记忆
 
-关联固定记忆：`/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_MEMORY.md`  
+关联固定记忆：`/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_MEMORY.md`
 读取建议：先读固定记忆，再读本文件，用本文件补足最近发生的变化。
 
+## 2026-05-04
+
+### 2026-05-04 — v2.9.7 / build 43 发布（迷你双行显示模式）
+
+- **迷你双行显示模式**：菜单栏可显示两行紧凑信息，大幅减少横向占用
+  - 上行：转速数字（如 `1204`）
+  - 下行：温度｜模式字母（如 `45｜A`）
+  - 颜色编码：A/M 正常时绿色，异常状态红色
+  - 技术实现：`renderMiniStatusImage()` 渲染 NSBitmapImageRep 为图片（NSStatusBarButton 不支持多行文字）
+  - 上下两行独立居中，避免 monospacedDigitSystemFont 中空格与数字宽度不同导致的对齐问题
+- **菜单栏布局优化**：重新排布菜单分组（控制→设置→帮助→反馈→退出）
+- **温度源选中态修复**：修复选择特定温度源后"自动选择（最热）"仍显示勾选的 bug
+- **控制状态卡片颜色编码**：正常（绿色）、2200 RPM 兜底（红色）、已交还系统（橙色）
+- **菜单宽度收窄**：整体菜单更窄，减少屏幕占用
+- **发布渠道同步**：GitHub Release、官网 ZIP、update-manifest.json、timeline.json 已同步到 build 43
+
+## 2026-05-03
+
+### 2026-05-03 — v2.9.6 / build 42 发布（菜单布局优化）
+
+- **菜单分组重排**：控制项（自动/手动、风扇曲线、温度源）在顶部，设置项（安全转速、开机自启）在中部，帮助/反馈/退出在底部
+- **温度源选中态修复**：`hottestItem` 改为实例变量，`updateDynamicMenuItems()` 正确更新选中态
+- **控制状态卡片重设计**：字段标签改为"控制状态"/"状态刷新"，底部左侧显示状态值（粗体彩色），右侧显示时间
+- **菜单收窄**：移除冗余间距，整体更紧凑
+- **发布渠道同步**：GitHub Release、官网 ZIP、update-manifest.json、timeline.json 已同步到 build 42
+
+### 2026-05-03 — v2.9.5 / build 41 发布（信息栏展示设置）
+
+- **信息栏展示设置**：菜单新增「信息栏展示」子菜单，支持「完整」和「简洁」两种模式
+  - 完整模式：保留原有 `65℃ | 2400 RPM [Auto] 🔥` 样式
+  - 简洁模式：`53｜981｜A`，无单位显示，全角竖线分隔，模式只显示首字母
+  - 偏好存 `UserDefaults("ifancontrol.ui.display_mode")`，切换即时生效，无需重启
+- **统计后台改进**：
+  - 用户详情页「首次出现时间」从纯日期改为显示具体时间戳（`toLocaleString`）
+  - 累计下载卡片新增「今日 +X」小字显示，复用用户卡片样式
+  - 后端 `summary.js` 新增 `today_downloads` 字段，从 `daily[daily.length - 1].downloads` 取今日下载数
+- **每周升级公告规范**：新建 `ANNOUNCEMENT_SPEC.md`，记录公告格式模板、数据统计获取方式、叙述口径
+- **发布**：ZIP + 官网 + update-manifest.json + GitHub Release 四项同步
+- 涉及文件：`Sources/MacFanControl/main.swift`、`ifan-stats/user.js`、`ifan-stats/app.js`、`ifan-stats/functions/api/dashboard/summary.js`、`docs/update-manifest.json`、`docs/timeline.json`
+
+## 2026-05-02
+
+### 2026-05-02 — 用户详情页 + 活跃日历重设计
+
+- **用户详情页**：新建 `user.html?id=N`，深度展示单用户数据
+  - 卡片：用户编号、使用时长排名、首次出现、在线状态、等效使用时长、活跃天数、最长连续活跃、留存率
+  - 活跃日历：≤30 天用水平条纹视图（自适应条形图 + X 轴刻度 + 网格线），"全部"保留 GitHub 周网格
+  - 活跃时段：折线图 + Canvas hover tooltip（时段 + 桶数）
+  - 版本升级时间线（HTML/CSS）、用户反馈表格、用户故事叙事
+  - 用户快速切换：顶栏 `←` / `→` 箭头 + 下拉选择器
+- **后端 API**：
+  - `GET /api/dashboard/user?id=N`：单用户全维度聚合数据（bucket_activity + flags + feedback）
+  - `GET /api/dashboard/users`：用户列表 + total_buckets（两条 batch 查询，JS 层合并，避免 D1 子查询超时）
+- **主页入口**：用户筛选旁新增「详情」按钮，选中用户后显示
+- **主页改进**：累计用户量卡片显示「今日 +N」新增用户数（`today_new_users` 字段）
+- **SPA 式切换**：`history.pushState` + `sessionStorage` 缓存用户列表，切换只需 1 次 fetch
+- **Bug 修复**：
+  - 热力日历列数：`cols = Math.ceil(days.length / 7)` 未考虑 firstDow
+  - `daysToRender` TDZ：`const` 变量在声明前使用导致 `ReferenceError`，被 catch 吞掉显示为"网络异常"
+  - D1 查询超时：users.js 子查询全表扫描导致超时，拆为 batch 并行
+- **UI 精简**：卡片从 16 个精简为 8 个（2 组）；移动端卡片改为每行 2 个
+- 涉及文件：`ifan-stats/user.html`、`ifan-stats/user.js`、`ifan-stats/index.html`、`ifan-stats/app.js`、`ifan-stats/styles.css`、`ifan-stats/functions/api/dashboard/user.js`、`ifan-stats/functions/api/dashboard/users.js`、`ifan-stats/functions/api/dashboard/summary.js`
+
+## 2026-05-01
+
+### 2026-05-01 — 统计后台暗色模式
+
+- **暗色模式**：统计后台新增手动主题切换，顶栏 pill 按钮（🌙/☀），偏好存 `localStorage("ifan_theme")`
+  - CSS：`[data-theme="dark"]` 变量覆盖 + 选择器覆盖（面板 `#1a1a1e`、卡片 `#242428`、文字 `#e8e6e1`、输入框 `#2a2a2e`）
+  - 新增 4 个 Canvas CSS 变量：`--chart-bg`、`--chart-grid`、`--chart-axis`、`--chart-tick`
+  - JS：`getChartColors()` 读取 CSS 变量同步 Canvas 绘图；饼图双色调色板 `PIE_PALETTE_LIGHT` / `PIE_PALETTE_DARK`
+  - `drawXAxisLabels()`、`drawHover()`、`drawPie()` 新增 colors/palette 参数
+  - 防闪烁：`<head>` 内联脚本，首屏前设置 `data-theme`
+- **饼图对比度修复**：暗色模式下浅色切片文字从 `#e8e6e1` 改为 `#1a1a1e`，解决最大切片可读性问题
+- **收工流程写入 CLAUDE.md**：新增「收工流程」章节，规定用户说收工时自动更新 PROJECT_TIMELINE / PROJECT_MEMORY / CLAUDE.md / CODE_AUDIT.md 等文档
+- 涉及文件：`ifan-stats/index.html`、`ifan-stats/styles.css`、`ifan-stats/app.js`、`macfan-control-v2/CLAUDE.md`
+- 已部署到 Cloudflare Pages（`ifan-stats`）
+
 ## 2026-04-28
+
+## 2026-04-30
+
+### 2026-04-30 — 心跳事件计数逻辑修复 + 历史数据重算
+
+- **`heartbeat.js` 计数逻辑修复**：`daily:${day}:events` 原先按 15 分钟桶去重后累加（`uniqueBuckets`），语义混乱且有重复计数风险；改为遍历原始 `events` 数组，按天累加真实事件数
+- **历史数据一次性迁移**：通过 `bucket_activity` 表按天聚合重算所有 `daily:*:events` 计数器，临时迁移脚本（`recalc-events.js`）已用完删除
+- 两个项目均已部署（`ifan` + `ifan-stats`）
+
+### 2026-04-30 — 统计后台趋势图改为累计曲线 + CLAUDE.md 创建
+
+- **30 天趋势图改为累计增长曲线**：折线不再展示每日快照，改为累计下载量和累计去重用户数的增长趋势
+  - 后端新增查询 `install:*` flags（用户首次出现时间），按日期分组得到每日新增用户数，附加到 daily 响应的 `new_unique` 字段
+  - 前端将每日 `downloads` 和 `new_unique` 累加后再绘制折线
+  - 浮窗（tooltip）同步改为显示"累计下载"和"累计用户"数值
+  - Y 轴最大值以全部去重用户数为上限，与卡片数字对齐
+  - 涉及文件：`ifan-stats/functions/api/dashboard/summary.js`（后端）、`ifan-stats/app.js`（前端）
+- **CLAUDE.md 创建**：项目根目录新增 `CLAUDE.md`，Claude Code 每次新会话自动加载，内容为项目红线 + 操作地图，核心价值是防止 Claude 自作聪明
+- **Claude Code hooks 配置**：在 `~/.claude/settings.json` 新增 Notification 和 Stop 两个 hook，分别播放 Glass/Ping 音效并弹出 macOS 通知
+
+### 2026-04-30 — 用户编号系统 + 活跃趋势多维度筛选
+
+- **用户编号系统（user_index 表）**：为每个 install_hash 分配递增短编号（#1、#2、#3...），持久化到 D1
+  - 新增 `user_index` 表（id 自增 PK、install_hash UNIQUE、first_seen）
+  - `docs/functions/api/heartbeat.js`：新安装时 INSERT OR IGNORE 写入 user_index；首次请求时从 `install:*` flags 批量回填存量用户
+  - `ifan-stats/functions/api/dashboard/summary.js`：查询 user_index 全表，响应新增 `user_index` 字段
+  - 存量回填：15 个用户全部按首次出现时间顺序分配编号（#1: 2026-04-26 ~ #15: 2026-04-29）
+- **活跃趋势多维度筛选器**：活跃趋势图上方新增版本/用户编号筛选栏
+  - `summary.js`：解析 `filter_version` 和 `filter_user_id` 参数，动态拼接 bucket_activity 和 version_breakdown 的 SQL WHERE 条件
+  - `app.js`：`populateFilters()` 从 API 返回的 version_list 和 user_index 构建下拉选项；用户选项显示 `#N (首次: YYYY-MM-DD)`
+  - `index.html`：panel-title 内新增 `.filter-bar`（版本下拉 + 用户下拉 + 清除筛选按钮）
+  - `styles.css`：新增 `.filter-bar`（inline-flex + flex-wrap），`.panel-title` 加 flex-wrap 支撑三组子元素
+  - 单用户模式 tooltip 显示「#N 活跃：是/否」替代「活跃用户：N」
+  - 版本和用户筛选可叠加使用
+
+## 2026-04-29
+
+### 2026-04-29 — 统计后台前端 UI 优化
+
+- **饼图深色切片文字可见性修复**：用 BT.601 亮度阈值（0.35）自动判断切片深浅，深色切片（#1c1c1c、#3e3329、#5d4b38）始终使用白色文字，hover 状态不再变黑导致不可见
+- **用户反馈隐藏归档按钮**：标题栏新增 pill 按钮，点击可切换显示/隐藏已勾选的归档条目，状态存 localStorage `ifan_feedback_hide_archived`
+- **30 天趋势图优化**：过滤掉全零天数，底部新增日期标签（最多 6 个均匀分布，格式 MM-DD）
+- **30 天明细表优化**：隐藏全零行，日期由近至远排列（今天在最上面）
+- 涉及文件：`ifan-stats/app.js`、`ifan-stats/index.html`、`ifan-stats/styles.css`
+
+### 2026-04-29 — v2.9.5 / build 40 发布（关屏稳定性与控制状态可观测性）
+
+- **关屏 / 无显示器场景稳定性提升**：围绕后台遥测、控制循环与安全兜底补强，降低关屏后风扇控制失效风险
+- **安全策略分层化**：温度遥测缺失时优先进入 2200 RPM 保守兜底，只有在控制能力本身也不可靠时才交还系统
+- **冷启动误报修复**：加入启动宽限期与连续失败门槛，避免应用刚启动就误判异常并弹窗
+- **控制状态可观测性增强**：菜单中新增最近控制状态展示，亮屏后可回看是否处于正常控制、2200 RPM 兜底或已交还系统
+- **风扇曲线默认值更新**：重置默认曲线改为当前预设 A
+- **发布渠道同步**：GitHub Release、官网 ZIP、update-manifest.json、timeline.json 已同步到 build 40
+- **公开文案口径修正**：心跳 / 后台统计相关改动对外统一归为“修复若干问题，提升整体稳定性”；其他用户可感知改动继续正常写明
+
+### 2026-04-29 — build 40 心跳修复第一阶段 + 灰度发布
+
+- **首次上线补发修复**：当前 build 未收到 heartbeat 成功确认时，后续 `tick()` 会持续补发，不再只赌启动时那一次发送
+- **队列版本归属修复**：本地心跳事件开始携带自身 `version/build`，更新后旧积压事件不再被当前版本吞掉
+- **反馈链路解耦**：反馈不再顺带携带或清空心跳队列，避免误删事件
+- **灰度策略**：直接替换 build 40 的官网 ZIP 与 GitHub ZIP 资产，不增加新 build
+- **公开文案策略**：
+  - `update-manifest.json` 继续使用“修复若干问题，提升整体稳定性”
+  - GitHub Release 与官网时间线对心跳相关改动保持泛化，但保留关屏稳定性、控制状态显示、启动误报修复等非心跳类具体说明
 
 ### 2026-04-28 — 统计后台版本分布面板重构
 
