@@ -1880,6 +1880,7 @@ class MenuBarManager {
     }
     private var displayFullItem: NSMenuItem?
     private var displayCompactItem: NSMenuItem?
+    private var displayMiniItem: NSMenuItem?
     
     private var speedSettingWindowController: SpeedSettingWindowController?
     private var safetyFloorWindowController: SafetyFloorWindowController?
@@ -2225,6 +2226,10 @@ class MenuBarManager {
         compactItem.target = self
         displayMenu.addItem(compactItem)
         self.displayCompactItem = compactItem
+        let miniItem = NSMenuItem(title: appL10n("迷你：两行显示", "Mini: Two Lines"), action: #selector(switchToMiniDisplay), keyEquivalent: "")
+        miniItem.target = self
+        displayMenu.addItem(miniItem)
+        self.displayMiniItem = miniItem
         menu.setSubmenu(displayMenu, for: displayItem)
         menu.addItem(displayItem)
 
@@ -2327,9 +2332,32 @@ class MenuBarManager {
 
         // 状态栏标题
         if displayMode == "compact" {
+            statusItem.button?.imagePosition = .noImage
             let modeLetter = isAutoMode ? "A" : "M"
             statusItem.button?.title = "\(String(format: "%.0f", currentTemperature))｜\(currentFanRPM)｜\(modeLetter)"
+            statusItem.button?.image = nil
+        } else if displayMode == "mini" {
+            let modeLetter = isAutoMode ? "A" : "M"
+            let tempStr = String(format: "%.0f", currentTemperature)
+
+            let snapshot = ControlStatusStore.load()
+            let isAbnormal = snapshot != nil && snapshot?.mode != "normal"
+            let modeColor: NSColor = isAbnormal ? .systemRed : .systemGreen
+
+            let img = renderMiniStatusImage(
+                topText: "\(currentFanRPM)",
+                bottomTempText: "\(tempStr)｜",
+                bottomModeText: modeLetter,
+                modeColor: modeColor
+            )
+            statusItem.button?.image = img
+            statusItem.button?.imagePosition = .imageOnly
+            statusItem.button?.title = ""
+            statusItem.length = img.size.width
+
+            statusItem.button?.toolTip = "\(currentFanRPM) RPM | \(tempStr)℃ [\(isAutoMode ? "Auto" : "Manual")]"
         } else {
+            statusItem.button?.imagePosition = .noImage
             let temperatureText = String(format: "%.0f℃", currentTemperature)
             let fanText = "\(currentFanRPM) RPM"
             let modeText = isAutoMode ? "[Auto]" : "[Manual]"
@@ -2339,11 +2367,13 @@ class MenuBarManager {
             } else if currentTemperature >= 85.0 {
                 statusIcon = " ⚠️"
             }
+            statusItem.button?.image = nil
             statusItem.button?.title = "\(temperatureText) | \(fanText) \(modeText)\(statusIcon)"
         }
         // 信息栏展示菜单选中态
-        displayFullItem?.state = (displayMode == "compact") ? .off : .on
+        displayFullItem?.state = (displayMode == "full") ? .on : .off
         displayCompactItem?.state = (displayMode == "compact") ? .on : .off
+        displayMiniItem?.state = (displayMode == "mini") ? .on : .off
 
         // 硬件信息
         hardwareItem?.title = FanManager.shared.fanCount > 0 ?
@@ -2505,6 +2535,76 @@ class MenuBarManager {
         )
     }
 
+    private func renderMiniStatusImage(
+        topText: String,
+        bottomTempText: String,
+        bottomModeText: String,
+        modeColor: NSColor
+    ) -> NSImage {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .bold)
+        let attrs: [NSAttributedString.Key: Any] = [.font: font]
+
+        // 测量每行实际宽度
+        let topWidth = (topText as NSString).size(withAttributes: attrs).width
+        let tempWidth = (bottomTempText as NSString).size(withAttributes: attrs).width
+        let modeWidth = (bottomModeText as NSString).size(withAttributes: attrs).width
+        let bottomWidth = tempWidth + modeWidth
+        let maxWidth = max(topWidth, bottomWidth)
+
+        // 图片尺寸
+        let lineHeight: CGFloat = 11
+        let padding: CGFloat = 4
+        let imageWidth = maxWidth + padding * 2
+        let imageHeight: CGFloat = 26
+        let imageSize = NSSize(width: imageWidth, height: imageHeight)
+
+        // Retina 感知
+        let scale = NSScreen.main?.backingScaleFactor ?? 2.0
+        let bitmap = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: Int(imageWidth * scale),
+            pixelsHigh: Int(imageHeight * scale),
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .calibratedRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        )!
+        bitmap.size = imageSize
+
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+
+        // 每行独立居中
+        let topX = padding + (maxWidth - topWidth) / 2
+        let bottomX = padding + (maxWidth - bottomWidth) / 2
+
+        // 上行：转速
+        (topText as NSString).draw(at: NSPoint(x: topX, y: lineHeight + 1), withAttributes: [
+            .font: font,
+            .foregroundColor: NSColor.labelColor
+        ])
+
+        // 下行：温度 + 模式字母
+        (bottomTempText as NSString).draw(at: NSPoint(x: bottomX, y: 1), withAttributes: [
+            .font: font,
+            .foregroundColor: NSColor.labelColor
+        ])
+        (bottomModeText as NSString).draw(at: NSPoint(x: bottomX + tempWidth, y: 1), withAttributes: [
+            .font: font,
+            .foregroundColor: modeColor
+        ])
+
+        NSGraphicsContext.restoreGraphicsState()
+
+        let image = NSImage(size: imageSize)
+        image.addRepresentation(bitmap)
+        image.isTemplate = false
+        return image
+    }
+
     /// 完全重建菜单（仅在语言切换等需要重建结构时调用）
     func updateMenu() {
         buildMenuOnce()
@@ -2650,11 +2750,21 @@ class MenuBarManager {
 
     @objc func switchToFullDisplay() {
         displayMode = "full"
+        statusItem?.button?.font = nil
+        statusItem?.length = NSStatusItem.variableLength
         updateDynamicMenuItems()
     }
 
     @objc func switchToCompactDisplay() {
         displayMode = "compact"
+        statusItem?.button?.font = nil
+        statusItem?.length = NSStatusItem.variableLength
+        updateDynamicMenuItems()
+    }
+
+    @objc func switchToMiniDisplay() {
+        displayMode = "mini"
+        statusItem?.length = NSStatusItem.variableLength
         updateDynamicMenuItems()
     }
 
