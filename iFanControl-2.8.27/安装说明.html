@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iFanControl - 安装指南</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header img {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 15px;
+            border-radius: 18px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .lang-toggle {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s;
+        }
+
+        .lang-toggle:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .header-wrapper {
+            position: relative;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .section-title h2 {
+            font-size: 18px;
+            color: #333;
+        }
+
+        .section-title .subtitle {
+            font-size: 12px;
+            color: #888;
+            margin-left: 10px;
+        }
+
+        .step {
+            display: flex;
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        .step-number {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            flex-shrink: 0;
+            margin-right: 15px;
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-content h3 {
+            font-size: 15px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .step-content .en {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .code-block {
+            background: #1e1e1e;
+            border-radius: 10px;
+            padding: 15px;
+            position: relative;
+            margin-top: 10px;
+        }
+
+        .code-block code {
+            color: #d4d4d4;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            word-break: break-all;
+            white-space: pre-wrap;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #4a4a4a;
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: background 0.3s;
+        }
+
+        .copy-btn:hover {
+            background: #5a5a5a;
+        }
+
+        .copy-btn.copied {
+            background: #28a745;
+        }
+
+        .tip {
+            background: #f0f7ff;
+            border-left: 4px solid #667eea;
+            padding: 12px 15px;
+            border-radius: 0 8px 8px 0;
+            margin-top: 15px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .tip strong {
+            color: #667eea;
+        }
+
+        .warning {
+            background: #fff8e6;
+            border-left: 4px solid #f0ad4e;
+            padding: 12px 15px;
+            border-radius: 0 8px 8px 0;
+            margin-top: 15px;
+            font-size: 13px;
+            color: #856404;
+        }
+
+        .warning strong {
+            color: #d9534f;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            border: 2px solid #667eea;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .highlight-box .icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
+        .highlight-box h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .faq {
+            margin-top: 30px;
+            border-top: 1px solid #eee;
+            padding-top: 25px;
+        }
+
+        .faq h2 {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .faq-item {
+            margin-bottom: 15px;
+        }
+
+        .faq-item summary {
+            cursor: pointer;
+            font-size: 14px;
+            color: #333;
+            padding: 10px 0;
+            font-weight: 500;
+        }
+
+        .faq-item summary::-webkit-details-marker {
+            color: #667eea;
+        }
+
+        .faq-item .answer {
+            padding: 10px 0 10px 15px;
+            font-size: 13px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-outline {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .btn-outline:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .download-section {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid #eee;
+        }
+
+        .download-section .zh {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .download-section .en {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .alt-method {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px dashed #ddd;
+        }
+
+        .alt-method summary {
+            font-size: 13px;
+            color: #888;
+            cursor: pointer;
+        }
+
+        .alt-method .content {
+            padding: 15px 0 0 0;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                border-radius: 15px;
+            }
+
+            .header {
+                padding: 30px 20px;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-wrapper">
+            <button class="lang-toggle" onclick="toggleLang()">EN / 中文</button>
+            <div class="header">
+                <img src="icon.png" alt="iFanControl Icon" onerror="this.style.display='none'">
+                <h1 class="zh">iFanControl</h1>
+                <h1 class="en" style="display:none">iFanControl</h1>
+                <p class="zh">适用于 Apple Silicon Mac 的简洁风扇控制应用</p>
+                <p class="en" style="display:none">A simple fan control app for Apple Silicon Macs</p>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="section-title">
+                <h2 class="zh">安装步骤</h2>
+                <h2 class="en" style="display:none">Installation Steps</h2>
+                <span class="subtitle zh">共 3 步</span>
+                <span class="subtitle en" style="display:none">3 steps total</span>
+            </div>
+
+            <!-- Step 1 -->
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <h3 class="zh">解压下载的 ZIP 文件</h3>
+                    <h3 class="en" style="display:none">Unzip the downloaded file</h3>
+                    <p class="zh">双击 ZIP 文件解压到「下载」文件夹</p>
+                    <p class="en" style="display:none">Double-click the ZIP to extract it to Downloads folder</p>
+                    
+                    <div class="warning">
+                        <strong class="zh">⚠ 重要：</strong>
+                        <span class="zh">解压后会看到一个文件夹，里面有多个文件，不要只移动单个文件！</span>
+                        <strong class="en" style="display:none">⚠ Important: </strong>
+                        <span class="en" style="display:none">After unzipping, you'll see a folder with multiple files. Don't move individual files!</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <h3 class="zh">打开终端，拖入 install.sh</h3>
+                    <h3 class="en" style="display:none">Open Terminal, drag in install.sh</h3>
+                    
+                    <div class="highlight-box">
+                        <div class="icon">🖱️</div>
+                        <h3 class="zh">拖进去 → 回车 → 完成</h3>
+                        <h3 class="en" style="display:none">Drag in → Press Enter → Done</h3>
+                        <p class="zh">不需要输入路径，不需要记命令</p>
+                        <p class="en" style="display:none">No paths to type, no commands to remember</p>
+                    </div>
+
+                    <p class="zh" style="margin-top: 15px;">打开「终端」应用（按 <code>⌘ + 空格</code> 搜索"终端"），然后：</p>
+                    <p class="en" style="margin-top: 15px; display:none;">Open "Terminal" app (press <code>⌘ + Space</code> and search "Terminal"), then:</p>
+                    
+                    <ol style="margin: 10px 0; padding-left: 20px; font-size: 14px; color: #555;">
+                        <li class="zh">找到解压后的文件夹中的 <code>install.sh</code> 文件</li>
+                        <li class="en" style="display:none">Find the <code>install.sh</code> file in the extracted folder</li>
+                        <li class="zh">将 <code>install.sh</code> 拖入终端窗口</li>
+                        <li class="en" style="display:none">Drag <code>install.sh</code> into the Terminal window</li>
+                        <li class="zh">按回车执行</li>
+                        <li class="en" style="display:none">Press Enter to run</li>
+                    </ol>
+
+                    <div class="tip">
+                        <strong class="zh">💡 密码提示：</strong>
+                        <span class="zh">安装过程中会要求输入密码。输入时屏幕上不会显示任何字符（包括星号），这是正常的！直接输入密码后按回车即可。</span>
+                        <strong class="en" style="display:none">💡 Password tip: </strong>
+                        <span class="en" style="display:none">During installation, you'll be asked for your password. Nothing will appear on screen when typing (not even asterisks) - this is normal! Just type your password and press Enter.</span>
+                    </div>
+
+                    <div class="warning">
+                        <strong class="zh">⚠ 请不要双击 Install.command：</strong>
+                        <span class="zh">从网络下载后，`.command` 文件可能被 macOS 持续拦截。请始终使用“拖拽 install.sh 到终端”的方式安装。</span>
+                        <strong class="en" style="display:none">⚠ Avoid double-clicking Install.command: </strong>
+                        <span class="en" style="display:none">After downloading from the internet, `.command` files may be repeatedly blocked by macOS. Always install by dragging `install.sh` into Terminal.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: First Run -->
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <h3 class="zh">首次打开应用</h3>
+                    <h3 class="en" style="display:none">First time opening the app</h3>
+                    <p class="zh">安装完成后，打开「应用程序」文件夹，双击 <strong>iFanControl.app</strong></p>
+                    <p class="en" style="display:none">After installation, open Applications folder and double-click <strong>iFanControl.app</strong></p>
+                    
+                    <div class="tip">
+                        <strong class="zh">💡 首次打开提示：</strong>
+                        <span class="zh">如果 macOS 显示安全警告，请前往「系统设置 → 隐私与安全性」，点击「仍要打开」。</span>
+                        <strong class="en" style="display:none">💡 First launch tip: </strong>
+                        <span class="en" style="display:none">If macOS shows a security warning, go to "System Settings → Privacy & Security" and click "Open Anyway".</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FAQ -->
+            <div class="faq">
+                <h2>
+                    <span class="zh">常见问题</span>
+                    <span class="en" style="display:none">FAQ</span>
+                </h2>
+
+                <details class="faq-item">
+                    <summary class="zh">Q: 拖入终端后没有反应？</summary>
+                    <summary class="en" style="display:none">Q: Nothing happens after dragging to Terminal?</summary>
+                    <div class="answer">
+                        <span class="zh">请确保已正确解压 ZIP 文件，并且拖入的是 install.sh 文件。拖入后需要按回车键执行。</span>
+                        <span class="en" style="display:none">Make sure you've properly unzipped the ZIP file and dragged the install.sh file. You need to press Enter after dragging.</span>
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary class="zh">Q: 显示"应用已损坏"怎么办？</summary>
+                    <summary class="en" style="display:none">Q: App shows "damaged" error?</summary>
+                    <div class="answer">
+                        <span class="zh">这是 macOS 安全机制。安装脚本会自动处理。如果仍有问题，可运行诊断工具 diagnose.sh 检查。</span>
+                        <span class="en" style="display:none">This is macOS security. The install script handles it automatically. If issues persist, run diagnose.sh to check.</span>
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary class="zh">Q: 为什么双击 Install.command 一直被拦截？</summary>
+                    <summary class="en" style="display:none">Q: Why is Install.command repeatedly blocked?</summary>
+                    <div class="answer">
+                        <span class="zh">这是下载来源触发的 Gatekeeper 行为。请改用推荐路径：打开终端，拖入 <code>install.sh</code>，按回车执行。</span>
+                        <span class="en" style="display:none">This is expected Gatekeeper behavior for internet downloads. Use the recommended path: open Terminal, drag <code>install.sh</code> in, and press Enter.</span>
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary class="zh">Q: 重启后需要重新输入密码？</summary>
+                    <summary class="en" style="display:none">Q: Need to re-enter password after restart?</summary>
+                    <div class="answer">
+                        <span class="zh">当前版本已修复此问题。安装时只需输入一次密码，之后即可免密运行。</span>
+                        <span class="en" style="display:none">Current versions already fix this. You only need to enter your password once during installation.</span>
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary class="zh">Q: 如何卸载？</summary>
+                    <summary class="en" style="display:none">Q: How to uninstall?</summary>
+                    <div class="answer">
+                        <span class="zh">打开终端 → 将 <code>uninstall.sh</code> 拖入终端 → 按回车</span>
+                        <span class="en" style="display:none">Open Terminal → Drag <code>uninstall.sh</code> into Terminal → Press Enter</span>
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary class="zh">Q: 如何检查安装状态？</summary>
+                    <summary class="en" style="display:none">Q: How to check installation status?</summary>
+                    <div class="answer">
+                        <span class="zh">打开终端 → 将 <code>diagnose.sh</code> 拖入终端 → 按回车</span>
+                        <span class="en" style="display:none">Open Terminal → Drag <code>diagnose.sh</code> into Terminal → Press Enter</span>
+                    </div>
+                </details>
+            </div>
+
+
+        </div>
+
+        <div class="download-section">
+            <p class="zh">尚未下载？前往 GitHub Releases 获取最新版本</p>
+            <p class="en" style="display:none">Not downloaded yet? Get the latest version from GitHub Releases</p>
+            <a href="https://github.com/PureMilkchun/iFanControl/releases" target="_blank" class="btn">
+                <span class="zh">下载 iFanControl</span>
+                <span class="en" style="display:none">Download iFanControl</span>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        let isChinese = true;
+
+        function toggleLang() {
+            isChinese = !isChinese;
+            document.querySelectorAll('.zh').forEach(el => {
+                el.style.display = isChinese ? '' : 'none';
+            });
+            document.querySelectorAll('.en').forEach(el => {
+                el.style.display = isChinese ? 'none' : '';
+            });
+        }
+
+        function copyCode(btn) {
+            const codeBlock = btn.closest('.code-block');
+            const code = codeBlock.querySelector('code').textContent;
+            
+            navigator.clipboard.writeText(code).then(() => {
+                btn.classList.add('copied');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<span class="icon">✓</span> Copied';
+                
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.innerHTML = originalText;
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>

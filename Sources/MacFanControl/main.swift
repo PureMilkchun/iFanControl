@@ -74,6 +74,51 @@ private enum ControlStatusStore {
     }
 }
 
+// MARK: - Mini status display (custom NSView, direct Core Text rendering)
+
+private final class MiniStatusView: NSView {
+    var topPrimaryText: String = ""
+    var topAccentText: String = ""
+    var topAccentColor: NSColor = .systemGreen
+    var bottomPrimaryText: String = ""
+    var bottomAccentText: String = ""
+    var bottomAccentColor: NSColor = .systemGreen
+
+    override var isFlipped: Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .bold)
+        let primaryAttrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.labelColor]
+        let topAccentAttrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: topAccentColor]
+        let botAccentAttrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: bottomAccentColor]
+
+        let topPrimaryW = (topPrimaryText as NSString).size(withAttributes: primaryAttrs).width
+        let topAccentW = topAccentText.isEmpty ? 0 : (topAccentText as NSString).size(withAttributes: topAccentAttrs).width
+        let topTotalW = topPrimaryW + topAccentW
+
+        let botPrimaryW = (bottomPrimaryText as NSString).size(withAttributes: primaryAttrs).width
+        let botAccentW = bottomAccentText.isEmpty ? 0 : (bottomAccentText as NSString).size(withAttributes: botAccentAttrs).width
+        let botTotalW = botPrimaryW + botAccentW
+
+        let lineHeight: CGFloat = font.ascender - font.descender - 2
+
+        // 上行
+        let topX = (bounds.width - topTotalW) / 2
+        (topPrimaryText as NSString).draw(at: NSPoint(x: topX, y: 0), withAttributes: primaryAttrs)
+        if !topAccentText.isEmpty {
+            (topAccentText as NSString).draw(at: NSPoint(x: topX + topPrimaryW, y: 0), withAttributes: topAccentAttrs)
+        }
+
+        // 下行
+        let botX = (bounds.width - botTotalW) / 2
+        (bottomPrimaryText as NSString).draw(at: NSPoint(x: botX, y: lineHeight), withAttributes: primaryAttrs)
+        if !bottomAccentText.isEmpty {
+            (bottomAccentText as NSString).draw(at: NSPoint(x: botX + botPrimaryW, y: lineHeight), withAttributes: botAccentAttrs)
+        }
+    }
+}
+
 final class AppLog: @unchecked Sendable {
     static let shared = AppLog()
 
@@ -1861,7 +1906,7 @@ class UpdateService {
 
 // 菜单栏管理
 @MainActor
-class MenuBarManager {
+class MenuBarManager: NSObject {
     static let shared = MenuBarManager()
     private let logger = Logger(subsystem: appSubsystem, category: "MenuBar")
     private let unsupportedHardwareHintKey = "ifancontrol.ui.unsupported_hardware_hint_shown"
@@ -1878,15 +1923,26 @@ class MenuBarManager {
         get { UserDefaults.standard.string(forKey: displayModeKey) ?? "full" }
         set { UserDefaults.standard.set(newValue, forKey: displayModeKey) }
     }
-    private var displayFullItem: NSMenuItem?
-    private var displayCompactItem: NSMenuItem?
-    private var displayMiniItem: NSMenuItem?
-    
+    private let miniTopLineKey = "ifancontrol.ui.mini_top_line"
+    private var miniTopLine: String {
+        get { UserDefaults.standard.string(forKey: miniTopLineKey) ?? "temp_unit_mode" }
+        set { UserDefaults.standard.set(newValue, forKey: miniTopLineKey) }
+    }
+    private let miniBottomLineKey = "ifancontrol.ui.mini_bottom_line"
+    private var miniBottomLine: String {
+        get { UserDefaults.standard.string(forKey: miniBottomLineKey) ?? "rpm_unit" }
+        set { UserDefaults.standard.set(newValue, forKey: miniBottomLineKey) }
+    }
+
+    // Mini display mode: custom NSView with direct Core Text rendering
+    private var miniStatusView: MiniStatusView?
+
     private var speedSettingWindowController: SpeedSettingWindowController?
     private var safetyFloorWindowController: SafetyFloorWindowController?
     private var fanCurveWindowController: NSWindowController?
     private var helpWindowController: HelpWindowController?
     private var feedbackWindowController: FeedbackWindowController?
+    private var displaySettingsWindowController: DisplaySettingsWindowController?
 
     // GCD 定时器（不依赖 RunLoop，无显示器也能运行）
     private var menuPollTimer: DispatchSourceTimer?
@@ -1984,7 +2040,26 @@ class MenuBarManager {
         }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         buildMenuOnce()
+        setupMiniStatusHostingView()
         updateDynamicMenuItems()
+    }
+
+    private func setupMiniStatusHostingView() {
+        guard let button = statusItem?.button else { return }
+        miniStatusView?.removeFromSuperview()
+
+        let view = MiniStatusView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        button.addSubview(view)
+
+        NSLayoutConstraint.activate([
+            view.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 2),
+            view.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -2),
+            view.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            view.heightAnchor.constraint(equalToConstant: 22),
+        ])
+
+        miniStatusView = view
     }
 
     @objc private func handleScreenOrDisplayChange() {
@@ -2216,21 +2291,8 @@ class MenuBarManager {
         self.autoStartItem = autoItem
 
         // 信息栏展示
-        let displayItem = NSMenuItem(title: appL10n("信息栏展示", "Display"), action: nil, keyEquivalent: "")
-        let displayMenu = NSMenu()
-        let fullItem = NSMenuItem(title: appL10n("完整：65℃ | 2400 RPM [Auto]", "Full: 65℃ | 2400 RPM [Auto]"), action: #selector(switchToFullDisplay), keyEquivalent: "")
-        fullItem.target = self
-        displayMenu.addItem(fullItem)
-        self.displayFullItem = fullItem
-        let compactItem = NSMenuItem(title: appL10n("简洁：53｜981｜A", "Compact: 53｜981｜A"), action: #selector(switchToCompactDisplay), keyEquivalent: "")
-        compactItem.target = self
-        displayMenu.addItem(compactItem)
-        self.displayCompactItem = compactItem
-        let miniItem = NSMenuItem(title: appL10n("迷你：两行显示", "Mini: Two Lines"), action: #selector(switchToMiniDisplay), keyEquivalent: "")
-        miniItem.target = self
-        displayMenu.addItem(miniItem)
-        self.displayMiniItem = miniItem
-        menu.setSubmenu(displayMenu, for: displayItem)
+        let displayItem = NSMenuItem(title: appL10n("信息栏展示...", "Display..."), action: #selector(showDisplaySettings), keyEquivalent: "")
+        displayItem.target = self
         menu.addItem(displayItem)
 
         // 语言
@@ -2332,31 +2394,60 @@ class MenuBarManager {
 
         // 状态栏标题
         if displayMode == "compact" {
+            miniStatusView?.isHidden = true
             statusItem.button?.imagePosition = .noImage
             let modeLetter = isAutoMode ? "A" : "M"
             statusItem.button?.title = "\(String(format: "%.0f", currentTemperature))｜\(currentFanRPM)｜\(modeLetter)"
             statusItem.button?.image = nil
+            statusItem.length = NSStatusItem.variableLength
         } else if displayMode == "mini" {
             let modeLetter = isAutoMode ? "A" : "M"
             let tempStr = String(format: "%.0f", currentTemperature)
 
             let snapshot = ControlStatusStore.load()
             let isAbnormal = snapshot != nil && snapshot?.mode != "normal"
-            let modeColor: NSColor = isAbnormal ? .systemRed : .systemGreen
+            let accentColor: NSColor = isAbnormal ? .systemRed : .systemGreen
 
-            let img = renderMiniStatusImage(
-                topText: "\(currentFanRPM)",
-                bottomTempText: "\(tempStr)｜",
-                bottomModeText: modeLetter,
-                modeColor: modeColor
-            )
-            statusItem.button?.image = img
-            statusItem.button?.imagePosition = .imageOnly
+            // 共享：根据 contentType 生成 primary / accent
+            func resolveMiniContent(_ contentType: String) -> (primary: String, accent: String) {
+                switch contentType {
+                case "temp":           return (tempStr, "")
+                case "temp_unit":      return ("\(tempStr)℃", "")
+                case "temp_unit_mode": return ("\(tempStr)℃｜", modeLetter)
+                case "temp_mode":      return ("\(tempStr)｜", modeLetter)
+                case "rpm_unit":       return ("\(currentFanRPM) RPM", "")
+                case "rpm_short":      return ("\(currentFanRPM)R", "")
+                default:               return ("\(currentFanRPM)", "")  // rpm
+                }
+            }
+
+            let top  = resolveMiniContent(miniTopLine)
+            let bot  = resolveMiniContent(miniBottomLine)
+
+            if let v = miniStatusView {
+                v.topPrimaryText    = top.primary
+                v.topAccentText     = top.accent
+                v.topAccentColor    = accentColor
+                v.bottomPrimaryText = bot.primary
+                v.bottomAccentText  = bot.accent
+                v.bottomAccentColor = accentColor
+                v.isHidden = false
+                v.setNeedsDisplay(v.bounds)
+            }
+
+            statusItem.button?.imagePosition = .noImage
+            statusItem.button?.image = nil
             statusItem.button?.title = ""
-            statusItem.length = img.size.width
+
+            let font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .bold)
+            let attrs: [NSAttributedString.Key: Any] = [.font: font]
+            let topW = ("\(top.primary)\(top.accent)" as NSString).size(withAttributes: attrs).width
+            let botW = ("\(bot.primary)\(bot.accent)" as NSString).size(withAttributes: attrs).width
+            statusItem.length = max(topW, botW) + 8
 
             statusItem.button?.toolTip = "\(currentFanRPM) RPM | \(tempStr)℃ [\(isAutoMode ? "Auto" : "Manual")]"
         } else {
+            miniStatusView?.isHidden = true
             statusItem.button?.imagePosition = .noImage
             let temperatureText = String(format: "%.0f℃", currentTemperature)
             let fanText = "\(currentFanRPM) RPM"
@@ -2369,11 +2460,8 @@ class MenuBarManager {
             }
             statusItem.button?.image = nil
             statusItem.button?.title = "\(temperatureText) | \(fanText) \(modeText)\(statusIcon)"
+            statusItem.length = NSStatusItem.variableLength
         }
-        // 信息栏展示菜单选中态
-        displayFullItem?.state = (displayMode == "full") ? .on : .off
-        displayCompactItem?.state = (displayMode == "compact") ? .on : .off
-        displayMiniItem?.state = (displayMode == "mini") ? .on : .off
 
         // 硬件信息
         hardwareItem?.title = FanManager.shared.fanCount > 0 ?
@@ -2535,76 +2623,6 @@ class MenuBarManager {
         )
     }
 
-    private func renderMiniStatusImage(
-        topText: String,
-        bottomTempText: String,
-        bottomModeText: String,
-        modeColor: NSColor
-    ) -> NSImage {
-        let font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .bold)
-        let attrs: [NSAttributedString.Key: Any] = [.font: font]
-
-        // 测量每行实际宽度
-        let topWidth = (topText as NSString).size(withAttributes: attrs).width
-        let tempWidth = (bottomTempText as NSString).size(withAttributes: attrs).width
-        let modeWidth = (bottomModeText as NSString).size(withAttributes: attrs).width
-        let bottomWidth = tempWidth + modeWidth
-        let maxWidth = max(topWidth, bottomWidth)
-
-        // 图片尺寸
-        let lineHeight: CGFloat = 11
-        let padding: CGFloat = 4
-        let imageWidth = maxWidth + padding * 2
-        let imageHeight: CGFloat = 26
-        let imageSize = NSSize(width: imageWidth, height: imageHeight)
-
-        // Retina 感知
-        let scale = NSScreen.main?.backingScaleFactor ?? 2.0
-        let bitmap = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: Int(imageWidth * scale),
-            pixelsHigh: Int(imageHeight * scale),
-            bitsPerSample: 8,
-            samplesPerPixel: 4,
-            hasAlpha: true,
-            isPlanar: false,
-            colorSpaceName: .calibratedRGB,
-            bytesPerRow: 0,
-            bitsPerPixel: 0
-        )!
-        bitmap.size = imageSize
-
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
-
-        // 每行独立居中
-        let topX = padding + (maxWidth - topWidth) / 2
-        let bottomX = padding + (maxWidth - bottomWidth) / 2
-
-        // 上行：转速
-        (topText as NSString).draw(at: NSPoint(x: topX, y: lineHeight + 1), withAttributes: [
-            .font: font,
-            .foregroundColor: NSColor.labelColor
-        ])
-
-        // 下行：温度 + 模式字母
-        (bottomTempText as NSString).draw(at: NSPoint(x: bottomX, y: 1), withAttributes: [
-            .font: font,
-            .foregroundColor: NSColor.labelColor
-        ])
-        (bottomModeText as NSString).draw(at: NSPoint(x: bottomX + tempWidth, y: 1), withAttributes: [
-            .font: font,
-            .foregroundColor: modeColor
-        ])
-
-        NSGraphicsContext.restoreGraphicsState()
-
-        let image = NSImage(size: imageSize)
-        image.addRepresentation(bitmap)
-        image.isTemplate = false
-        return image
-    }
-
     /// 完全重建菜单（仅在语言切换等需要重建结构时调用）
     func updateMenu() {
         buildMenuOnce()
@@ -2730,6 +2748,17 @@ class MenuBarManager {
         presentWindowFront(speedSettingWindowController?.window)
     }
 
+    @objc func showDisplaySettings() {
+        displaySettingsWindowController = DisplaySettingsWindowController()
+        displaySettingsWindowController?.onSettingsChanged = { [weak self] in
+            self?.statusItem?.button?.font = nil
+            self?.statusItem?.length = NSStatusItem.variableLength
+            self?.updateDynamicMenuItems()
+        }
+        displaySettingsWindowController?.showWindow(nil)
+        presentWindowFront(displaySettingsWindowController?.window)
+    }
+
     @objc func showSafetyFloorSetting() {
         let config = ConfigManager.shared.loadConfig()
         let currentRPM = min(max(config.safetyFloorRPM ?? FanManager.shared.defaultSafetyRPM, 2000), FanManager.shared.currentMaxRPM)
@@ -2746,26 +2775,6 @@ class MenuBarManager {
     @objc func switchToEnglish() {
         UserDefaults.standard.set("en", forKey: "ifancontrol.ui.language")
         showRestartRequiredAlert()
-    }
-
-    @objc func switchToFullDisplay() {
-        displayMode = "full"
-        statusItem?.button?.font = nil
-        statusItem?.length = NSStatusItem.variableLength
-        updateDynamicMenuItems()
-    }
-
-    @objc func switchToCompactDisplay() {
-        displayMode = "compact"
-        statusItem?.button?.font = nil
-        statusItem?.length = NSStatusItem.variableLength
-        updateDynamicMenuItems()
-    }
-
-    @objc func switchToMiniDisplay() {
-        displayMode = "mini"
-        statusItem?.length = NSStatusItem.variableLength
-        updateDynamicMenuItems()
     }
 
     private func showRestartRequiredAlert() {
@@ -3246,6 +3255,234 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         lastControlLoopLogTime = now
         AppLog.shared.debug("control loop mode=\(mode) sensor=\(reading.sensor.key) temp=\(String(format: "%.2f", reading.value)) targetRPM=\(targetRPM)")
+    }
+}
+
+// 信息栏展示设置窗口控制器
+@MainActor
+class DisplaySettingsWindowController: NSWindowController {
+    var onSettingsChanged: (() -> Void)?
+
+    private var fullRadio: NSButton!
+    private var compactRadio: NSButton!
+    private var miniRadio: NSButton!
+    private var miniOptionsStack: NSStackView!
+
+    // 所有选项共享同一个枚举，上下行各一组 radio
+    private var topRadios: [String: NSButton] = [:]
+    private var bottomRadios: [String: NSButton] = [:]
+
+    private let displayModeKey    = "ifancontrol.ui.display_mode"
+    private let miniTopLineKey    = "ifancontrol.ui.mini_top_line"
+    private let miniBottomLineKey = "ifancontrol.ui.mini_bottom_line"
+
+    private var currentDisplayMode: String {
+        get { UserDefaults.standard.string(forKey: displayModeKey) ?? "full" }
+        set { UserDefaults.standard.set(newValue, forKey: displayModeKey) }
+    }
+    private var currentMiniTopLine: String {
+        get { UserDefaults.standard.string(forKey: miniTopLineKey) ?? "temp_unit_mode" }
+        set { UserDefaults.standard.set(newValue, forKey: miniTopLineKey) }
+    }
+    private var currentMiniBottomLine: String {
+        get { UserDefaults.standard.string(forKey: miniBottomLineKey) ?? "rpm_unit" }
+        set { UserDefaults.standard.set(newValue, forKey: miniBottomLineKey) }
+    }
+
+    // 所有可选内容类型，顺序固定
+    private static let allContentTypes: [(key: String, zh: String, en: String)] = [
+        ("temp",           "温度  (65)",           "Temperature  (65)"),
+        ("temp_unit",      "温度 + 单位  (65℃)",   "Temperature + Unit  (65℃)"),
+        ("temp_mode",      "温度 + 模式  (65｜A)",  "Temperature + Mode  (65｜A)"),
+        ("temp_unit_mode", "温度 + 全部  (65℃｜A)", "Temperature + All  (65℃｜A)"),
+        ("rpm",            "转速  (2400)",          "RPM  (2400)"),
+        ("rpm_unit",       "转速 + 单位  (2400 RPM)", "RPM + Unit  (2400 RPM)"),
+        ("rpm_short",      "转速 + 简称  (2400R)",   "RPM + Short  (2400R)"),
+    ]
+
+    init() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 380, height: 180),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = appL10n("信息栏展示", "Display Settings")
+        window.center()
+        super.init(window: window)
+        applyWindowMaterialStyle(window)
+        setupUI()
+        loadCurrentSettings()
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    private func setupUI() {
+        guard let contentView = window?.contentView else { return }
+
+        // ── 显示模式 ──────────────────────────
+        let displayModeLabel = makeSectionLabel(appL10n("显示模式", "Display Mode"))
+        contentView.addSubview(displayModeLabel)
+
+        fullRadio    = makeRadioButton(appL10n("完整：65℃ | 2400 RPM [Auto]", "Full: 65℃ | 2400 RPM [Auto]"))
+        compactRadio = makeRadioButton(appL10n("简洁：53｜981｜A", "Compact: 53｜981｜A"))
+        miniRadio    = makeRadioButton(appL10n("迷你：两行显示", "Mini: Two Lines"))
+        for radio in [fullRadio!, compactRadio!, miniRadio!] {
+            contentView.addSubview(radio)
+            radio.target = self
+            radio.action = #selector(displayModeChanged)
+        }
+
+        // ── 迷你选项容器（缩进，视觉上从属于「迷你」）────────
+        miniOptionsStack = NSStackView()
+        miniOptionsStack.orientation = .vertical
+        miniOptionsStack.alignment = .leading
+        miniOptionsStack.spacing = 6
+        miniOptionsStack.translatesAutoresizingMaskIntoConstraints = false
+        miniOptionsStack.isHidden = true
+        contentView.addSubview(miniOptionsStack)
+
+        // 上行内容（次级标签）
+        miniOptionsStack.addArrangedSubview(makeSubsectionLabel(appL10n("上行内容", "Top Line")))
+        for item in Self.allContentTypes {
+            let radio = makeRadioButton(appL10n(item.zh, item.en))
+            radio.target = self
+            radio.action = #selector(topLineChanged)
+            miniOptionsStack.addArrangedSubview(radio)
+            topRadios[item.key] = radio
+        }
+
+        // 交换按钮 + 分隔线
+        let swapRow = NSStackView()
+        swapRow.orientation = .horizontal
+        swapRow.alignment = .centerY
+        swapRow.spacing = 8
+        swapRow.translatesAutoresizingMaskIntoConstraints = false
+
+        let leftSep = NSBox(); leftSep.boxType = .separator; leftSep.translatesAutoresizingMaskIntoConstraints = false
+        let rightSep = NSBox(); rightSep.boxType = .separator; rightSep.translatesAutoresizingMaskIntoConstraints = false
+        let swapButton = NSButton(title: appL10n("交换上下行", "Swap Lines"), target: self, action: #selector(swapLines))
+        swapButton.bezelStyle = .rounded
+        swapButton.font = .systemFont(ofSize: 12)
+        swapButton.translatesAutoresizingMaskIntoConstraints = false
+
+        swapRow.addArrangedSubview(leftSep)
+        swapRow.addArrangedSubview(swapButton)
+        swapRow.addArrangedSubview(rightSep)
+        leftSep.widthAnchor.constraint(greaterThanOrEqualToConstant: 40).isActive = true
+        rightSep.widthAnchor.constraint(equalTo: leftSep.widthAnchor).isActive = true
+        miniOptionsStack.addArrangedSubview(swapRow)
+        leftSep.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        rightSep.heightAnchor.constraint(equalToConstant: 1).isActive = true
+
+        // 下行内容（次级标签）
+        miniOptionsStack.addArrangedSubview(makeSubsectionLabel(appL10n("下行内容", "Bottom Line")))
+        for item in Self.allContentTypes {
+            let radio = makeRadioButton(appL10n(item.zh, item.en))
+            radio.target = self
+            radio.action = #selector(bottomLineChanged)
+            miniOptionsStack.addArrangedSubview(radio)
+            bottomRadios[item.key] = radio
+        }
+
+        // ── 布局 ─────────────────────────────
+        NSLayoutConstraint.activate([
+            displayModeLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
+            displayModeLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
+
+            fullRadio.topAnchor.constraint(equalTo: displayModeLabel.bottomAnchor, constant: 8),
+            fullRadio.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
+            compactRadio.topAnchor.constraint(equalTo: fullRadio.bottomAnchor, constant: 4),
+            compactRadio.leadingAnchor.constraint(equalTo: fullRadio.leadingAnchor),
+            miniRadio.topAnchor.constraint(equalTo: compactRadio.bottomAnchor, constant: 4),
+            miniRadio.leadingAnchor.constraint(equalTo: fullRadio.leadingAnchor),
+
+            miniOptionsStack.topAnchor.constraint(equalTo: miniRadio.bottomAnchor, constant: 12),
+            miniOptionsStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 40),
+            miniOptionsStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
+            miniOptionsStack.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -20),
+        ])
+    }
+
+    // MARK: - Helpers
+
+    private func makeSectionLabel(_ text: String) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+        label.font = .boldSystemFont(ofSize: 13)
+        label.textColor = .labelColor
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }
+
+    private func makeSubsectionLabel(_ text: String) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+        label.font = .systemFont(ofSize: 12)
+        label.textColor = .secondaryLabelColor
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }
+
+    private func makeRadioButton(_ title: String) -> NSButton {
+        let button = NSButton(radioButtonWithTitle: title, target: nil, action: nil)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }
+
+    private func loadCurrentSettings() {
+        switch currentDisplayMode {
+        case "compact": compactRadio.state = .on
+        case "mini":    miniRadio.state = .on
+        default:        fullRadio.state = .on
+        }
+
+        topRadios[currentMiniTopLine]?.state      = .on
+        bottomRadios[currentMiniBottomLine]?.state = .on
+        updateMiniOptionsVisibility()
+    }
+
+    // MARK: - Actions
+
+    @objc private func displayModeChanged(_ sender: NSButton) {
+        if fullRadio.state == .on {
+            currentDisplayMode = "full"
+        } else if compactRadio.state == .on {
+            currentDisplayMode = "compact"
+        } else {
+            currentDisplayMode = "mini"
+        }
+        updateMiniOptionsVisibility()
+        onSettingsChanged?()
+    }
+
+    @objc private func topLineChanged(_ sender: NSButton) {
+        if let key = topRadios.first(where: { $0.value === sender })?.key {
+            currentMiniTopLine = key
+            onSettingsChanged?()
+        }
+    }
+
+    @objc private func bottomLineChanged(_ sender: NSButton) {
+        if let key = bottomRadios.first(where: { $0.value === sender })?.key {
+            currentMiniBottomLine = key
+            onSettingsChanged?()
+        }
+    }
+
+    @objc private func swapLines(_ sender: Any) {
+        let top    = currentMiniTopLine
+        let bottom = currentMiniBottomLine
+        currentMiniTopLine    = bottom
+        currentMiniBottomLine = top
+        topRadios[bottom]?.state    = .on
+        bottomRadios[top]?.state    = .on
+        onSettingsChanged?()
+    }
+
+    private func updateMiniOptionsVisibility() {
+        let showMini = miniRadio.state == .on
+        miniOptionsStack.isHidden = !showMini
+        let height: CGFloat = showMini ? 520 : 180
+        window?.setContentSize(NSSize(width: 380, height: height))
     }
 }
 

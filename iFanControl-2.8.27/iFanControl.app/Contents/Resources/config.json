@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "curve": [
+    {"temperature": 20, "rpm": 0},
+    {"temperature": 47.3547794117647, "rpm": 650},
+    {"temperature": 68.21691176470588, "rpm": 1642},
+    {"temperature": 86.18520220588235, "rpm": 2997},
+    {"temperature": 100, "rpm": 4900}
+  ],
+  "mode": "auto",
+  "autoStart": true,
+  "maxRPM": 4900,
+  "manualRPM": 2168
+}
