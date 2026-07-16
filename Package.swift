@@ -10,6 +10,10 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "IOReportBridge",
+            publicHeadersPath: "include"
+        ),
+        .target(
             name: "FanCurveEditor",
             linkerSettings: [
                 .linkedFramework("AppKit"),
@@ -18,10 +22,12 @@ let package = Package(
         ),
         .executableTarget(
             name: "MacFanControl",
-            dependencies: ["FanCurveEditor"],
+            dependencies: ["FanCurveEditor", "IOReportBridge"],
             linkerSettings: [
                 .linkedFramework("AppKit"),
-                .linkedFramework("Foundation")
+                .linkedFramework("Foundation"),
+                .linkedFramework("IOKit"),
+                .unsafeFlags(["-lIOReport"])
             ]
         ),
     ]

@@ -108,6 +108,15 @@ struct TemperatureSensorDefinition: Hashable {
 }
 
 enum SensorCatalog {
+    static let cpuAverageTemperatureSource = TemperatureSensorDefinition(
+        key: "__cpu_average__",
+        name: sensorL10n("CPU 平均温度", "CPU Average Temperature")
+    )
+    static let gpuAverageTemperatureSource = TemperatureSensorDefinition(
+        key: "__gpu_average__",
+        name: sensorL10n("GPU 平均温度", "GPU Average Temperature")
+    )
+
     // 基于 Stats 项目对 Apple Silicon 传感器键的公开整理，并保留常见系统温度键作为补充。
     static let appleSiliconTemperatureSensors: [TemperatureSensorDefinition] = [
         TemperatureSensorDefinition(key: "Tp09", name: "CPU efficiency core 1"),
@@ -213,4 +222,38 @@ enum SensorCatalog {
         TemperatureSensorDefinition(key: "TTLD", name: "Thunderbolt left"),
         TemperatureSensorDefinition(key: "TTRD", name: "Thunderbolt right")
     ]
+
+    static let appleSiliconTemperatureSensorsByKey: [String: TemperatureSensorDefinition] = {
+        var lookup: [String: TemperatureSensorDefinition] = [:]
+        for sensor in appleSiliconTemperatureSensors where lookup[sensor.key] == nil {
+            lookup[sensor.key] = sensor
+        }
+        return lookup
+    }()
+
+    static func definition(forTemperatureKey key: String) -> TemperatureSensorDefinition {
+        if let known = appleSiliconTemperatureSensorsByKey[key] {
+            return known
+        }
+        return TemperatureSensorDefinition(key: key, name: fallbackName(forTemperatureKey: key))
+    }
+
+    private static func fallbackName(forTemperatureKey key: String) -> String {
+        guard key.count == 4 else {
+            return "Unknown thermal sensor \(key)"
+        }
+        let second = key[key.index(after: key.startIndex)].lowercased()
+        switch second {
+        case "p", "e", "f":
+            return "Unknown CPU-like sensor \(key)"
+        case "g":
+            return "Unknown GPU-like sensor \(key)"
+        case "m":
+            return "Unknown memory-like sensor \(key)"
+        case "a":
+            return "Unknown airflow-like sensor \(key)"
+        default:
+            return "Unknown thermal sensor \(key)"
+        }
+    }
 }

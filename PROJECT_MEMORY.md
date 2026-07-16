@@ -3,7 +3,7 @@
 关联时间戳记忆：`/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_TIMELINE.md`
 读取建议：先读本文件，再读时间戳记忆，避免遗漏最新变更。
 
-更新时间：2026-05-04
+更新时间：2026-07-16
 
 ## 1. 项目当前基线
 
@@ -18,9 +18,51 @@ iFanControl 是一个面向 Apple Silicon 带风扇机型的风扇控制工具�
 - 匿名活跃统计（每日上报，可关闭）
 - 告诉开发者（菜单栏反馈入口）
 - 开机自启动（SMAppService 原生登录项 API，系统设置中可直接管理）
-- 信息栏展示设置（完整/简洁两种模式，存 `ifancontrol.ui.display_mode`，切换即时生效）
+- 信息栏展示设置（完整/简洁/迷你三种模式，弹窗设置，存 `ifancontrol.ui.display_mode`，切换即时生效）
 
-当前版本：`2.9.7` / build 43
+当前版本：`2.9.8` / build 48
+
+### build 48 说明
+
+- **新增温度源**：支持分别计算 CPU 传感器平均温度与 GPU 传感器平均温度，并作为独立温度源驱动风扇曲线
+- **传感器兼容性**：保留静态 catalog，同时支持动态发现可读取的 `T*` 温度 key
+- **发布口径**：小版本迭代，公开说明聚焦温度源选择、问题修复与稳定性提升
+
+### build 47 说明
+
+- **对外版本基线**：`2.9.8 / build 47`
+- **发布口径**：本次对外文案继续保持克制，统一表述为“修复部分 bug，提高稳定性”
+- **本地基线变化**：版本号与 app bundle 已提升到 build 47；官网 `timeline.json` 与 `update-manifest.json` 已同步到 build 47
+- **文档状态**：本文件与 `PROJECT_TIMELINE.md` 于 2026-06-10 补齐到 build 47，和当前已发布版本重新对齐
+
+### build 46 说明
+
+- **对外版本基线**：`2.9.8 / build 46`
+- **菜单栏不显示修复**：修复少数设备上 App 进程已启动但菜单栏没有显示的问题；启动阶段不再因为同步动态传感器发现阻塞主线程，菜单栏与控制循环可先正常起来
+- **传感器发现增强**：温度传感器从“纯静态白名单”升级为“静态 catalog + 动态发现”双轨策略，未知但可稳定读取的 `T*` key 不再被直接忽略
+- **遥测与安全控制稳健性提升**：后台单轮温度 / RPM 读取全失败时不再立即清空最后成功快照；控制循环改为区分 `fresh / cached_stale / expired` 三种状态，短时遥测空窗优先继续使用最后成功快照并进入更保守控制
+- **诊断增强**：fallback / fail-safe 日志补充 `model / os / telemetryState / tempAge / rpmAge / reason code`，便于后续定位 M4 / M5 / MacBook Pro 机型上的真实根因
+- **发布状态**：`2.9.8 / build 46` 作为当前对外版本发布；GitHub Release、官网 ZIP、`update-manifest.json`、`timeline.json` 四项保持同步
+
+### build 45 说明
+
+- **本地版本基线**：`2.9.8 / build 45`
+- **状态栏遥测失效显示修复**：后台遥测超过 stale 阈值后，完整 / 简洁 / 迷你三种模式不再沿用旧温度或旧 RPM，统一改为 `--` 占位；tooltip 同步显示占位值
+- **信息栏展示重构**：双层信息栏改为“上层 / 下层内容可多选 + 统一样式”结构，并新增核心功率展示项
+- **默认曲线适配修复**：`defaultFanCurve(maxRPM:)` 改为随机型 `maxRPM` 比例缩放，首次生成配置与重置曲线时更符合不同机型
+- **新增观测与提醒**：新增“电力消耗...”窗口（核心功率 / DC In 等实时观测）与规则型散热异常提醒
+- **发布状态**：`2.9.8 / build 45` 已作为上一版对外版本发布
+
+### build 46 技术备注（2026-05-10）
+
+- **根因定位**：本地成功复现“App 进程已启动，但菜单栏完全不显示”。最终确认根因是启动阶段同步执行动态传感器发现（`kentsmc -l`）阻塞主线程，导致 `applicationDidFinishLaunching` 未及时完成，`NSStatusItem` 没有正常挂上去。
+- **重要教训**：为临时兜菜单栏显示，曾尝试给迷你双行模式增加文本 fallback；该方案会破坏原本稳定的迷你双行显示，已确认撤回。**最终保留的正确修复只有“异步发现 + 启动兜底 + 遥测容错增强”**。
+
+### build 44 说明
+
+- **GitHub / 官网 / App 内更新真实版本**：`2.9.8 / build 44`
+- **新增功能**：迷你模式上下行内容自定义（7 种选项自由组合）、交换按钮、转速简称单位（`2400R`）；信息栏展示改为独立弹窗（`DisplaySettingsWindowController`）
+- **清理**：移除 `menuKeepOpen`、`menuDidClose`、`NSMenuDelegate`、9 个死属性、5 个旧 action
 
 ### build 43 说明
 
@@ -76,9 +118,10 @@ npx wrangler pages deploy ./ --project-name ifan --no-bundle --skip-caching
 
 1. Landing Screen（首页）
 2. Iteration Section（开发者也是用户本身）
-3. **Timeline Section（项目时间线）** — 默认展示最近 1 天，可展开查看全部
-4. Showcase Section（界面展示）
-5. Support Modal（支持作者）
+3. **Voices Section（用户声音）** — 左右分栏：统计卡片 + 反馈轮播，fetch `voices.json` 加载
+4. **Timeline Section（项目时间线）** — 默认展示最近 1 天，可展开查看全部
+5. Showcase Section（界面展示）
+6. Support Modal（支持作者）
 
 ### 时间线维护规范
 
@@ -181,8 +224,8 @@ cd /tmp/staging && zip -r /tmp/iFanControl-macOS-X.Y.Z.zip .
 - `FanManager` 是 `@MainActor`，硬件调用必须在后台线程
 - **Process 超时保护（已撤回）**：v2.9.5/build 37 曾添加 `DispatchSemaphore` 8 秒超时，但实际导致温度读取变慢/卡住。已撤回为原始 `waitUntilExit()` 直接等待。教训见 `CODE_AUDIT.md#6`
 - **菜单栏恢复**：监听 `NSApplication.didChangeScreenParametersNotification` 检测 SystemUIServer 重启，自动重建 `NSStatusItem`；事件触发时还会重新探测硬件（`reprobeHardware`）并刷新遥测
-- **信息栏展示设置（build 41）**：`displayMode` 存 `UserDefaults("ifancontrol.ui.display_mode")`，值为 `"full"`（默认）或 `"compact"`；简洁模式 `53｜981｜A` 无单位、全角竖线分隔、模式首字母；菜单「信息栏展示」子菜单带选中态，切换即时生效
-- **迷你双行显示模式（build 43）**：`displayMode` 新增 `"mini"` 值，存 `UserDefaults("ifancontrol.ui.display_mode")`；NSStatusBarButton 不支持多行文字，改用 `renderMiniStatusImage()` 渲染 NSBitmapImageRep（Retina 感知，26px 高度），上下两行独立居中（避免 monospacedDigitSystemFont 空格/数字宽度不一致问题）；A/M 颜色从 `ControlStatusStore.load()` 读取，正常绿色、异常红色（nil 时不标红）
+- **信息栏展示设置（build 41→44）**：`displayMode` 存 `UserDefaults("ifancontrol.ui.display_mode")`，值为 `"full"`（默认）/ `"compact"` / `"mini"`；菜单「信息栏展示...」点击弹出 `DisplaySettingsWindowController` 独立窗口，切换即时生效；简洁模式 `53｜981｜A` 无单位、全角竖线分隔、模式首字母
+- **迷你双行显示模式（build 43→44）**：NSStatusBarButton 不支持多行文字，改用自定义 `MiniStatusView`（`NSView` + `draw(_:)` Core Text 渲染，与原生菜单栏文字同一管线，锐利）；上下行均可选择任意内容类型（温度/转速/单位/模式，共 7 种），一键交换；默认上行 `65℃｜A`，下行 `2400 RPM`；`miniTopLine` / `miniBottomLine` 存 `UserDefaults`；A/M 颜色从 `ControlStatusStore.load()` 读取，正常绿色、异常红色（nil 时不标红）
 - **开机自启动**：使用 `SMAppService.mainApp.register()` 原生 API，在系统设置「登录项与扩展」中显示为 App 类型开关；旧的 LaunchAgent plist 在首次启动时自动迁移清理
 - **更新校验**：仅依赖 SHA256 校验，不校验文件大小（Cloudflare CDN 传输时大小可能变化 5 字节导致误判）
 - **GCD 定时器（build 40）**：所有 `Timer.scheduledTimer` 改为 `DispatchSource.makeTimerSource`，不依赖 RunLoop，无显示器场景也能正常运行（解决 Mac mini 无显示器风扇控制失效根因）

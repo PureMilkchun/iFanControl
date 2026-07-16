@@ -21,12 +21,18 @@ private func fanCurveL10n(_ zh: String, _ en: String) -> String {
 
 /// 官方默认曲线（预设 A）
 public func defaultFanCurve(maxRPM: Int) -> [FanPoint] {
+    let referenceMaxRPM = 4900.0
+    let clampedMaxRPM = max(maxRPM, 0)
+    func scaledRPM(_ referenceRPM: Double) -> Int {
+        Int((referenceRPM / referenceMaxRPM * Double(clampedMaxRPM)).rounded())
+    }
+
     return [
-        FanPoint(temperature: 20, rpm: 602),
-        FanPoint(temperature: 41.09696691176471, rpm: 695),
-        FanPoint(temperature: 62.62178308823529, rpm: 1388),
-        FanPoint(temperature: 84.76838235294117, rpm: 2825),
-        FanPoint(temperature: 100, rpm: 3504)
+        FanPoint(temperature: 20, rpm: scaledRPM(602)),
+        FanPoint(temperature: 41.09696691176471, rpm: scaledRPM(695)),
+        FanPoint(temperature: 62.62178308823529, rpm: scaledRPM(1388)),
+        FanPoint(temperature: 84.76838235294117, rpm: scaledRPM(2825)),
+        FanPoint(temperature: 100, rpm: scaledRPM(3504))
     ]
 }
 

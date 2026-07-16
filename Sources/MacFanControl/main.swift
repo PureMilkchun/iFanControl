@@ -9,8 +9,10 @@
 import AppKit
 import CoreImage
 import CryptoKit
+import Darwin
 import Foundation
 import FanCurveEditor
+import IOReportBridge
 import OSLog
 import ServiceManagement
 
@@ -23,6 +25,59 @@ struct TemperatureReading {
     let value: Double
 }
 
+private func averagedTemperatureSourceDefinition(for mode: String?) -> TemperatureSensorDefinition? {
+    switch mode {
+    case "cpu_average":
+        return SensorCatalog.cpuAverageTemperatureSource
+    case "gpu_average":
+        return SensorCatalog.gpuAverageTemperatureSource
+    default:
+        return nil
+    }
+}
+
+private func averageTemperatureReading(
+    from readings: [TemperatureReading],
+    category: TemperatureSensorCategory,
+    source: TemperatureSensorDefinition
+) -> TemperatureReading? {
+    let componentReadings = readings.filter { $0.sensor.category == category }
+    guard !componentReadings.isEmpty else {
+        return nil
+    }
+    let average = componentReadings.map(\.value).reduce(0, +) / Double(componentReadings.count)
+    return TemperatureReading(sensor: source, value: average)
+}
+
+private func selectedTemperatureReading(from readings: [TemperatureReading], config: Config) -> TemperatureReading? {
+    guard !readings.isEmpty else {
+        return nil
+    }
+
+    switch config.temperatureSourceMode {
+    case "cpu_average":
+        return averageTemperatureReading(
+            from: readings,
+            category: .cpu,
+            source: SensorCatalog.cpuAverageTemperatureSource
+        )
+    case "gpu_average":
+        return averageTemperatureReading(
+            from: readings,
+            category: .gpu,
+            source: SensorCatalog.gpuAverageTemperatureSource
+        )
+    case "manual":
+        if let selectedKey = config.selectedTemperatureSensorKey,
+           let selected = readings.first(where: { $0.sensor.key == selectedKey }) {
+            return selected
+        }
+        fallthrough
+    default:
+        return readings.max(by: { $0.value < $1.value })
+    }
+}
+
 struct FanInfo {
     let index: Int
     let actualKey: String
@@ -32,6 +87,8 @@ struct FanInfo {
 
 private let appSubsystem = Bundle.main.bundleIdentifier ?? "com.ifancontrol.app"
 private let defaultManualRPMStep = 500
+private let backgroundTelemetryStaleThreshold: TimeInterval = 15.0
+private let backgroundTelemetryExpiryThreshold: TimeInterval = 45.0
 private let supportEmailAddress = "puremilkchun@foxmail.com"
 private let wechatDonatePayload = "wxp://f2f0rVY6iLnpjTqEKL4HKTHRw3Ej81vNbWU9UUXk4msd30ehG7Xh9NwXEyNsZaTn5gZE"
 private let alipayDonatePayload = "https://qr.alipay.com/fkx16601ptfadpsxd3mfpf6"
@@ -43,6 +100,39 @@ private let currentLanguage: String = {
 }()
 private func appL10n(_ zh: String, _ en: String) -> String {
     currentLanguage == "en" ? en : zh
+}
+
+private func sysctlString(named name: String) -> String? {
+    var size: size_t = 0
+    guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else {
+        return nil
+    }
+    var buffer = [CChar](repeating: 0, count: size)
+    guard sysctlbyname(name, &buffer, &size, nil, 0) == 0 else {
+        return nil
+    }
+    let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+    return String(decoding: bytes, as: UTF8.self)
+}
+
+private let systemModelIdentifier: String = {
+    sysctlString(named: "hw.model") ?? "unknown"
+}()
+
+private let systemArchitecture: String = {
+    var uts = utsname()
+    uname(&uts)
+    return withUnsafePointer(to: &uts.machine) {
+        $0.withMemoryRebound(to: CChar.self, capacity: Int(_SYS_NAMELEN)) {
+            String(cString: $0)
+        }
+    }
+}()
+
+private enum TelemetrySnapshotState: String {
+    case fresh
+    case cachedStale = "cached_stale"
+    case expired
 }
 
 private struct ControlStatusSnapshot {
@@ -71,6 +161,468 @@ private enum ControlStatusStore {
         defaults.set(mode, forKey: modeKey)
         defaults.set(detail, forKey: detailKey)
         defaults.set(recordedAt, forKey: recordedAtKey)
+    }
+}
+
+private struct PowerTelemetrySnapshot {
+    let cpuWatts: Double
+    let gpuWatts: Double
+    let aneWatts: Double
+    let ramWatts: Double
+    let pciWatts: Double
+    let dcInWatts: Double?
+    let lastUpdatedAt: Date?
+    let isSupported: Bool
+
+    var componentTotalWatts: Double {
+        cpuWatts + gpuWatts + aneWatts + ramWatts + pciWatts
+    }
+
+    var displayTotalWatts: Double {
+        if let dcInWatts, dcInWatts > 0 {
+            return dcInWatts
+        }
+        return componentTotalWatts
+    }
+
+    var hasAnyReading: Bool {
+        lastUpdatedAt != nil
+    }
+}
+
+private final class PowerTelemetryReader: @unchecked Sendable {
+    static let shared = PowerTelemetryReader()
+
+    private let queue = DispatchQueue(label: "com.ifancontrol.power-telemetry", qos: .utility)
+    private let kentsmcPath = "/usr/local/bin/kentsmc"
+    private let lock = NSLock()
+    private var _refreshInFlight = false
+    private var _snapshot = PowerTelemetrySnapshot(
+        cpuWatts: 0,
+        gpuWatts: 0,
+        aneWatts: 0,
+        ramWatts: 0,
+        pciWatts: 0,
+        dcInWatts: nil,
+        lastUpdatedAt: nil,
+        isSupported: false
+    )
+    private var _loggedFirstSuccess = false
+
+#if arch(arm64)
+    private var channels: CFMutableDictionary?
+    private var subscription: IOReportSubscriptionRef?
+    private var lastReadAt: Date?
+    private var previousEnergies: (cpu: Double, gpu: Double, ane: Double, ram: Double, pci: Double)?
+#endif
+
+    private init() {
+#if arch(arm64)
+        self.channels = makeChannels()
+        if let channels {
+            var dict: Unmanaged<CFMutableDictionary>?
+            self.subscription = IOReportCreateSubscription(nil, channels, &dict, 0, nil)
+            dict?.release()
+        }
+#endif
+        let supported = {
+#if arch(arm64)
+            self.subscription != nil
+#else
+            false
+#endif
+        }()
+        _snapshot = PowerTelemetrySnapshot(
+            cpuWatts: 0,
+            gpuWatts: 0,
+            aneWatts: 0,
+            ramWatts: 0,
+            pciWatts: 0,
+            dcInWatts: nil,
+            lastUpdatedAt: nil,
+            isSupported: supported
+        )
+        if !supported {
+            AppLog.shared.info("power telemetry unsupported or unavailable")
+        }
+    }
+
+    var snapshot: PowerTelemetrySnapshot {
+        lock.lock(); defer { lock.unlock() }
+        return _snapshot
+    }
+
+    func refresh() {
+        lock.lock()
+        if _refreshInFlight {
+            lock.unlock()
+            return
+        }
+        _refreshInFlight = true
+        lock.unlock()
+
+        queue.async { [weak self] in
+            guard let self else { return }
+            defer {
+                self.lock.lock()
+                self._refreshInFlight = false
+                self.lock.unlock()
+            }
+
+            guard let updated = self.readSnapshot() else { return }
+
+            self.lock.lock()
+            self._snapshot = updated
+            let shouldLogSuccess = !self._loggedFirstSuccess && updated.hasAnyReading
+            if shouldLogSuccess {
+                self._loggedFirstSuccess = true
+            }
+            self.lock.unlock()
+
+            if shouldLogSuccess {
+                AppLog.shared.info(
+                    "power telemetry ready cpu=\(String(format: "%.2f", updated.cpuWatts)) " +
+                    "gpu=\(String(format: "%.2f", updated.gpuWatts)) " +
+                    "ane=\(String(format: "%.2f", updated.aneWatts)) " +
+                    "ram=\(String(format: "%.2f", updated.ramWatts)) " +
+                    "pci=\(String(format: "%.2f", updated.pciWatts)) " +
+                    "dcin=\(String(format: "%.2f", updated.dcInWatts ?? 0))"
+                )
+            }
+        }
+    }
+
+    private func readSnapshot() -> PowerTelemetrySnapshot? {
+#if arch(arm64)
+        guard let subscription, let channels else {
+            return PowerTelemetrySnapshot(
+                cpuWatts: 0, gpuWatts: 0, aneWatts: 0, ramWatts: 0, pciWatts: 0, dcInWatts: nil,
+                lastUpdatedAt: nil, isSupported: false
+            )
+        }
+        guard let reportSample = IOReportCreateSamples(subscription, channels, nil)?.takeRetainedValue(),
+              let dict = reportSample as? [String: Any],
+              let rawItems = dict["IOReportChannels"] else {
+            return nil
+        }
+        let items = rawItems as! CFArray
+
+        var current = (cpu: 0.0, gpu: 0.0, ane: 0.0, ram: 0.0, pci: 0.0)
+        for index in 0..<CFArrayGetCount(items) {
+            let rawValue = CFArrayGetValueAtIndex(items, index)
+            let item = unsafeBitCast(rawValue, to: CFDictionary.self)
+            guard let group = IOReportChannelGetGroup(item)?.takeUnretainedValue() as? String,
+                  group == "Energy Model",
+                  let channel = IOReportChannelGetChannelName(item)?.takeUnretainedValue() as? String else {
+                continue
+            }
+
+            let rawEnergy = Double(IOReportSimpleGetIntegerValue(item, 0))
+            let unitLabel = (IOReportChannelGetUnitLabel(item)?.takeUnretainedValue() as? String) ?? ""
+            let joules = Self.energyToJoules(rawEnergy, unitLabel: unitLabel)
+
+            if channel.hasSuffix("CPU Energy") {
+                current.cpu = joules
+            } else if channel.hasSuffix("GPU Energy") {
+                current.gpu = joules
+            } else if channel.hasPrefix("ANE") {
+                current.ane = joules
+            } else if channel.hasPrefix("DRAM") {
+                current.ram = joules
+            } else if channel.hasPrefix("PCI") && channel.hasSuffix("Energy") {
+                current.pci = joules
+            }
+        }
+
+        let now = Date()
+        defer {
+            previousEnergies = current
+            lastReadAt = now
+        }
+
+        guard let previous = previousEnergies, let previousReadAt = lastReadAt else {
+            return PowerTelemetrySnapshot(
+                cpuWatts: 0, gpuWatts: 0, aneWatts: 0, ramWatts: 0, pciWatts: 0, dcInWatts: readSMCPower(key: "PDTR"),
+                lastUpdatedAt: nil, isSupported: true
+            )
+        }
+
+        let elapsed = now.timeIntervalSince(previousReadAt)
+        guard elapsed > 0 else { return nil }
+
+        return PowerTelemetrySnapshot(
+            cpuWatts: max(0, (current.cpu - previous.cpu) / elapsed),
+            gpuWatts: max(0, (current.gpu - previous.gpu) / elapsed),
+            aneWatts: max(0, (current.ane - previous.ane) / elapsed),
+            ramWatts: max(0, (current.ram - previous.ram) / elapsed),
+            pciWatts: max(0, (current.pci - previous.pci) / elapsed),
+            dcInWatts: readSMCPower(key: "PDTR"),
+            lastUpdatedAt: now,
+            isSupported: true
+        )
+#else
+        return PowerTelemetrySnapshot(
+            cpuWatts: 0, gpuWatts: 0, aneWatts: 0, ramWatts: 0, pciWatts: 0, dcInWatts: nil,
+            lastUpdatedAt: nil, isSupported: false
+        )
+#endif
+    }
+
+#if arch(arm64)
+    private func makeChannels() -> CFMutableDictionary? {
+        guard let channel = IOReportCopyChannelsInGroup("Energy Model" as CFString, nil, 0, 0, 0)?.takeRetainedValue() else {
+            return nil
+        }
+        let size = CFDictionaryGetCount(channel)
+        guard let mutable = CFDictionaryCreateMutableCopy(kCFAllocatorDefault, size, channel),
+              let dict = mutable as? [String: Any],
+              dict["IOReportChannels"] != nil else {
+            return nil
+        }
+        return mutable
+    }
+#endif
+
+    private static func energyToJoules(_ raw: Double, unitLabel: String) -> Double {
+        switch unitLabel.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "j":
+            return raw
+        case "mj":
+            return raw / 1_000
+        case "uj", "µj":
+            return raw / 1_000_000
+        case "nj":
+            return raw / 1_000_000_000
+        case "pj":
+            return raw / 1_000_000_000_000
+        default:
+            // Stats defaults to nJ when the unit label is unusual/blank.
+            return raw / 1_000_000_000
+        }
+    }
+
+    private func readSMCPower(key: String) -> Double? {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: kentsmcPath)
+        task.arguments = ["-r", key]
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = Pipe()
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+            guard task.terminationStatus == 0 else { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let output = String(data: data, encoding: .utf8),
+                  let range = output.range(of: "\\((-?\\d+(?:\\.\\d+)?)\\)", options: .regularExpression) else {
+                return nil
+            }
+            return Double(output[range].dropFirst().dropLast())
+        } catch {
+            return nil
+        }
+    }
+}
+
+private final class ThermalAnomalyAlertService: @unchecked Sendable {
+    static let shared = ThermalAnomalyAlertService()
+
+    private struct Bucket {
+        let bucketStart: TimeInterval
+        var firstSampleAt: TimeInterval
+        var lastSampleAt: TimeInterval
+        var sampleCount: Int
+        var accumulatedDuration: TimeInterval
+        var autoDuration: TimeInterval
+        var hotEnergyJoules: Double
+        var normalizedRPMTimeIntegral: Double
+        var temperatureTimeIntegral: Double
+        var rpmHighDuration: TimeInterval
+        var tempHighDuration: TimeInterval
+    }
+
+    private let queue = DispatchQueue(label: "com.ifancontrol.thermal-alert", qos: .utility)
+    private let enabledKey = "ifancontrol.thermal_alert.enabled"
+    private let lastAlertAtKey = "ifancontrol.thermal_alert.last_alert_at"
+    private let bucketDuration: TimeInterval = 600
+    private let minimumBucketSpan: TimeInterval = 480
+    private let minimumBucketSamples = 200
+    private let hotPowerThreshold = 10.0
+    private let highRPMThreshold = 0.60
+    private let highTemperatureThreshold = 100.0
+    private let sustainedFractionThreshold = 0.90
+    private let cooldownInterval: TimeInterval = 12 * 60 * 60
+
+    private var currentBucket: Bucket?
+    private var lastFinalizedBucketStart: TimeInterval?
+    private var lastBucketQualified = false
+    private var consecutiveQualifiedBuckets = 0
+    private var qualifyingBucketStarts: [TimeInterval] = []
+
+    private init() {
+        if UserDefaults.standard.object(forKey: enabledKey) == nil {
+            UserDefaults.standard.set(true, forKey: enabledKey)
+        }
+    }
+
+    func recordSample(
+        timestamp: TimeInterval,
+        weightedHotTemperatureCelsius: Double?,
+        hottestFanRPM: Int?,
+        currentMaxRPM: Int,
+        hotWatts: Double,
+        controlModeAutomatic: Bool
+    ) {
+        guard UserDefaults.standard.bool(forKey: enabledKey),
+              let temperature = weightedHotTemperatureCelsius,
+              let hottestFanRPM,
+              currentMaxRPM > 0 else {
+            return
+        }
+
+        let normalizedRPM = min(max(Double(hottestFanRPM) / Double(currentMaxRPM), 0), 1)
+        let bucketStart = floor(timestamp / bucketDuration) * bucketDuration
+
+        queue.async { [weak self] in
+            guard let self else { return }
+
+            if self.currentBucket == nil {
+                self.currentBucket = Bucket(
+                    bucketStart: bucketStart,
+                    firstSampleAt: timestamp,
+                    lastSampleAt: timestamp,
+                    sampleCount: 0,
+                    accumulatedDuration: 0,
+                    autoDuration: 0,
+                    hotEnergyJoules: 0,
+                    normalizedRPMTimeIntegral: 0,
+                    temperatureTimeIntegral: 0,
+                    rpmHighDuration: 0,
+                    tempHighDuration: 0
+                )
+            } else if self.currentBucket?.bucketStart != bucketStart {
+                if let finished = self.currentBucket {
+                    self.finalize(bucket: finished)
+                }
+                self.currentBucket = Bucket(
+                    bucketStart: bucketStart,
+                    firstSampleAt: timestamp,
+                    lastSampleAt: timestamp,
+                    sampleCount: 0,
+                    accumulatedDuration: 0,
+                    autoDuration: 0,
+                    hotEnergyJoules: 0,
+                    normalizedRPMTimeIntegral: 0,
+                    temperatureTimeIntegral: 0,
+                    rpmHighDuration: 0,
+                    tempHighDuration: 0
+                )
+            }
+
+            guard var bucket = self.currentBucket else { return }
+            let dt = max(0, timestamp - bucket.lastSampleAt)
+            bucket.lastSampleAt = timestamp
+            bucket.sampleCount += 1
+            bucket.accumulatedDuration += dt
+            bucket.hotEnergyJoules += hotWatts * dt
+            bucket.normalizedRPMTimeIntegral += normalizedRPM * dt
+            bucket.temperatureTimeIntegral += temperature * dt
+            if controlModeAutomatic {
+                bucket.autoDuration += dt
+            }
+            if normalizedRPM >= self.highRPMThreshold {
+                bucket.rpmHighDuration += dt
+            }
+            if temperature >= self.highTemperatureThreshold {
+                bucket.tempHighDuration += dt
+            }
+            self.currentBucket = bucket
+        }
+    }
+
+    private func finalize(bucket: Bucket) {
+        let span = bucket.lastSampleAt - bucket.firstSampleAt
+        let effectiveDuration = max(bucket.accumulatedDuration, 0)
+        guard bucket.sampleCount >= minimumBucketSamples, span >= minimumBucketSpan, effectiveDuration > 0 else {
+            consecutiveQualifiedBuckets = 0
+            lastBucketQualified = false
+            lastFinalizedBucketStart = bucket.bucketStart
+            return
+        }
+
+        let avgHotWatts = bucket.hotEnergyJoules / effectiveDuration
+        let avgNormalizedRPM = bucket.normalizedRPMTimeIntegral / effectiveDuration
+        let avgTemperature = bucket.temperatureTimeIntegral / effectiveDuration
+        let autoFraction = bucket.autoDuration / effectiveDuration
+        let rpmHighFraction = bucket.rpmHighDuration / effectiveDuration
+        let tempHighFraction = bucket.tempHighDuration / effectiveDuration
+
+        let qualifies =
+            avgHotWatts < hotPowerThreshold &&
+            avgNormalizedRPM >= highRPMThreshold &&
+            avgTemperature >= highTemperatureThreshold &&
+            autoFraction >= sustainedFractionThreshold &&
+            rpmHighFraction >= sustainedFractionThreshold &&
+            tempHighFraction >= sustainedFractionThreshold
+
+        if qualifies {
+            if let lastFinalizedBucketStart,
+               lastBucketQualified,
+               bucket.bucketStart == lastFinalizedBucketStart + bucketDuration {
+                consecutiveQualifiedBuckets += 1
+            } else {
+                consecutiveQualifiedBuckets = 1
+            }
+            qualifyingBucketStarts.append(bucket.bucketStart)
+            let trailingEdge = bucket.bucketStart - 3600
+            qualifyingBucketStarts.removeAll(where: { $0 < trailingEdge })
+        } else {
+            consecutiveQualifiedBuckets = 0
+        }
+
+        let shouldAlert = qualifies &&
+            (consecutiveQualifiedBuckets >= 2 || qualifyingBucketStarts.count >= 4) &&
+            cooldownElapsed(referenceTimestamp: bucket.lastSampleAt)
+
+        AppLog.shared.info(
+            "thermal alert bucket start=\(bucket.bucketStart) hot=\(String(format: "%.2f", avgHotWatts)) " +
+            "rpm=\(String(format: "%.3f", avgNormalizedRPM)) temp=\(String(format: "%.2f", avgTemperature)) " +
+            "autoFrac=\(String(format: "%.2f", autoFraction)) rpmHighFrac=\(String(format: "%.2f", rpmHighFraction)) " +
+            "tempHighFrac=\(String(format: "%.2f", tempHighFraction)) qualifies=\(qualifies) " +
+            "consecutive=\(consecutiveQualifiedBuckets) recent=\(qualifyingBucketStarts.count) alert=\(shouldAlert)"
+        )
+
+        if shouldAlert {
+            UserDefaults.standard.set(bucket.lastSampleAt, forKey: lastAlertAtKey)
+            presentAlert()
+        }
+
+        lastBucketQualified = qualifies
+        lastFinalizedBucketStart = bucket.bucketStart
+    }
+
+    private func cooldownElapsed(referenceTimestamp: TimeInterval) -> Bool {
+        let defaults = UserDefaults.standard
+        guard let lastAlertAt = defaults.object(forKey: lastAlertAtKey) as? TimeInterval else {
+            return true
+        }
+        return referenceTimestamp - lastAlertAt >= cooldownInterval
+    }
+
+    private func presentAlert() {
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = appL10n("散热异常提醒", "Thermal Warning")
+            alert.informativeText = appL10n(
+                "检测到设备在较低输入功率下，风扇已长时间保持较高转速，但温度仍持续维持在高位。请检查进风口和出风口是否被遮挡；如通风正常，建议联系 Apple 官方售后进一步检查。",
+                "The device has stayed at a high temperature for an extended period despite low input power and sustained high fan speed. Please check whether the intake and exhaust are blocked. If airflow is normal, consider contacting Apple Support for further inspection."
+            )
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: appL10n("知道了", "OK"))
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
     }
 }
 
@@ -155,7 +707,7 @@ final class AppLog: @unchecked Sendable {
         let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
         let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
         let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
-        info("Session started version=\(shortVersion) (\(buildVersion)) os=\(osVersion) pid=\(ProcessInfo.processInfo.processIdentifier)")
+        info("Session started version=\(shortVersion) (\(buildVersion)) os=\(osVersion) model=\(systemModelIdentifier) arch=\(systemArchitecture) pid=\(ProcessInfo.processInfo.processIdentifier)")
     }
 
     func debug(_ message: String) { write(level: "DEBUG", message: message) }
@@ -254,6 +806,8 @@ final class AppLog: @unchecked Sendable {
         generated_at=\(formatter.string(from: Date()))
         app_version=\(shortVersion) (\(buildVersion))
         os=\(osVersion)
+        model=\(systemModelIdentifier)
+        arch=\(systemArchitecture)
         locale=\(locale)
         support_email=\(supportEmailAddress)
         log_directory=\(logsDirectoryURL.path)
@@ -492,7 +1046,9 @@ final class PrivacyStatsService: @unchecked Sendable {
     private let activationAckKey = "ifancontrol.privacy_stats.last_activation_ack_version_build"
 
     private let recordInterval: TimeInterval = 15 * 60   // 每 15 分钟入队一条
-    private let maxQueuedEvents = 192                      // 48 小时（192 × 15min）
+    private let maxQueuedEvents = 2880                     // 30 天（2880 × 15min）
+    private let maxUploadEventsPerBatch = 80
+    private let targetUploadPayloadBytes = 3800
 
     private let queueFileURL: URL = {
         FileManager.default.homeDirectoryForCurrentUser
@@ -734,25 +1290,44 @@ final class PrivacyStatsService: @unchecked Sendable {
 
     private func sendEventsToHeartbeat(_ events: [HeartbeatEvent], version: String, build: String) async -> Bool {
         let installID = currentInstallID()
-        let eventDicts = events.map { ["ts": $0.ts, "type": $0.type] as [String: Any] }
-        let payload: [String: Any] = [
-            "install_id": installID,
-            "version": version,
-            "build": build,
-            "events": eventDicts
-        ]
+        let chunks = chunkEventsForUpload(events, installID: installID, version: version, build: build)
+        var allSucceeded = true
+        for chunk in chunks {
+            let success = await sendHeartbeatRequest(chunk, installID: installID, version: version, build: build)
+            allSucceeded = allSucceeded && success
+        }
+        return allSucceeded
+    }
 
+    private func sendHeartbeatRequest(_ events: [HeartbeatEvent], installID: String, version: String, build: String) async -> Bool {
         do {
             var request = URLRequest(url: endpointURL)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.timeoutInterval = 8
 
-            let body = try JSONSerialization.data(withJSONObject: payload)
+            let body = try payloadData(for: events, installID: installID, version: version, build: build)
             let (_, response) = try await URLSession.shared.upload(for: request, from: body)
+            let payloadBytes = body.count
 
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                logger.warning("Heartbeat batch rejected by server, re-queuing \(events.count) events for \(version)-\(build).")
+            guard let http = response as? HTTPURLResponse else {
+                logger.warning("Heartbeat batch rejected by server status=non_http events=\(events.count) bytes=\(payloadBytes) version=\(version, privacy: .public)-\(build, privacy: .public), re-queuing.")
+                requeueEvents(events)
+                return false
+            }
+
+            if http.statusCode == 413, events.count > 1 {
+                let splitIndex = max(1, events.count / 2)
+                let firstHalf = Array(events[..<splitIndex])
+                let secondHalf = Array(events[splitIndex...])
+                logger.warning("Heartbeat batch too large status=413 events=\(events.count) bytes=\(payloadBytes) split=\(firstHalf.count)+\(secondHalf.count) version=\(version, privacy: .public)-\(build, privacy: .public).")
+                let firstSucceeded = await sendEventsToHeartbeat(firstHalf, version: version, build: build)
+                let secondSucceeded = await sendEventsToHeartbeat(secondHalf, version: version, build: build)
+                return firstSucceeded && secondSucceeded
+            }
+
+            guard (200..<300).contains(http.statusCode) else {
+                logger.warning("Heartbeat batch rejected by server status=\(http.statusCode) events=\(events.count) bytes=\(payloadBytes) version=\(version, privacy: .public)-\(build, privacy: .public), re-queuing.")
                 requeueEvents(events)
                 return false
             }
@@ -760,13 +1335,55 @@ final class PrivacyStatsService: @unchecked Sendable {
             if "\(version)-\(build)" == currentVersionBuild() {
                 lock.withLock { lastActivationAckVersionBuild = currentVersionBuild() }
             }
-            logger.info("Heartbeat batch sent: \(events.count) events for \(version)-\(build).")
+            logger.info("Heartbeat batch sent status=\(http.statusCode) events=\(events.count) bytes=\(payloadBytes) version=\(version, privacy: .public)-\(build, privacy: .public).")
             return true
         } catch {
-            logger.warning("Heartbeat batch failed: \(error.localizedDescription, privacy: .public), re-queuing \(events.count) events for \(version)-\(build).")
+            logger.warning("Heartbeat batch failed error=\(error.localizedDescription, privacy: .public) events=\(events.count) version=\(version, privacy: .public)-\(build, privacy: .public), re-queuing.")
             requeueEvents(events)
             return false
         }
+    }
+
+    private func payloadData(for events: [HeartbeatEvent], installID: String, version: String, build: String) throws -> Data {
+        let eventDicts = events.map { ["ts": $0.ts, "type": $0.type] as [String: Any] }
+        let payload: [String: Any] = [
+            "install_id": installID,
+            "version": version,
+            "build": build,
+            "events": eventDicts
+        ]
+        return try JSONSerialization.data(withJSONObject: payload)
+    }
+
+    private func chunkEventsForUpload(_ events: [HeartbeatEvent], installID: String, version: String, build: String) -> [[HeartbeatEvent]] {
+        guard !events.isEmpty else { return [] }
+
+        var chunks: [[HeartbeatEvent]] = []
+        var currentChunk: [HeartbeatEvent] = []
+
+        for event in events {
+            let candidateChunk = currentChunk + [event]
+            let isOverEventLimit = candidateChunk.count > maxUploadEventsPerBatch
+            let isOverPayloadLimit: Bool
+            do {
+                let data = try payloadData(for: candidateChunk, installID: installID, version: version, build: build)
+                isOverPayloadLimit = data.count > targetUploadPayloadBytes
+            } catch {
+                isOverPayloadLimit = candidateChunk.count > 1
+            }
+
+            if !currentChunk.isEmpty && (isOverEventLimit || isOverPayloadLimit) {
+                chunks.append(currentChunk)
+                currentChunk = [event]
+            } else {
+                currentChunk = candidateChunk
+            }
+        }
+
+        if !currentChunk.isEmpty {
+            chunks.append(currentChunk)
+        }
+        return chunks
     }
 
     func requeueEvents(_ events: [HeartbeatEvent]) {
@@ -974,6 +1591,7 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
     private var _temperatures: [String: Double] = [:]
     private var _fanRPMs: [Int: Int] = [:]
     private var _lastSuccessfulTemperatureRefresh: Date?
+    private var _lastSuccessfulFanRPMRefresh: Date?
     private var _consecutiveTemperatureFailures: Int = 0
     private var _refreshInFlight = false
 
@@ -982,6 +1600,7 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
         let fanRPMs: [Int: Int]
         let consecutiveTemperatureFailures: Int
         let secondsSinceTemperatureSuccess: TimeInterval?
+        let secondsSinceFanRPMSuccess: TimeInterval?
     }
 
     var temperatures: [String: Double] {
@@ -998,7 +1617,8 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
             temperatures: _temperatures,
             fanRPMs: _fanRPMs,
             consecutiveTemperatureFailures: _consecutiveTemperatureFailures,
-            secondsSinceTemperatureSuccess: _lastSuccessfulTemperatureRefresh.map { Date().timeIntervalSince($0) }
+            secondsSinceTemperatureSuccess: _lastSuccessfulTemperatureRefresh.map { Date().timeIntervalSince($0) },
+            secondsSinceFanRPMSuccess: _lastSuccessfulFanRPMRefresh.map { Date().timeIntervalSince($0) }
         )
     }
 
@@ -1065,16 +1685,24 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
                 _lastSuccessfulTemperatureRefresh = finishedAt
                 _consecutiveTemperatureFailures = 0
             } else if !sensors.isEmpty {
-                _temperatures = [:]
                 _consecutiveTemperatureFailures += 1
             }
-            if !rpms.isEmpty { _fanRPMs = rpms }
+            if !rpms.isEmpty {
+                _fanRPMs = rpms
+                _lastSuccessfulFanRPMRefresh = finishedAt
+            }
             let gotTemps = !temps.isEmpty
             let consecutiveFailures = _consecutiveTemperatureFailures
+            let cachedTempCount = _temperatures.count
+            let cachedRPMCount = _fanRPMs.count
+            let tempAge = _lastSuccessfulTemperatureRefresh.map { finishedAt.timeIntervalSince($0) } ?? .infinity
+            let rpmAge = _lastSuccessfulFanRPMRefresh.map { finishedAt.timeIntervalSince($0) } ?? .infinity
             lock.unlock()
 
             if !gotTemps && !sensors.isEmpty {
-                AppLog.shared.warning("bg refresh: all \(sensors.count) sensor reads failed consecutive=\(consecutiveFailures)")
+                let tempAgeText = tempAge.isFinite ? String(format: "%.1f", tempAge) : "inf"
+                let rpmAgeText = rpmAge.isFinite ? String(format: "%.1f", rpmAge) : "inf"
+                AppLog.shared.warning("bg refresh: all \(sensors.count) sensor reads failed consecutive=\(consecutiveFailures) keepingCachedTemps=\(cachedTempCount) keepingCachedRPMs=\(cachedRPMCount) tempAge=\(tempAgeText) rpmAge=\(rpmAgeText)")
             }
         }
     }
@@ -1088,6 +1716,7 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
         }
         if !fanRPMs.isEmpty {
             _fanRPMs = fanRPMs
+            _lastSuccessfulFanRPMRefresh = Date()
         }
         lock.unlock()
         AppLog.shared.info("bg snapshot replaced reason=\(reason) temps=\(temperatures.count) rpms=\(fanRPMs.count)")
@@ -1115,6 +1744,10 @@ class FanManager {
     private var lastTelemetryLogTimestamp: Date?
     private var hasProbedHardware = false
     private var lastHardwareReprobeAt: Date?
+    private let discoveryQueue = DispatchQueue(label: "com.ifancontrol.dynamic-sensor-discovery", qos: .utility)
+    private var cachedDynamicTemperatureCandidateKeys: [String] = []
+    private var dynamicSensorDiscoveryInFlight = false
+    private var dynamicSensorDiscoveryAttempted = false
     private let logger = Logger(subsystem: appSubsystem, category: "Hardware")
     private let telemetryDetailLogInterval: TimeInterval = 10.0
     
@@ -1232,6 +1865,103 @@ class FanManager {
         return candidateMaxima.min() ?? fallbackMaxRPM
     }
 
+    private func discoverTemperatureCandidateKeys() -> [String] {
+        var orderedKeys: [String] = SensorCatalog.appleSiliconTemperatureSensors.map(\.key)
+        var seen = Set(orderedKeys)
+        for key in cachedDynamicTemperatureCandidateKeys where !seen.contains(key) {
+            seen.insert(key)
+            orderedKeys.append(key)
+        }
+
+        if cachedDynamicTemperatureCandidateKeys.isEmpty {
+            kickOffDynamicSensorDiscoveryIfNeeded()
+        }
+
+        AppLog.shared.info("dynamic sensor discovery candidates model=\(systemModelIdentifier) static=\(SensorCatalog.appleSiliconTemperatureSensors.count) cachedDynamic=\(cachedDynamicTemperatureCandidateKeys.count) mergedCandidates=\(orderedKeys.count)")
+        return orderedKeys
+    }
+
+    private func kickOffDynamicSensorDiscoveryIfNeeded() {
+        guard !dynamicSensorDiscoveryInFlight, !dynamicSensorDiscoveryAttempted else { return }
+        dynamicSensorDiscoveryInFlight = true
+        dynamicSensorDiscoveryAttempted = true
+        let kentsmcPath = self.kentsmcPath
+
+        discoveryQueue.async { [weak self] in
+            guard let self else { return }
+
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: kentsmcPath)
+            task.arguments = ["-l"]
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            task.standardError = Pipe()
+
+            let discoveredKeys: [String]
+            do {
+                try task.run()
+                task.waitUntilExit()
+                if task.terminationStatus == 0,
+                   let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8),
+                   !output.isEmpty,
+                   let regex = try? NSRegularExpression(pattern: "\\bT[A-Za-z0-9]{3}\\b") {
+                    let nsRange = NSRange(output.startIndex..<output.endIndex, in: output)
+                    var seen = Set<String>()
+                    discoveredKeys = regex.matches(in: output, options: [], range: nsRange).compactMap { match -> String? in
+                        guard let range = Range(match.range, in: output) else { return nil }
+                        let key = String(output[range])
+                        return seen.insert(key).inserted ? key : nil
+                    }
+                } else {
+                    discoveredKeys = []
+                }
+            } catch {
+                Task { @MainActor in
+                    AppLog.shared.warning("dynamic sensor discovery failed to launch model=\(systemModelIdentifier) error=\(error.localizedDescription)")
+                    self.dynamicSensorDiscoveryInFlight = false
+                }
+                return
+            }
+
+            Task { @MainActor in
+                self.dynamicSensorDiscoveryInFlight = false
+                guard !discoveredKeys.isEmpty else {
+                    AppLog.shared.warning("dynamic sensor discovery unavailable: kentsmc -l returned no usable temperature keys model=\(systemModelIdentifier) os=\(ProcessInfo.processInfo.operatingSystemVersionString)")
+                    return
+                }
+                self.cachedDynamicTemperatureCandidateKeys = discoveredKeys
+                AppLog.shared.info("dynamic sensor discovery completed model=\(systemModelIdentifier) discovered=\(discoveredKeys.count)")
+                self.reprobeHardware(reason: "dynamic_sensor_discovery_ready", minimumInterval: 0)
+            }
+        }
+    }
+
+    private func validateDiscoveredTemperatureKey(_ key: String, isKnown: Bool) -> TemperatureSensorDefinition? {
+        var successfulReadings: [Double] = []
+        let attempts = isKnown ? 1 : 2
+        for _ in 0..<attempts {
+            if let value = readTemperatureValue(forKey: key) {
+                successfulReadings.append(value)
+            }
+        }
+
+        guard !successfulReadings.isEmpty else {
+            return nil
+        }
+        if !isKnown && successfulReadings.count < attempts {
+            return nil
+        }
+        if successfulReadings.count >= 2,
+           let minValue = successfulReadings.min(),
+           let maxValue = successfulReadings.max(),
+           maxValue - minValue > 15 {
+            AppLog.shared.warning("dynamic sensor candidate rejected key=\(key) reason=unstable delta=\(String(format: "%.2f", maxValue - minValue))")
+            return nil
+        }
+
+        return SensorCatalog.definition(forTemperatureKey: key)
+    }
+
     func probeHardwareIfNeeded() {
         guard !hasProbedHardware else { return }
         refreshHardwareProfile()
@@ -1255,10 +1985,17 @@ class FanManager {
 
         currentMaxRPM = determineGlobalMaxRPM(from: fans)
 
+        let candidateKeys = discoverTemperatureCandidateKeys()
+        let knownKeys = Set(SensorCatalog.appleSiliconTemperatureSensors.map(\.key))
         var discoveredSensors: [TemperatureSensorDefinition] = []
-        for sensor in SensorCatalog.appleSiliconTemperatureSensors {
-            if readTemperatureValue(forKey: sensor.key) != nil {
+        var dynamicOnlyKeys: [String] = []
+        for key in candidateKeys {
+            let isKnown = knownKeys.contains(key)
+            if let sensor = validateDiscoveredTemperatureKey(key, isKnown: isKnown) {
                 discoveredSensors.append(sensor)
+                if !isKnown {
+                    dynamicOnlyKeys.append(key)
+                }
             }
         }
 
@@ -1271,7 +2008,8 @@ class FanManager {
 
         logger.info("Hardware profile refreshed: fans=\(self.fanCount, privacy: .public) sensors=\(self.availableTemperatureSensors.count, privacy: .public) maxRPM=\(self.currentMaxRPM, privacy: .public)")
         let sensorKeys = availableTemperatureSensors.map(\.key).joined(separator: ",")
-        AppLog.shared.info("hardware profile refreshed fans=\(fanCount) maxRPM=\(currentMaxRPM) sensors=\(availableTemperatureSensors.count) keys=[\(sensorKeys)]")
+        let dynamicKeyText = dynamicOnlyKeys.isEmpty ? "none" : dynamicOnlyKeys.joined(separator: ",")
+        AppLog.shared.info("hardware profile refreshed model=\(systemModelIdentifier) os=\(ProcessInfo.processInfo.operatingSystemVersionString) fans=\(fanCount) maxRPM=\(currentMaxRPM) sensors=\(availableTemperatureSensors.count) dynamicOnly=\(dynamicOnlyKeys.count) dynamicKeys=[\(dynamicKeyText)] keys=[\(sensorKeys)]")
 
         hasProbedHardware = true
         lastHardwareReprobeAt = Date()
@@ -1342,17 +2080,7 @@ class FanManager {
 
     func currentTemperatureReading(using config: Config) -> TemperatureReading? {
         let readings = availableTemperatureReadings()
-        guard !readings.isEmpty else {
-            return nil
-        }
-
-        if config.temperatureSourceMode == "manual",
-           let selectedKey = config.selectedTemperatureSensorKey,
-           let selected = readings.first(where: { $0.sensor.key == selectedKey }) {
-            return selected
-        }
-
-        return readings.max(by: { $0.value < $1.value })
+        return selectedTemperatureReading(from: readings, config: config)
     }
 
     func readPrimaryFanRPM(refresh: Bool = true) -> Int? {
@@ -1406,7 +2134,7 @@ class FanManager {
             } else {
                 print("Error setting fan RPM: \(error ?? "Unknown error")")
                 AppLog.shared.error("setFanRPM apply failed smoothed=\(smoothedRPM) error=\(error ?? "unknown")")
-                self.returnControlToSystemFailSafe(reason: "setFanRPM_failed")
+                self.returnControlToSystemFailSafe(reason: "fan_command_failed")
             }
         }
     }
@@ -1417,7 +2145,7 @@ class FanManager {
             return
         }
         lastFailSafeAutoReturnAt = Date()
-        AppLog.shared.warning("returning control to system fail-safe reason=\(reason)")
+        AppLog.shared.warning("returning control to system fail-safe reason=\(reason) model=\(systemModelIdentifier) os=\(ProcessInfo.processInfo.operatingSystemVersionString)")
         Task { @MainActor in
             AppDelegate.shared?.recordSystemAutoFallback(reason: reason)
             AppDelegate.shared?.showSafetyAlert(
@@ -1923,15 +2651,71 @@ class MenuBarManager: NSObject {
         get { UserDefaults.standard.string(forKey: displayModeKey) ?? "full" }
         set { UserDefaults.standard.set(newValue, forKey: displayModeKey) }
     }
-    private let miniTopLineKey = "ifancontrol.ui.mini_top_line"
-    private var miniTopLine: String {
-        get { UserDefaults.standard.string(forKey: miniTopLineKey) ?? "temp_unit_mode" }
-        set { UserDefaults.standard.set(newValue, forKey: miniTopLineKey) }
+    private let miniTopSourceKey = "ifancontrol.ui.mini_top_source"
+    private let miniTopStyleKey = "ifancontrol.ui.mini_top_style"
+    private let miniBottomSourceKey = "ifancontrol.ui.mini_bottom_source"
+    private let miniBottomStyleKey = "ifancontrol.ui.mini_bottom_style"
+
+    private enum MiniLineSource: String {
+        case temperature
+        case rpm
+        case power
     }
-    private let miniBottomLineKey = "ifancontrol.ui.mini_bottom_line"
-    private var miniBottomLine: String {
-        get { UserDefaults.standard.string(forKey: miniBottomLineKey) ?? "rpm_unit" }
-        set { UserDefaults.standard.set(newValue, forKey: miniBottomLineKey) }
+
+    private enum MiniLineStyle: String {
+        case value
+        case unit
+        case mode
+        case full
+    }
+
+    private func parseMiniLineSources(_ rawValue: String?) -> [MiniLineSource] {
+        guard let rawValue, !rawValue.isEmpty else { return [] }
+        var seen = Set<String>()
+        return rawValue
+            .split(separator: ",")
+            .compactMap { MiniLineSource(rawValue: String($0)) }
+            .filter { seen.insert($0.rawValue).inserted }
+    }
+
+    private func serializedMiniLineSources(_ sources: [MiniLineSource]) -> String {
+        var seen = Set<String>()
+        return sources
+            .filter { seen.insert($0.rawValue).inserted }
+            .map(\.rawValue)
+            .joined(separator: ",")
+    }
+
+    private func miniLineConfiguration(sourceKey: String, styleKey: String, legacyKey: String, defaultSources: [MiniLineSource], defaultStyle: MiniLineStyle) -> ([MiniLineSource], MiniLineStyle) {
+        let defaults = UserDefaults.standard
+        let savedSources = parseMiniLineSources(defaults.string(forKey: sourceKey))
+        if !savedSources.isEmpty,
+           let style = defaults.string(forKey: styleKey).flatMap(MiniLineStyle.init(rawValue:)) {
+            return (savedSources, style)
+        }
+        if let legacy = defaults.string(forKey: legacyKey) {
+            let migrated = Self.mapLegacyMiniContentType(legacy)
+            defaults.set(serializedMiniLineSources([migrated.0]), forKey: sourceKey)
+            defaults.set(migrated.1.rawValue, forKey: styleKey)
+            return ([migrated.0], migrated.1)
+        }
+        return (defaultSources, defaultStyle)
+    }
+
+    private var miniTopLine: (sources: [MiniLineSource], style: MiniLineStyle) {
+        get { miniLineConfiguration(sourceKey: miniTopSourceKey, styleKey: miniTopStyleKey, legacyKey: "ifancontrol.ui.mini_top_line", defaultSources: [.temperature], defaultStyle: .full) }
+        set {
+            UserDefaults.standard.set(serializedMiniLineSources(newValue.sources), forKey: miniTopSourceKey)
+            UserDefaults.standard.set(newValue.style.rawValue, forKey: miniTopStyleKey)
+        }
+    }
+
+    private var miniBottomLine: (sources: [MiniLineSource], style: MiniLineStyle) {
+        get { miniLineConfiguration(sourceKey: miniBottomSourceKey, styleKey: miniBottomStyleKey, legacyKey: "ifancontrol.ui.mini_bottom_line", defaultSources: [.rpm], defaultStyle: .unit) }
+        set {
+            UserDefaults.standard.set(serializedMiniLineSources(newValue.sources), forKey: miniBottomSourceKey)
+            UserDefaults.standard.set(newValue.style.rawValue, forKey: miniBottomStyleKey)
+        }
     }
 
     // Mini display mode: custom NSView with direct Core Text rendering
@@ -1943,6 +2727,7 @@ class MenuBarManager: NSObject {
     private var helpWindowController: HelpWindowController?
     private var feedbackWindowController: FeedbackWindowController?
     private var displaySettingsWindowController: DisplaySettingsWindowController?
+    private var powerConsumptionWindowController: PowerConsumptionWindowController?
 
     // GCD 定时器（不依赖 RunLoop，无显示器也能运行）
     private var menuPollTimer: DispatchSourceTimer?
@@ -1965,6 +2750,8 @@ class MenuBarManager: NSObject {
     private var speedItem: NSMenuItem?
     private var autoStartItem: NSMenuItem?
     private var hottestItem: NSMenuItem?
+    private var cpuAverageItem: NSMenuItem?
+    private var gpuAverageItem: NSMenuItem?
     private var sensorMenuItems: [NSMenuItem] = []
     private var zhItem: NSMenuItem?
     private var enItem: NSMenuItem?
@@ -1991,9 +2778,126 @@ class MenuBarManager: NSObject {
         }
         return automatic ? appL10n("自动 / \(reading.sensor.key)", "Auto / \(reading.sensor.key)") : appL10n("手动 / \(reading.sensor.key)", "Manual / \(reading.sensor.key)")
     }
+
+    private func sourceSummary(for reading: TemperatureReading, config: Config, in readings: [TemperatureReading]) -> String {
+        if let averagedSource = averagedTemperatureSourceDefinition(for: config.temperatureSourceMode) {
+            return averagedSource.name
+        }
+        return selectionSummary(
+            for: reading,
+            in: readings,
+            automatic: config.temperatureSourceMode != "manual"
+        )
+    }
+
+    private struct StatusBarDisplayData {
+        let temperatureNumberText: String
+        let temperatureTextWithUnit: String
+        let rpmNumberText: String
+        let rpmTextWithUnit: String
+        let powerNumberText: String
+        let powerTextWithUnit: String
+        let isTemperatureAvailable: Bool
+        let isRPMAvailable: Bool
+        let isPowerAvailable: Bool
+
+        private func sourceTexts(for source: MiniLineSource) -> (value: String, unit: String) {
+            switch source {
+            case .temperature:
+                return (temperatureNumberText, temperatureTextWithUnit)
+            case .rpm:
+                return (rpmNumberText, rpmTextWithUnit)
+            case .power:
+                return (powerNumberText, powerTextWithUnit)
+            }
+        }
+
+        func miniContent(sources: [MiniLineSource], style: MiniLineStyle, modeLetter: String) -> (primary: String, accent: String) {
+            let effectiveSources = sources.isEmpty ? [.temperature] : sources
+            let values = effectiveSources.map { sourceTexts(for: $0).value }
+            let units = effectiveSources.map { sourceTexts(for: $0).unit }
+            let joinedValue = values.joined(separator: "｜")
+            let joinedUnit = units.joined(separator: "｜")
+
+            switch style {
+            case .value:
+                return (joinedValue, "")
+            case .unit:
+                return (joinedUnit, "")
+            case .mode:
+                return ("\(joinedValue)｜", modeLetter)
+            case .full:
+                return ("\(joinedUnit)｜", modeLetter)
+            }
+        }
+    }
+
+    private func makeStatusBarDisplayData(
+        selectedReading: TemperatureReading?,
+        latestRPM: Int?,
+        bgSnapshot: BackgroundHardwareReader.Snapshot,
+        powerSnapshot: PowerTelemetrySnapshot
+    ) -> StatusBarDisplayData {
+        let temperatureIsStale = (bgSnapshot.secondsSinceTemperatureSuccess ?? .infinity) > backgroundTelemetryStaleThreshold
+        let rpmIsStale = (bgSnapshot.secondsSinceFanRPMSuccess ?? .infinity) > backgroundTelemetryStaleThreshold
+        let powerIsStale = {
+            guard powerSnapshot.isSupported,
+                  let updatedAt = powerSnapshot.lastUpdatedAt else { return true }
+            return Date().timeIntervalSince(updatedAt) > backgroundTelemetryStaleThreshold
+        }()
+
+        let isTemperatureAvailable = selectedReading != nil && !temperatureIsStale
+        let isRPMAvailable = latestRPM != nil && !rpmIsStale
+        let isPowerAvailable = powerSnapshot.isSupported && !powerIsStale
+
+        let temperatureNumberText = isTemperatureAvailable
+            ? String(format: "%.0f", selectedReading!.value)
+            : "--"
+        let rpmNumberText = isRPMAvailable
+            ? "\(latestRPM!)"
+            : "--"
+        let powerNumberText = isPowerAvailable
+            ? String(format: "%.1f", max(powerSnapshot.cpuWatts + powerSnapshot.gpuWatts + powerSnapshot.aneWatts + powerSnapshot.ramWatts, 0))
+            : "--"
+
+        return StatusBarDisplayData(
+            temperatureNumberText: temperatureNumberText,
+            temperatureTextWithUnit: "\(temperatureNumberText)℃",
+            rpmNumberText: rpmNumberText,
+            rpmTextWithUnit: "\(rpmNumberText) RPM",
+            powerNumberText: powerNumberText,
+            powerTextWithUnit: "\(powerNumberText)W",
+            isTemperatureAvailable: isTemperatureAvailable,
+            isRPMAvailable: isRPMAvailable
+            ,
+            isPowerAvailable: isPowerAvailable
+        )
+    }
+
+    private static func mapLegacyMiniContentType(_ legacy: String) -> (MiniLineSource, MiniLineStyle) {
+        switch legacy {
+        case "temp":
+            return (.temperature, .value)
+        case "temp_unit":
+            return (.temperature, .unit)
+        case "temp_mode":
+            return (.temperature, .mode)
+        case "temp_unit_mode":
+            return (.temperature, .full)
+        case "rpm":
+            return (.rpm, .value)
+        case "rpm_unit":
+            return (.rpm, .unit)
+        case "rpm_short":
+            return (.rpm, .value)
+        default:
+            return (.rpm, .unit)
+        }
+    }
     
     func setupMenuBar() {
         createStatusItem()
+        PowerTelemetryReader.shared.refresh()
 
         NotificationCenter.default.addObserver(self, selector: #selector(handleCurveSaved), name: NSNotification.Name("FanCurveDidSave"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleCurveSwitched), name: NSNotification.Name("FanCurveDidSwitch"), object: nil)
@@ -2024,6 +2928,7 @@ class MenuBarManager: NSObject {
                 sensors: fm.availableTemperatureSensors,
                 fans: fm.fans
             )
+            PowerTelemetryReader.shared.refresh()
             // 主线程更新菜单 UI
             self.updateDynamicMenuItems()
         }
@@ -2039,6 +2944,12 @@ class MenuBarManager: NSObject {
             NSStatusBar.system.removeStatusItem(old)
         }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        if let button = statusItem?.button {
+            button.image = nil
+            button.imagePosition = .noImage
+            button.title = "···"
+        }
+        statusItem?.length = NSStatusItem.variableLength
         buildMenuOnce()
         setupMiniStatusHostingView()
         updateDynamicMenuItems()
@@ -2214,9 +3125,21 @@ class MenuBarManager: NSObject {
 
         let hottestItem = NSMenuItem(title: appL10n("自动选择（最热）", "Auto (Hottest)"), action: #selector(selectAutomaticTemperatureSource), keyEquivalent: "")
         hottestItem.target = self
-        hottestItem.state = config.temperatureSourceMode == "manual" ? .off : .on
+        hottestItem.state = (config.temperatureSourceMode == "manual" || averagedTemperatureSourceDefinition(for: config.temperatureSourceMode) != nil) ? .off : .on
         temperatureSourceMenu.addItem(hottestItem)
         self.hottestItem = hottestItem
+
+        let cpuAverageItem = NSMenuItem(title: appL10n("CPU 平均温度", "CPU Average Temperature"), action: #selector(selectCPUAverageTemperatureSource), keyEquivalent: "")
+        cpuAverageItem.target = self
+        cpuAverageItem.state = config.temperatureSourceMode == "cpu_average" ? .on : .off
+        temperatureSourceMenu.addItem(cpuAverageItem)
+        self.cpuAverageItem = cpuAverageItem
+
+        let gpuAverageItem = NSMenuItem(title: appL10n("GPU 平均温度", "GPU Average Temperature"), action: #selector(selectGPUAverageTemperatureSource), keyEquivalent: "")
+        gpuAverageItem.target = self
+        gpuAverageItem.state = config.temperatureSourceMode == "gpu_average" ? .on : .off
+        temperatureSourceMenu.addItem(gpuAverageItem)
+        self.gpuAverageItem = gpuAverageItem
 
         sensorMenuItems.removeAll()
         if !readings.isEmpty {
@@ -2295,6 +3218,10 @@ class MenuBarManager: NSObject {
         displayItem.target = self
         menu.addItem(displayItem)
 
+        let powerItem = NSMenuItem(title: appL10n("电力消耗...", "Power Consumption..."), action: #selector(showPowerConsumption), keyEquivalent: "")
+        powerItem.target = self
+        menu.addItem(powerItem)
+
         // 语言
         let languageItem = NSMenuItem(title: appL10n("语言", "Language"), action: nil, keyEquivalent: "")
         let languageMenu = NSMenu()
@@ -2366,64 +3293,55 @@ class MenuBarManager: NSObject {
         let config = ConfigManager.shared.loadConfig()
 
         // 从后台读取器的缓存读取（零硬件 I/O，零磁盘 I/O）
-        let bgReader = BackgroundHardwareReader.shared
+        let bgSnapshot = BackgroundHardwareReader.shared.snapshot
         let readings: [TemperatureReading] = FanManager.shared.availableTemperatureSensors.compactMap { sensor in
-            guard let value = bgReader.temperatures[sensor.key] else { return nil }
+            guard let value = bgSnapshot.temperatures[sensor.key] else { return nil }
             return TemperatureReading(sensor: sensor, value: value)
         }.sorted { lhs, rhs in
             if lhs.sensor.sortKey != rhs.sensor.sortKey { return lhs.sensor.sortKey < rhs.sensor.sortKey }
             return lhs.value > rhs.value
         }
 
-        let selectedReading: TemperatureReading?
-        if config.temperatureSourceMode == "manual",
-           let selectedKey = config.selectedTemperatureSensorKey {
-            selectedReading = readings.first(where: { $0.sensor.key == selectedKey })
-        } else {
-            selectedReading = readings.max(by: { $0.value < $1.value })
-        }
+        let selectedReading = selectedTemperatureReading(from: readings, config: config)
 
         if let reading = selectedReading {
             currentTemperature = reading.value
-            currentTemperatureSensorName = selectionSummary(for: reading, in: readings, automatic: config.temperatureSourceMode != "manual")
+            currentTemperatureSensorName = sourceSummary(for: reading, config: config, in: readings)
         }
 
-        if let rpm = bgReader.fanRPMs.values.max() {
+        let latestRPM = bgSnapshot.fanRPMs.values.max()
+        if let rpm = latestRPM {
             currentFanRPM = rpm
         }
+        let powerSnapshot = PowerTelemetryReader.shared.snapshot
+
+        let displayData = makeStatusBarDisplayData(
+            selectedReading: selectedReading,
+            latestRPM: latestRPM,
+            bgSnapshot: bgSnapshot,
+            powerSnapshot: powerSnapshot
+        )
 
         // 状态栏标题
         if displayMode == "compact" {
             miniStatusView?.isHidden = true
             statusItem.button?.imagePosition = .noImage
             let modeLetter = isAutoMode ? "A" : "M"
-            statusItem.button?.title = "\(String(format: "%.0f", currentTemperature))｜\(currentFanRPM)｜\(modeLetter)"
+            statusItem.button?.title = "\(displayData.temperatureNumberText)｜\(displayData.rpmNumberText)｜\(modeLetter)"
             statusItem.button?.image = nil
             statusItem.length = NSStatusItem.variableLength
         } else if displayMode == "mini" {
             let modeLetter = isAutoMode ? "A" : "M"
-            let tempStr = String(format: "%.0f", currentTemperature)
 
             let snapshot = ControlStatusStore.load()
             let isAbnormal = snapshot != nil && snapshot?.mode != "normal"
             let accentColor: NSColor = isAbnormal ? .systemRed : .systemGreen
 
-            // 共享：根据 contentType 生成 primary / accent
-            func resolveMiniContent(_ contentType: String) -> (primary: String, accent: String) {
-                switch contentType {
-                case "temp":           return (tempStr, "")
-                case "temp_unit":      return ("\(tempStr)℃", "")
-                case "temp_unit_mode": return ("\(tempStr)℃｜", modeLetter)
-                case "temp_mode":      return ("\(tempStr)｜", modeLetter)
-                case "rpm_unit":       return ("\(currentFanRPM) RPM", "")
-                case "rpm_short":      return ("\(currentFanRPM)R", "")
-                default:               return ("\(currentFanRPM)", "")  // rpm
-                }
-            }
+            let top = displayData.miniContent(sources: miniTopLine.sources, style: miniTopLine.style, modeLetter: modeLetter)
+            let bot = displayData.miniContent(sources: miniBottomLine.sources, style: miniBottomLine.style, modeLetter: modeLetter)
 
-            let top  = resolveMiniContent(miniTopLine)
-            let bot  = resolveMiniContent(miniBottomLine)
-
+            statusItem.button?.imagePosition = .noImage
+            statusItem.button?.image = nil
             if let v = miniStatusView {
                 v.topPrimaryText    = top.primary
                 v.topAccentText     = top.accent
@@ -2434,9 +3352,6 @@ class MenuBarManager: NSObject {
                 v.isHidden = false
                 v.setNeedsDisplay(v.bounds)
             }
-
-            statusItem.button?.imagePosition = .noImage
-            statusItem.button?.image = nil
             statusItem.button?.title = ""
 
             let font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .bold)
@@ -2445,17 +3360,17 @@ class MenuBarManager: NSObject {
             let botW = ("\(bot.primary)\(bot.accent)" as NSString).size(withAttributes: attrs).width
             statusItem.length = max(topW, botW) + 8
 
-            statusItem.button?.toolTip = "\(currentFanRPM) RPM | \(tempStr)℃ [\(isAutoMode ? "Auto" : "Manual")]"
+            statusItem.button?.toolTip = "\(displayData.rpmTextWithUnit) | \(displayData.temperatureTextWithUnit) | \(displayData.powerTextWithUnit) [\(isAutoMode ? "Auto" : "Manual")]"
         } else {
             miniStatusView?.isHidden = true
             statusItem.button?.imagePosition = .noImage
-            let temperatureText = String(format: "%.0f℃", currentTemperature)
-            let fanText = "\(currentFanRPM) RPM"
+            let temperatureText = displayData.temperatureTextWithUnit
+            let fanText = displayData.rpmTextWithUnit
             let modeText = isAutoMode ? "[Auto]" : "[Manual]"
             var statusIcon = ""
-            if currentTemperature >= 90.0 {
+            if displayData.isTemperatureAvailable && currentTemperature >= 90.0 {
                 statusIcon = " 🔥"
-            } else if currentTemperature >= 85.0 {
+            } else if displayData.isTemperatureAvailable && currentTemperature >= 85.0 {
                 statusIcon = " ⚠️"
             }
             statusItem.button?.image = nil
@@ -2478,7 +3393,9 @@ class MenuBarManager: NSObject {
         controlStatusBottomRightField?.stringValue = controlStatus.bottomRight
 
         // 温度源子菜单：更新传感器数值和选中态
-        hottestItem?.state = config.temperatureSourceMode == "manual" ? .off : .on
+        hottestItem?.state = (config.temperatureSourceMode == "manual" || averagedTemperatureSourceDefinition(for: config.temperatureSourceMode) != nil) ? .off : .on
+        cpuAverageItem?.state = config.temperatureSourceMode == "cpu_average" ? .on : .off
+        gpuAverageItem?.state = config.temperatureSourceMode == "gpu_average" ? .on : .off
         var sensorIdx = 0
         for section in groupedTemperatureReadings(readings) {
             for (index, reading) in section.readings.enumerated() {
@@ -2759,6 +3676,16 @@ class MenuBarManager: NSObject {
         presentWindowFront(displaySettingsWindowController?.window)
     }
 
+    @objc func showPowerConsumption() {
+        if powerConsumptionWindowController == nil {
+            powerConsumptionWindowController = PowerConsumptionWindowController()
+        }
+        PowerTelemetryReader.shared.refresh()
+        powerConsumptionWindowController?.showWindow(nil)
+        powerConsumptionWindowController?.refreshSnapshot()
+        presentWindowFront(powerConsumptionWindowController?.window)
+    }
+
     @objc func showSafetyFloorSetting() {
         let config = ConfigManager.shared.loadConfig()
         let currentRPM = min(max(config.safetyFloorRPM ?? FanManager.shared.defaultSafetyRPM, 2000), FanManager.shared.currentMaxRPM)
@@ -2795,6 +3722,24 @@ class MenuBarManager: NSObject {
         config.selectedTemperatureSensorKey = nil
         ConfigManager.shared.saveConfig(config)
         logger.info("Temperature source switched to automatic hottest sensor")
+        updateDynamicMenuItems()
+    }
+
+    @objc func selectCPUAverageTemperatureSource() {
+        var config = ConfigManager.shared.loadConfig()
+        config.temperatureSourceMode = "cpu_average"
+        config.selectedTemperatureSensorKey = nil
+        ConfigManager.shared.saveConfig(config)
+        logger.info("Temperature source switched to CPU sensor average")
+        updateDynamicMenuItems()
+    }
+
+    @objc func selectGPUAverageTemperatureSource() {
+        var config = ConfigManager.shared.loadConfig()
+        config.temperatureSourceMode = "gpu_average"
+        config.selectedTemperatureSensorKey = nil
+        ConfigManager.shared.saveConfig(config)
+        logger.info("Temperature source switched to GPU sensor average")
         updateDynamicMenuItems()
     }
 
@@ -2847,7 +3792,7 @@ class MenuBarManager: NSObject {
             defaults.set(true, forKey: temperatureSourceHintKey)
             let alert = NSAlert()
             alert.messageText = appL10n("温度源已自动选择", "Temperature Source Set to Auto")
-            alert.informativeText = appL10n("默认会使用当前最热的温度传感器来驱动风扇曲线。这里显示的是这台机器真实可读到的温度传感器，不一定与 CPU/GPU 核心数量一一对应。", "By default, the hottest available sensor is used to drive the fan curve. Sensor count may not match CPU/GPU core count.")
+            alert.informativeText = appL10n("默认会使用当前最热的温度传感器来驱动风扇曲线，也可以在温度源菜单中选择 CPU 或 GPU 传感器的平均温度，或固定某个传感器。这里显示的是这台机器真实可读到的温度传感器，不一定与 CPU/GPU 核心数量一一对应。", "By default, the hottest available sensor drives the fan curve. You can also choose a CPU or GPU sensor average, or pin one sensor from the temperature-source menu. Sensor count may not match CPU/GPU core count.")
             alert.alertStyle = .informational
             alert.addButton(withTitle: appL10n("知道了", "OK"))
             logger.info("Displayed first-run temperature source guidance")
@@ -2969,11 +3914,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     static weak var shared: AppDelegate?
     private var lastControlLoopLogTime: Date?
     private let controlLoopLogInterval: TimeInterval = 10.0
-    private let bgTelemetryStaleThreshold: TimeInterval = 8.0
     private let systemAutoFallbackInterval: TimeInterval = 30.0
     private let sensorLossSafeRPM = 2200
-    private let startupTelemetryGracePeriod: TimeInterval = 12.0
-    private let missingTelemetryTriggerCount = 3
+    private let startupTelemetryGracePeriod: TimeInterval = 20.0
+    private let missingTelemetryTriggerCount = 5
     private var statsHeartbeatTimer: DispatchSourceTimer?
     private var controlLoopTimer: DispatchSourceTimer?
     private var lastDiagLogTime: TimeInterval = 0
@@ -3077,26 +4021,57 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let config = ConfigManager.shared.loadConfig()
             let curve = MenuBarManager.shared.currentFanCurve
             let isAutoMode = config.mode == "auto"
+            let powerSnapshot = PowerTelemetryReader.shared.snapshot
 
             // 从后台读取器缓存读取（不触发主线程硬件 I/O）
             let bgSnapshot = BackgroundHardwareReader.shared.snapshot
             let bgTemps = bgSnapshot.temperatures
             let bgRPMs = bgSnapshot.fanRPMs
+            let temperatureAge = bgSnapshot.secondsSinceTemperatureSuccess ?? .infinity
+            let fanRPMAge = bgSnapshot.secondsSinceFanRPMSuccess ?? .infinity
+            let telemetryState: TelemetrySnapshotState = {
+                if temperatureAge.isFinite == false || temperatureAge > backgroundTelemetryExpiryThreshold {
+                    return .expired
+                }
+                if temperatureAge > backgroundTelemetryStaleThreshold {
+                    return .cachedStale
+                }
+                return .fresh
+            }()
+            let canUseTemperatureSnapshot = telemetryState != .expired
+            let candidateTemperatures = canUseTemperatureSnapshot ? bgTemps : [:]
             let readings: [TemperatureReading] = FanManager.shared.availableTemperatureSensors.compactMap { sensor in
-                guard let value = bgTemps[sensor.key] else { return nil }
+                guard let value = candidateTemperatures[sensor.key] else { return nil }
                 return TemperatureReading(sensor: sensor, value: value)
             }
-            var reading: TemperatureReading?
-            if config.temperatureSourceMode == "manual", let key = config.selectedTemperatureSensorKey {
-                reading = readings.first(where: { $0.sensor.key == key })
-            } else {
-                reading = readings.max(by: { $0.value < $1.value })
-            }
+            let reading = selectedTemperatureReading(from: readings, config: config)
 
-            let backgroundDataIsStale = (bgSnapshot.secondsSinceTemperatureSuccess ?? .infinity) > bgTelemetryStaleThreshold
-            if reading == nil || backgroundDataIsStale || bgSnapshot.consecutiveTemperatureFailures >= 3 {
-                if backgroundDataIsStale || bgSnapshot.consecutiveTemperatureFailures >= 3 {
-                    AppLog.shared.warning("control loop detected stale background telemetry bgFail=\(bgSnapshot.consecutiveTemperatureFailures) bgAge=\(bgSnapshot.secondsSinceTemperatureSuccess ?? -1)")
+            ThermalAnomalyAlertService.shared.recordSample(
+                timestamp: Date().timeIntervalSince1970,
+                weightedHotTemperatureCelsius: bgTemps.isEmpty ? nil : {
+                    let values = [
+                        "Tp00", "Tp01", "Tp04", "Tp05", "Tp08", "Tp09", "Tp0C", "Tp0D",
+                        "Tp0U", "Tp0V", "Tp0X", "Tp0Y", "Tp0a", "Tp0b", "Tp0d", "Tp0e", "Tp0f"
+                    ].compactMap { bgTemps[$0] }.sorted()
+                    guard !values.isEmpty else { return nil }
+                    let cutoff = Int(floor(Double(values.count) * 0.35))
+                    let keep = Array(values.dropFirst(cutoff))
+                    let topCount = max(3, Int(floor(Double(values.count) * 0.25)))
+                    let top = Array(values.suffix(topCount))
+                    guard !keep.isEmpty, !top.isEmpty else { return nil }
+                    let keepAverage = keep.reduce(0, +) / Double(keep.count)
+                    let topAverage = top.reduce(0, +) / Double(top.count)
+                    return 0.65 * keepAverage + 0.35 * topAverage
+                }(),
+                hottestFanRPM: bgSnapshot.fanRPMs.values.max(),
+                currentMaxRPM: FanManager.shared.currentMaxRPM,
+                hotWatts: powerSnapshot.cpuWatts + powerSnapshot.gpuWatts + powerSnapshot.aneWatts + powerSnapshot.ramWatts,
+                controlModeAutomatic: isAutoMode
+            )
+
+            if reading == nil || telemetryState != .fresh || bgSnapshot.consecutiveTemperatureFailures >= 3 {
+                if telemetryState != .fresh || bgSnapshot.consecutiveTemperatureFailures >= 3 {
+                    AppLog.shared.warning("control loop detected telemetry degradation state=\(telemetryState.rawValue) bgFail=\(bgSnapshot.consecutiveTemperatureFailures) tempAge=\(String(format: "%.1f", temperatureAge)) rpmAge=\(String(format: "%.1f", fanRPMAge))")
                 }
                 BackgroundHardwareReader.shared.refresh(
                     sensors: FanManager.shared.availableTemperatureSensors,
@@ -3110,13 +4085,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 lastDiagLogTime = now
                 let sensorKeys = FanManager.shared.availableTemperatureSensors.map(\.key)
                 let bgAgeText = bgSnapshot.secondsSinceTemperatureSuccess.map { String(format: "%.1f", $0) } ?? "nil"
-                AppLog.shared.info("ctrl diag bgTemps=\(bgTemps.count) bgRPMs=\(bgRPMs.count) sensors=\(sensorKeys.count) readings=\(readings.count) hasReading=\(reading != nil) bgFail=\(bgSnapshot.consecutiveTemperatureFailures) bgAge=\(bgAgeText)")
+                let rpmAgeText = bgSnapshot.secondsSinceFanRPMSuccess.map { String(format: "%.1f", $0) } ?? "nil"
+                AppLog.shared.info("ctrl diag model=\(systemModelIdentifier) os=\(ProcessInfo.processInfo.operatingSystemVersionString) bgTemps=\(bgTemps.count) bgRPMs=\(bgRPMs.count) sensors=\(sensorKeys.count) readings=\(readings.count) hasReading=\(reading != nil) telemetryState=\(telemetryState.rawValue) bgFail=\(bgSnapshot.consecutiveTemperatureFailures) bgAge=\(bgAgeText) rpmAge=\(rpmAgeText)")
             }
 
             guard let reading else {
                 consecutiveMissingTelemetryCount += 1
                 if !FanManager.shared.availableTemperatureSensors.isEmpty {
-                    AppLog.shared.warning("ctrl loop skip: no readable temperatures sensors=\(FanManager.shared.availableTemperatureSensors.count) bgFail=\(bgSnapshot.consecutiveTemperatureFailures) missingCount=\(consecutiveMissingTelemetryCount)")
+                    AppLog.shared.warning("ctrl loop skip: no readable temperatures sensors=\(FanManager.shared.availableTemperatureSensors.count) telemetryState=\(telemetryState.rawValue) bgFail=\(bgSnapshot.consecutiveTemperatureFailures) missingCount=\(consecutiveMissingTelemetryCount)")
                 }
                 let withinStartupGrace = Date().timeIntervalSince(launchDate) < startupTelemetryGracePeriod
                 if withinStartupGrace {
@@ -3126,21 +4102,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 if consecutiveMissingTelemetryCount < missingTelemetryTriggerCount {
                     return
                 }
-                self.handleMissingTemperatureTelemetry(hasFanTelemetry: !bgRPMs.isEmpty)
+                let missingReason = telemetryState == .expired ? "temp_snapshot_expired" : "bg_temp_poll_empty"
+                self.handleMissingTemperatureTelemetry(hasFanTelemetry: fanRPMAge <= backgroundTelemetryExpiryThreshold && !bgRPMs.isEmpty, reason: missingReason)
                 return
             }
             consecutiveMissingTelemetryCount = 0
             self.clearSafetyAlertState(prefix: "sensor_loss")
             self.clearSafetyAlertState(prefix: "system_auto_fallback")
+            let controlSourceName = averagedTemperatureSourceDefinition(for: config.temperatureSourceMode)?.name ?? reading.sensor.compactName
             self.updateControlStatus(
-                mode: "normal",
+                mode: telemetryState == .cachedStale ? "telemetry_cached" : "normal",
                 detail: isAutoMode
-                    ? appL10n("自动 / \(reading.sensor.compactName)", "Auto / \(reading.sensor.compactName)")
+                    ? (telemetryState == .cachedStale
+                        ? appL10n("自动 / \(controlSourceName) / 缓存", "Auto / \(controlSourceName) / Cached")
+                        : appL10n("自动 / \(controlSourceName)", "Auto / \(controlSourceName)"))
                     : appL10n("手动 / \(config.manualRPM) RPM", "Manual / \(config.manualRPM) RPM")
             )
 
             if isAutoMode {
-                let safetyFloorRPM = min(max(config.safetyFloorRPM ?? FanManager.shared.defaultSafetyRPM, 2000), FanManager.shared.currentMaxRPM)
+                let baseSafetyFloor = max(config.safetyFloorRPM ?? FanManager.shared.defaultSafetyRPM, 2000)
+                let safetyFloorRPM = min(max(baseSafetyFloor, telemetryState == .cachedStale ? sensorLossSafeRPM : 0), FanManager.shared.currentMaxRPM)
                 let targetRPM = FanManager.shared.calculateFanRPM(
                     temperature: reading.value,
                     curve: curve,
@@ -3152,20 +4133,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 } else {
                     FanManager.shared.setFanRPM(rpm: targetRPM)
                 }
-                self.logControlLoopSummaryIfNeeded(mode: "auto", reading: reading, targetRPM: targetRPM)
+                self.logControlLoopSummaryIfNeeded(mode: telemetryState == .cachedStale ? "auto_cached" : "auto", reading: reading, targetRPM: targetRPM)
             } else {
                 FanManager.shared.setFanRPM(rpm: config.manualRPM)
-                self.logControlLoopSummaryIfNeeded(mode: "manual", reading: reading, targetRPM: config.manualRPM)
+                self.logControlLoopSummaryIfNeeded(mode: telemetryState == .cachedStale ? "manual_cached" : "manual", reading: reading, targetRPM: config.manualRPM)
             }
         }
         timer.resume()
         self.controlLoopTimer = timer
     }
 
-    private func handleMissingTemperatureTelemetry(hasFanTelemetry: Bool) {
+    private func handleMissingTemperatureTelemetry(hasFanTelemetry: Bool, reason: String) {
         let safeRPM = min(sensorLossSafeRPM, FanManager.shared.currentMaxRPM)
         if FanManager.shared.fanCount > 0 && safeRPM > 0 {
-            AppLog.shared.warning("temperature telemetry missing; applying fixed fail-safe rpm=\(safeRPM) hasFanTelemetry=\(hasFanTelemetry)")
+            AppLog.shared.warning("temperature telemetry missing; applying fixed fail-safe rpm=\(safeRPM) hasFanTelemetry=\(hasFanTelemetry) reason=\(reason)")
             FanManager.shared.setFanRPM(rpm: safeRPM)
             updateControlStatus(
                 mode: "sensor_loss_fixed_rpm",
@@ -3191,7 +4172,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        engageSystemAutoFallback(reason: hasFanTelemetry ? "no_controllable_fan_on_sensor_loss" : "no_temp_no_fan_telemetry")
+        engageSystemAutoFallback(reason: hasFanTelemetry ? reason : "temp_and_fan_unavailable")
     }
 
     private func engageSystemAutoFallback(reason: String) {
@@ -3200,7 +4181,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         lastSystemAutoFallbackAt = Date()
-        AppLog.shared.warning("engaging system auto fallback reason=\(reason)")
+        AppLog.shared.warning("engaging system auto fallback reason=\(reason) model=\(systemModelIdentifier) os=\(ProcessInfo.processInfo.operatingSystemVersionString)")
         recordSystemAutoFallback(reason: reason)
         showSafetyAlert(
             state: "system_auto_fallback_\(reason)",
@@ -3268,36 +4249,87 @@ class DisplaySettingsWindowController: NSWindowController {
     private var miniRadio: NSButton!
     private var miniOptionsStack: NSStackView!
 
-    // 所有选项共享同一个枚举，上下行各一组 radio
-    private var topRadios: [String: NSButton] = [:]
-    private var bottomRadios: [String: NSButton] = [:]
+    private var topSourceCheckboxes: [String: NSButton] = [:]
+    private var topStyleRadios: [String: NSButton] = [:]
+    private var bottomSourceCheckboxes: [String: NSButton] = [:]
+    private var bottomStyleRadios: [String: NSButton] = [:]
 
     private let displayModeKey    = "ifancontrol.ui.display_mode"
-    private let miniTopLineKey    = "ifancontrol.ui.mini_top_line"
-    private let miniBottomLineKey = "ifancontrol.ui.mini_bottom_line"
+    private let miniTopSourceKey = "ifancontrol.ui.mini_top_source"
+    private let miniTopStyleKey = "ifancontrol.ui.mini_top_style"
+    private let miniBottomSourceKey = "ifancontrol.ui.mini_bottom_source"
+    private let miniBottomStyleKey = "ifancontrol.ui.mini_bottom_style"
+
+    private enum MiniLineSource: String {
+        case temperature
+        case rpm
+        case power
+    }
+
+    private enum MiniLineStyle: String {
+        case value
+        case unit
+        case mode
+        case full
+    }
 
     private var currentDisplayMode: String {
         get { UserDefaults.standard.string(forKey: displayModeKey) ?? "full" }
         set { UserDefaults.standard.set(newValue, forKey: displayModeKey) }
     }
-    private var currentMiniTopLine: String {
-        get { UserDefaults.standard.string(forKey: miniTopLineKey) ?? "temp_unit_mode" }
-        set { UserDefaults.standard.set(newValue, forKey: miniTopLineKey) }
-    }
-    private var currentMiniBottomLine: String {
-        get { UserDefaults.standard.string(forKey: miniBottomLineKey) ?? "rpm_unit" }
-        set { UserDefaults.standard.set(newValue, forKey: miniBottomLineKey) }
+    private func parseMiniLineSources(_ rawValue: String?) -> [MiniLineSource] {
+        guard let rawValue, !rawValue.isEmpty else { return [] }
+        var seen = Set<String>()
+        return rawValue
+            .split(separator: ",")
+            .compactMap { MiniLineSource(rawValue: String($0)) }
+            .filter { seen.insert($0.rawValue).inserted }
     }
 
-    // 所有可选内容类型，顺序固定
-    private static let allContentTypes: [(key: String, zh: String, en: String)] = [
-        ("temp",           "温度  (65)",           "Temperature  (65)"),
-        ("temp_unit",      "温度 + 单位  (65℃)",   "Temperature + Unit  (65℃)"),
-        ("temp_mode",      "温度 + 模式  (65｜A)",  "Temperature + Mode  (65｜A)"),
-        ("temp_unit_mode", "温度 + 全部  (65℃｜A)", "Temperature + All  (65℃｜A)"),
-        ("rpm",            "转速  (2400)",          "RPM  (2400)"),
-        ("rpm_unit",       "转速 + 单位  (2400 RPM)", "RPM + Unit  (2400 RPM)"),
-        ("rpm_short",      "转速 + 简称  (2400R)",   "RPM + Short  (2400R)"),
+    private func serializedMiniLineSources(_ sources: [MiniLineSource]) -> String {
+        var seen = Set<String>()
+        return sources
+            .filter { seen.insert($0.rawValue).inserted }
+            .map(\.rawValue)
+            .joined(separator: ",")
+    }
+
+    private var currentMiniTopLine: (sources: [MiniLineSource], style: MiniLineStyle) {
+        get {
+            let defaults = UserDefaults.standard
+            let sources = parseMiniLineSources(defaults.string(forKey: miniTopSourceKey))
+            let style = defaults.string(forKey: miniTopStyleKey).flatMap(MiniLineStyle.init(rawValue:)) ?? .full
+            return (sources.isEmpty ? [.temperature] : sources, style)
+        }
+        set {
+            UserDefaults.standard.set(serializedMiniLineSources(newValue.sources), forKey: miniTopSourceKey)
+            UserDefaults.standard.set(newValue.style.rawValue, forKey: miniTopStyleKey)
+        }
+    }
+    private var currentMiniBottomLine: (sources: [MiniLineSource], style: MiniLineStyle) {
+        get {
+            let defaults = UserDefaults.standard
+            let sources = parseMiniLineSources(defaults.string(forKey: miniBottomSourceKey))
+            let style = defaults.string(forKey: miniBottomStyleKey).flatMap(MiniLineStyle.init(rawValue:)) ?? .unit
+            return (sources.isEmpty ? [.rpm] : sources, style)
+        }
+        set {
+            UserDefaults.standard.set(serializedMiniLineSources(newValue.sources), forKey: miniBottomSourceKey)
+            UserDefaults.standard.set(newValue.style.rawValue, forKey: miniBottomStyleKey)
+        }
+    }
+
+    private static let allSources: [(key: MiniLineSource, zh: String, en: String)] = [
+        (.temperature, "温度  (65)", "Temperature  (65)"),
+        (.rpm, "转速  (2400)", "RPM  (2400)"),
+        (.power, "功率  (12.3)", "Power  (12.3)")
+    ]
+
+    private static let allStyles: [(key: MiniLineStyle, zh: String, en: String)] = [
+        (.value, "纯数值  (65)", "Value Only  (65)"),
+        (.unit, "带单位  (65℃)", "With Unit  (65℃)"),
+        (.mode, "带模式  (65｜A)", "With Mode  (65｜A)"),
+        (.full, "全部信息  (65℃｜A)", "Full  (65℃｜A)"),
     ]
 
     init() {
@@ -3343,13 +4375,25 @@ class DisplaySettingsWindowController: NSWindowController {
         contentView.addSubview(miniOptionsStack)
 
         // 上行内容（次级标签）
-        miniOptionsStack.addArrangedSubview(makeSubsectionLabel(appL10n("上行内容", "Top Line")))
-        for item in Self.allContentTypes {
+        miniOptionsStack.addArrangedSubview(makeSubsectionLabel(appL10n("上层内容（可多选）", "Top Content (Multi-select)")))
+        let topSourceGroup = makeRadioGroupStack()
+        miniOptionsStack.addArrangedSubview(topSourceGroup)
+        for item in Self.allSources {
+            let checkbox = makeCheckboxButton(appL10n(item.zh, item.en))
+            checkbox.target = self
+            checkbox.action = #selector(topSourceChanged)
+            topSourceGroup.addArrangedSubview(checkbox)
+            topSourceCheckboxes[item.key.rawValue] = checkbox
+        }
+        miniOptionsStack.addArrangedSubview(makeSubsectionLabel(appL10n("上层样式（示例）", "Top Style (Examples)")))
+        let topStyleGroup = makeRadioGroupStack()
+        miniOptionsStack.addArrangedSubview(topStyleGroup)
+        for item in Self.allStyles {
             let radio = makeRadioButton(appL10n(item.zh, item.en))
             radio.target = self
-            radio.action = #selector(topLineChanged)
-            miniOptionsStack.addArrangedSubview(radio)
-            topRadios[item.key] = radio
+            radio.action = #selector(topStyleChanged)
+            topStyleGroup.addArrangedSubview(radio)
+            topStyleRadios[item.key.rawValue] = radio
         }
 
         // 交换按钮 + 分隔线
@@ -3376,13 +4420,25 @@ class DisplaySettingsWindowController: NSWindowController {
         rightSep.heightAnchor.constraint(equalToConstant: 1).isActive = true
 
         // 下行内容（次级标签）
-        miniOptionsStack.addArrangedSubview(makeSubsectionLabel(appL10n("下行内容", "Bottom Line")))
-        for item in Self.allContentTypes {
+        miniOptionsStack.addArrangedSubview(makeSubsectionLabel(appL10n("下层内容（可多选）", "Bottom Content (Multi-select)")))
+        let bottomSourceGroup = makeRadioGroupStack()
+        miniOptionsStack.addArrangedSubview(bottomSourceGroup)
+        for item in Self.allSources {
+            let checkbox = makeCheckboxButton(appL10n(item.zh, item.en))
+            checkbox.target = self
+            checkbox.action = #selector(bottomSourceChanged)
+            bottomSourceGroup.addArrangedSubview(checkbox)
+            bottomSourceCheckboxes[item.key.rawValue] = checkbox
+        }
+        miniOptionsStack.addArrangedSubview(makeSubsectionLabel(appL10n("下层样式（示例）", "Bottom Style (Examples)")))
+        let bottomStyleGroup = makeRadioGroupStack()
+        miniOptionsStack.addArrangedSubview(bottomStyleGroup)
+        for item in Self.allStyles {
             let radio = makeRadioButton(appL10n(item.zh, item.en))
             radio.target = self
-            radio.action = #selector(bottomLineChanged)
-            miniOptionsStack.addArrangedSubview(radio)
-            bottomRadios[item.key] = radio
+            radio.action = #selector(bottomStyleChanged)
+            bottomStyleGroup.addArrangedSubview(radio)
+            bottomStyleRadios[item.key.rawValue] = radio
         }
 
         // ── 布局 ─────────────────────────────
@@ -3422,10 +4478,39 @@ class DisplaySettingsWindowController: NSWindowController {
         return label
     }
 
+    private func makeRadioGroupStack() -> NSStackView {
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 4
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        return stack
+    }
+
     private func makeRadioButton(_ title: String) -> NSButton {
         let button = NSButton(radioButtonWithTitle: title, target: nil, action: nil)
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
+    }
+
+    private func makeCheckboxButton(_ title: String) -> NSButton {
+        let button = NSButton(checkboxWithTitle: title, target: nil, action: nil)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }
+
+    private func syncMiniLineControls() {
+        let topSources = Set(currentMiniTopLine.sources.map(\.rawValue))
+        for (key, checkbox) in topSourceCheckboxes {
+            checkbox.state = topSources.contains(key) ? .on : .off
+        }
+        topStyleRadios[currentMiniTopLine.style.rawValue]?.state = .on
+
+        let bottomSources = Set(currentMiniBottomLine.sources.map(\.rawValue))
+        for (key, checkbox) in bottomSourceCheckboxes {
+            checkbox.state = bottomSources.contains(key) ? .on : .off
+        }
+        bottomStyleRadios[currentMiniBottomLine.style.rawValue]?.state = .on
     }
 
     private func loadCurrentSettings() {
@@ -3435,8 +4520,7 @@ class DisplaySettingsWindowController: NSWindowController {
         default:        fullRadio.state = .on
         }
 
-        topRadios[currentMiniTopLine]?.state      = .on
-        bottomRadios[currentMiniBottomLine]?.state = .on
+        syncMiniLineControls()
         updateMiniOptionsVisibility()
     }
 
@@ -3454,18 +4538,52 @@ class DisplaySettingsWindowController: NSWindowController {
         onSettingsChanged?()
     }
 
-    @objc private func topLineChanged(_ sender: NSButton) {
-        if let key = topRadios.first(where: { $0.value === sender })?.key {
-            currentMiniTopLine = key
-            onSettingsChanged?()
+    @objc private func topSourceChanged(_ sender: NSButton) {
+        guard let key = topSourceCheckboxes.first(where: { $0.value === sender })?.key,
+              let source = MiniLineSource(rawValue: key) else { return }
+        var sources = currentMiniTopLine.sources
+        if sender.state == .on {
+            if !sources.contains(source) { sources.append(source) }
+        } else {
+            sources.removeAll { $0 == source }
         }
+        if sources.isEmpty {
+            sources = [source]
+        }
+        currentMiniTopLine = (sources, currentMiniTopLine.style)
+        syncMiniLineControls()
+        onSettingsChanged?()
     }
 
-    @objc private func bottomLineChanged(_ sender: NSButton) {
-        if let key = bottomRadios.first(where: { $0.value === sender })?.key {
-            currentMiniBottomLine = key
-            onSettingsChanged?()
+    @objc private func topStyleChanged(_ sender: NSButton) {
+        guard let key = topStyleRadios.first(where: { $0.value === sender })?.key,
+              let style = MiniLineStyle(rawValue: key) else { return }
+        currentMiniTopLine = (currentMiniTopLine.sources, style)
+        onSettingsChanged?()
+    }
+
+    @objc private func bottomSourceChanged(_ sender: NSButton) {
+        guard let key = bottomSourceCheckboxes.first(where: { $0.value === sender })?.key,
+              let source = MiniLineSource(rawValue: key) else { return }
+        var sources = currentMiniBottomLine.sources
+        if sender.state == .on {
+            if !sources.contains(source) { sources.append(source) }
+        } else {
+            sources.removeAll { $0 == source }
         }
+        if sources.isEmpty {
+            sources = [source]
+        }
+        currentMiniBottomLine = (sources, currentMiniBottomLine.style)
+        syncMiniLineControls()
+        onSettingsChanged?()
+    }
+
+    @objc private func bottomStyleChanged(_ sender: NSButton) {
+        guard let key = bottomStyleRadios.first(where: { $0.value === sender })?.key,
+              let style = MiniLineStyle(rawValue: key) else { return }
+        currentMiniBottomLine = (currentMiniBottomLine.sources, style)
+        onSettingsChanged?()
     }
 
     @objc private func swapLines(_ sender: Any) {
@@ -3473,16 +4591,145 @@ class DisplaySettingsWindowController: NSWindowController {
         let bottom = currentMiniBottomLine
         currentMiniTopLine    = bottom
         currentMiniBottomLine = top
-        topRadios[bottom]?.state    = .on
-        bottomRadios[top]?.state    = .on
+        syncMiniLineControls()
         onSettingsChanged?()
     }
 
     private func updateMiniOptionsVisibility() {
         let showMini = miniRadio.state == .on
         miniOptionsStack.isHidden = !showMini
-        let height: CGFloat = showMini ? 520 : 180
+        let height: CGFloat = showMini ? 640 : 180
         window?.setContentSize(NSSize(width: 380, height: height))
+    }
+}
+
+@MainActor
+class PowerConsumptionWindowController: NSWindowController {
+    private let rows: [(key: String, zh: String, en: String)] = [
+        ("cpu", "CPU", "CPU"),
+        ("gpu", "GPU", "GPU"),
+        ("ane", "神经引擎", "Neural Engine"),
+        ("ram", "内存", "Memory"),
+        ("pci", "PCI", "PCI"),
+        ("total", "总计（DC In）", "Total (DC In)"),
+    ]
+    private var valueLabels: [String: NSTextField] = [:]
+    private var updateTimer: DispatchSourceTimer?
+
+    init() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 300),
+            styleMask: [.titled, .closable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = appL10n("电力消耗", "Power Consumption")
+        window.center()
+
+        super.init(window: window)
+        applyWindowMaterialStyle(window)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        updateTimer?.cancel()
+    }
+
+    override func showWindow(_ sender: Any?) {
+        super.showWindow(sender)
+        startTimerIfNeeded()
+    }
+
+    func refreshSnapshot() {
+        let snapshot = PowerTelemetryReader.shared.snapshot
+        if !snapshot.isSupported {
+            valueLabels["cpu"]?.stringValue = appL10n("当前机型暂不支持", "Not supported on this Mac")
+            for key in ["gpu", "ane", "ram", "pci", "total"] {
+                valueLabels[key]?.stringValue = "--"
+            }
+            return
+        }
+
+        updateValueLabel(for: "cpu", value: snapshot.cpuWatts, hasReading: snapshot.hasAnyReading)
+        updateValueLabel(for: "gpu", value: snapshot.gpuWatts, hasReading: snapshot.hasAnyReading)
+        updateValueLabel(for: "ane", value: snapshot.aneWatts, hasReading: snapshot.hasAnyReading)
+        updateValueLabel(for: "ram", value: snapshot.ramWatts, hasReading: snapshot.hasAnyReading)
+        updateValueLabel(for: "pci", value: snapshot.pciWatts, hasReading: snapshot.hasAnyReading)
+        updateValueLabel(for: "total", value: snapshot.displayTotalWatts, hasReading: snapshot.hasAnyReading)
+    }
+
+    private func setupUI() {
+        guard let contentView = window?.contentView else { return }
+
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(stack)
+
+        let descriptionLabel = NSTextField(labelWithString: appL10n(
+            "基于 Apple Silicon Energy Model 的实时估算，仅供参考。",
+            "Live estimate based on Apple Silicon Energy Model. For reference only."
+        ))
+        descriptionLabel.textColor = .secondaryLabelColor
+        descriptionLabel.maximumNumberOfLines = 0
+        descriptionLabel.lineBreakMode = .byWordWrapping
+        stack.addArrangedSubview(descriptionLabel)
+
+        let grid = NSGridView()
+        grid.rowSpacing = 8
+        grid.columnSpacing = 16
+        grid.translatesAutoresizingMaskIntoConstraints = false
+        stack.addArrangedSubview(grid)
+
+        for row in rows {
+            let titleLabel = NSTextField(labelWithString: appL10n(row.zh, row.en))
+            titleLabel.font = .systemFont(ofSize: 13, weight: row.key == "total" ? .semibold : .regular)
+            let valueLabel = NSTextField(labelWithString: "--")
+            valueLabel.font = .monospacedDigitSystemFont(ofSize: 13, weight: row.key == "total" ? .semibold : .regular)
+            valueLabel.alignment = .right
+            valueLabel.stringValue = "--"
+            valueLabels[row.key] = valueLabel
+            grid.addRow(with: [titleLabel, valueLabel])
+        }
+
+        let noteLabel = NSTextField(labelWithString: appL10n(
+            "首次打开后的前一次采样可能显示为空，等待 1-2 秒即可。",
+            "The first sample may be empty right after opening. Please wait 1-2 seconds."
+        ))
+        noteLabel.textColor = .secondaryLabelColor
+        noteLabel.maximumNumberOfLines = 0
+        noteLabel.lineBreakMode = .byWordWrapping
+        stack.addArrangedSubview(noteLabel)
+
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
+            stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            stack.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -20),
+            grid.widthAnchor.constraint(equalTo: stack.widthAnchor),
+        ])
+    }
+
+    private func startTimerIfNeeded() {
+        guard updateTimer == nil else { return }
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now(), repeating: 1.0)
+        timer.setEventHandler { [weak self] in
+            self?.refreshSnapshot()
+        }
+        timer.resume()
+        updateTimer = timer
+    }
+
+    private func updateValueLabel(for key: String, value: Double, hasReading: Bool) {
+        guard let label = valueLabels[key] else { return }
+        label.stringValue = hasReading ? String(format: "%.2f W", value) : "--"
     }
 }
 
@@ -4763,7 +6010,7 @@ class HelpWindowController: NSWindowController {
         let faqItems: [(String, String)] = [
             (
                 appL10n("温度源是自动选择的吗？", "How is the temperature source selected?"),
-                appL10n("默认自动选择最热传感器；也可以在主界面手动固定某个温度源。", "By default the hottest sensor is selected automatically; you can pin a specific source in the main panel.")
+                appL10n("默认自动选择最热传感器；也可以选择 CPU 或 GPU 传感器的平均温度，或在主界面手动固定某个温度源。", "By default the hottest sensor is selected automatically; you can also use a CPU or GPU sensor average or pin a specific source in the main panel.")
             ),
             (
                 appL10n("为什么传感器数量和核心数不一致？", "Why does sensor count differ from core count?"),
