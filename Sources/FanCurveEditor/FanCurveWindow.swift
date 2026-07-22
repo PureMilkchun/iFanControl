@@ -19,6 +19,8 @@ private func fanCurveL10n(_ zh: String, _ en: String) -> String {
     currentLanguage == "en" ? en : zh
 }
 
+private let fanCurveYAxisReversedKey = "ifancontrol.ui.fan_curve_y_axis_reversed"
+
 /// 官方默认曲线（预设 A）
 public func defaultFanCurve(maxRPM: Int) -> [FanPoint] {
     let referenceMaxRPM = 4900.0
@@ -261,6 +263,7 @@ public class FanCurvePresetWindowController: NSWindowController {
     private var presetNames: [String]
     private var presets: [[FanPoint]]
     private var activePresetIndex: Int
+    private var isYAxisReversed = UserDefaults.standard.bool(forKey: fanCurveYAxisReversedKey)
 
     public init(fanCurve: [FanPoint], maxRPM: Int,
                 presetNames: [String]? = nil,
@@ -320,6 +323,7 @@ public class FanCurvePresetWindowController: NSWindowController {
         // 1. 曲线视图
         fanCurveView.fanCurve = currentFanCurve
         fanCurveView.maxRPM = maxRPM
+        fanCurveView.isYAxisReversed = isYAxisReversed
         fanCurveView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(fanCurveView)
 
@@ -345,6 +349,25 @@ public class FanCurvePresetWindowController: NSWindowController {
         separator.textColor = .separatorColor
         separator.font = NSFont.systemFont(ofSize: 16)
 
+        // Y 轴方向：只影响曲线编辑器的显示和拖拽坐标换算，不修改曲线数据。
+        let yAxisLabel = NSTextField(labelWithString: fanCurveL10n("Y 轴", "Y Axis"))
+        let yAxisSeparator = NSTextField(labelWithString: "│")
+        yAxisSeparator.textColor = .separatorColor
+        yAxisSeparator.font = NSFont.systemFont(ofSize: 16)
+        let yAxisDirectionControl = NSSegmentedControl(
+            labels: [
+                fanCurveL10n("正向", "Normal"),
+                fanCurveL10n("反向", "Reversed")
+            ],
+            trackingMode: .selectOne,
+            target: self,
+            action: #selector(yAxisDirectionChanged(_:))
+        )
+        yAxisDirectionControl.selectedSegment = isYAxisReversed ? 1 : 0
+        let yAxisStack = NSStackView(views: [yAxisLabel, yAxisSeparator, yAxisDirectionControl])
+        yAxisStack.spacing = 4
+        yAxisStack.alignment = .centerY
+
         // 右侧：操作按钮
         let resetButton = NSButton(title: fanCurveL10n("重置", "Reset"), target: self, action: #selector(resetCurve))
         let closeButton = NSButton(title: fanCurveL10n("关闭", "Close"), target: self, action: #selector(closeWindow))
@@ -353,7 +376,7 @@ public class FanCurvePresetWindowController: NSWindowController {
         actionStack.spacing = 12
 
         // 整行
-        let bottomStack = NSStackView(views: [presetStack, separator, actionStack])
+        let bottomStack = NSStackView(views: [presetStack, separator, yAxisStack, actionStack])
         bottomStack.spacing = 12
         bottomStack.alignment = .centerY
         bottomStack.translatesAutoresizingMaskIntoConstraints = false
@@ -378,6 +401,15 @@ public class FanCurvePresetWindowController: NSWindowController {
             hintLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             hintLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8)
         ])
+    }
+
+    @objc private func yAxisDirectionChanged(_ sender: NSSegmentedControl) {
+        let reversed = sender.selectedSegment == 1
+        guard reversed != isYAxisReversed else { return }
+
+        isYAxisReversed = reversed
+        UserDefaults.standard.set(reversed, forKey: fanCurveYAxisReversedKey)
+        fanCurveView.isYAxisReversed = reversed
     }
 
     @objc private func presetButtonClicked(_ sender: NSButton) {

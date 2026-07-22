@@ -39,11 +39,23 @@ class FanCurveView: NSView {
             setNeedsDisplay(bounds)
         }
     }
+
+    var isYAxisReversed = false {
+        didSet {
+            setNeedsDisplay(bounds)
+        }
+    }
+
     private let minTemp = 20.0
     private let maxTemp = 100.0
     private let padding = 40.0
     
     private var selectedPointIndex: Int? = nil
+
+    private func yPosition(forRPM rpm: Int, height: CGFloat) -> CGFloat {
+        let normalizedRPM = CGFloat(rpm) / CGFloat(maxRPM)
+        return padding + (isYAxisReversed ? normalizedRPM : 1 - normalizedRPM) * height
+    }
     
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
@@ -106,7 +118,7 @@ class FanCurveView: NSView {
         
         // RPM标签
         for rpm in stride(from: 0, through: maxRPM, by: maxRPM / 4) {
-            let y = padding + height - (CGFloat(rpm) / CGFloat(maxRPM)) * height
+            let y = yPosition(forRPM: rpm, height: height)
             let label = String(format: "%d", rpm)
             let size = label.size(withAttributes: attributes)
             label.draw(at: CGPoint(x: padding - size.width - 5, y: y - size.height / 2), withAttributes: attributes)
@@ -122,7 +134,7 @@ class FanCurveView: NSView {
         var points: [CGPoint] = []
         for point in fanCurve {
             let x = padding + (point.temperature - minTemp) / (maxTemp - minTemp) * width
-            let y = padding + height - (CGFloat(point.rpm) / CGFloat(maxRPM)) * height
+            let y = yPosition(forRPM: point.rpm, height: height)
             points.append(CGPoint(x: x, y: y))
         }
         
@@ -179,7 +191,7 @@ class FanCurveView: NSView {
         
         for (index, point) in fanCurve.enumerated() {
             let x = padding + (point.temperature - minTemp) / (maxTemp - minTemp) * width
-            let y = padding + height - (CGFloat(point.rpm) / CGFloat(maxRPM)) * height
+            let y = yPosition(forRPM: point.rpm, height: height)
             
             let circlePath = CGMutablePath()
             circlePath.addArc(center: CGPoint(x: x, y: y), radius: 6, startAngle: 0, endAngle: .pi * 2, clockwise: false)
@@ -247,7 +259,7 @@ class FanCurveView: NSView {
         
         for (index, fanPoint) in fanCurve.enumerated() {
             let x = padding + (fanPoint.temperature - minTemp) / (maxTemp - minTemp) * width
-            let y = padding + height - (CGFloat(fanPoint.rpm) / CGFloat(maxRPM)) * height
+            let y = yPosition(forRPM: fanPoint.rpm, height: height)
             
             let distance = hypot(point.x - x, point.y - y)
             if distance < 10 {
@@ -271,7 +283,10 @@ class FanCurveView: NSView {
         let height = bounds.height - 2 * padding
         
         let newTemp = minTemp + (point.x - padding) / width * (maxTemp - minTemp)
-        let newRPM = Int((1 - (point.y - padding) / height) * Double(maxRPM))
+        let normalizedRPM = isYAxisReversed
+            ? (point.y - padding) / height
+            : 1 - (point.y - padding) / height
+        let newRPM = Int(normalizedRPM * Double(maxRPM))
         
         if index == 0 {
             fanCurve[index].temperature = minTemp

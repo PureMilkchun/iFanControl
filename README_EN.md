@@ -21,6 +21,7 @@ This repository now keeps only source code, scripts, and essential resources. Re
 - Menu bar display for current temperature, RPM, and control mode
 - Automatic mode based on a 5-point fan curve
 - Manual mode with a fixed RPM target
+- Fan curve editor with normal/reversed Y-axis display options
 - Safety floor RPM at critical temperature without overriding higher user RPM
 - Temperature source selection with automatic hottest-sensor mode by default, plus separate CPU/GPU average-temperature and manual sensor modes
 - In-app updates with manual and scheduled checks
