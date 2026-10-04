@@ -1,0 +1,14 @@
+{
+  "latest_version": "2.9.9",
+  "latest_build": 52,
+  "min_supported_build": 1,
+  "published_at": "2026-10-04T15:41:08Z",
+  "mandatory": false,
+  "rollout_percent": 100,
+  "notes": "优化安装体验。",
+  "assets": {
+    "macos_arm64_zip_url": "https://ifan-59w.pages.dev/iFanControl-legacy-2.9.9.zip?build=52",
+    "sha256": "b80296cbd80e7878e476e9dce0a1aaf03acea1decadf6d628d3743680771610d",
+    "size": 6111690
+  }
+}

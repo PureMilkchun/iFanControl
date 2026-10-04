@@ -3,6 +3,15 @@
 关联固定记忆：`/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_MEMORY.md`
 读取建议：先读固定记忆，再读本文件，用本文件补足最近发生的变化。
 
+## 2026-10-05
+
+### 2026-10-05 — v2.9.9 / build 52（安装与更新通道修正）
+
+- 先撤下 build51 的 GitHub 安装包和官网分发，再以同一公开版本发布修正版。
+- 2.9.9/build52 起通过独立新通道下载 PKG、校验、打开系统安装器并退出 App；去掉应用内 ZIP 解压与终端安装。
+- 旧 update-manifest.json 永久停在 2.9.9/build52，保留原有完整 ZIP 更新方式及官网下载入口；后续版本只更新新通道。
+- 添加冻结通道版本/哈希保护和 PKG 元数据、校验失败测试；未替换用户 /Applications 中的 2.9.8。
+
 ## 2026-10-04
 
 ### 2026-10-04 — v2.9.9 / build 51（优化安装体验）

@@ -2357,8 +2357,7 @@ class UpdateService {
     static let shared = UpdateService()
     private let logger = Logger(subsystem: appSubsystem, category: "Updater")
 
-    private let manifestURL = URL(string: "https://ifan-59w.pages.dev/update-manifest.json")!
-    private let fallbackZipURL = URL(string: "https://ifan-59w.pages.dev/iFanControl-macOS.zip")!
+    private let manifestURL = UpdateManifest.channelURL
     private let releasesHomeURL = URL(string: "https://github.com/PureMilkchun/iFanControl/releases")!
     private let lastCheckKey = "ifancontrol.update.last_check"
     private let automaticCheckEnabledKey = "ifancontrol.update.automatic_check_enabled"
@@ -2390,36 +2389,6 @@ class UpdateService {
         set {
             UserDefaults.standard.set(newValue, forKey: automaticCheckEnabledKey)
             logger.info("Automatic update checks toggled. enabled=\(newValue, privacy: .public)")
-        }
-    }
-
-    private struct UpdateManifest: Decodable {
-        let latestVersion: String
-        let latestBuild: Int
-        let publishedAt: String?
-        let notes: String?
-        let mandatory: Bool?
-        let assets: Assets?
-
-        enum CodingKeys: String, CodingKey {
-            case latestVersion = "latest_version"
-            case latestBuild = "latest_build"
-            case publishedAt = "published_at"
-            case notes
-            case mandatory
-            case assets
-        }
-    }
-
-    private struct Assets: Decodable {
-        let zipURL: String?
-        let sha256: String?
-        let size: Int?
-
-        enum CodingKeys: String, CodingKey {
-            case zipURL = "macos_arm64_zip_url"
-            case sha256
-            case size
         }
     }
 
@@ -2492,35 +2461,36 @@ class UpdateService {
     private func startDownloadAndInstall(manifest: UpdateManifest) {
         Task {
             do {
-                let zipURL = URL(string: manifest.assets?.zipURL ?? "") ?? fallbackZipURL
-                logger.info("Downloading update archive from \(zipURL.absoluteString, privacy: .public)")
-                let (data, _) = try await URLSession.shared.data(from: zipURL)
-
-                if let expectedSHA = manifest.assets?.sha256?.lowercased(), !expectedSHA.isEmpty {
-                    let actualSHA = sha256Hex(data)
-                    if expectedSHA != actualSHA {
-                        throw NSError(domain: "UpdateService", code: 1002, userInfo: [NSLocalizedDescriptionKey: appL10n("安装包哈希校验失败。", "Package checksum verification failed.")])
-                    }
+                let packageURL: URL
+                do {
+                    packageURL = try manifest.packageDownloadURL()
+                } catch {
+                    throw NSError(domain: "UpdateService", code: 1001, userInfo: [NSLocalizedDescriptionKey: appL10n("更新信息暂不可用，请稍后重试。", "Update information is unavailable. Please try again later.")])
+                }
+                logger.info("Downloading update package from \(packageURL.absoluteString, privacy: .public)")
+                let (data, response) = try await URLSession.shared.data(from: packageURL)
+                guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
+                    throw NSError(domain: "UpdateService", code: 1002, userInfo: [NSLocalizedDescriptionKey: appL10n("下载安装包失败，请稍后重试。", "Could not download the installer. Please try again later.")])
+                }
+                do {
+                    try manifest.verifyPackage(data)
+                } catch {
+                    throw NSError(domain: "UpdateService", code: 1003, userInfo: [NSLocalizedDescriptionKey: appL10n("安装包校验失败，请重新下载。", "Installer verification failed. Please download it again.")])
                 }
 
-                let stagingDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("iFanControlUpdate", isDirectory: true)
-                try? FileManager.default.removeItem(at: stagingDir)
+                // Keep each downloaded installer at its own path while Installer uses it.
+                let stagingDir = URL(fileURLWithPath: NSTemporaryDirectory())
+                    .appendingPathComponent("iFanControlUpdate-\(UUID().uuidString)", isDirectory: true)
                 try FileManager.default.createDirectory(at: stagingDir, withIntermediateDirectories: true)
+                let packagePath = stagingDir.appendingPathComponent("iFanControl-macOS.pkg")
+                try data.write(to: packagePath, options: .atomic)
 
-                let zipPath = stagingDir.appendingPathComponent("iFanControl-macOS.zip")
-                try data.write(to: zipPath, options: .atomic)
-
-                let extractDir = stagingDir.appendingPathComponent("extracted", isDirectory: true)
-                try FileManager.default.createDirectory(at: extractDir, withIntermediateDirectories: true)
-                try unzip(zipPath: zipPath, to: extractDir)
-
-                guard let installScript = findInstallScript(in: extractDir) else {
-                    throw NSError(domain: "UpdateService", code: 1003, userInfo: [NSLocalizedDescriptionKey: appL10n("未找到 install.sh。", "install.sh not found.")])
+                guard NSWorkspace.shared.open(packagePath) else {
+                    throw NSError(domain: "UpdateService", code: 1004, userInfo: [NSLocalizedDescriptionKey: appL10n("无法打开系统安装器，请从官网下载后打开安装包。", "Could not open Installer. Please download the package from our website and open it.")])
                 }
-
-                try runInstallScriptInTerminal(scriptURL: installScript)
-                logger.info("Update installer launched successfully for version \(manifest.latestVersion, privacy: .public)")
-                showInfoAlert(title: appL10n("下载完成", "Download Complete"), message: appL10n("安装脚本已在终端打开，请按提示完成升级。", "Installer has opened in Terminal. Follow the prompts to finish update."))
+                logger.info("Native PKG installer launched for version \(manifest.latestVersion, privacy: .public)")
+                // Normal termination restores automatic fan control before installation.
+                NSApp.terminate(nil)
             } catch {
                 logger.error("Update download/install failed: \(error.localizedDescription, privacy: .public)")
                 showUpdateFailureAlert(
@@ -2529,70 +2499,6 @@ class UpdateService {
                     releaseURL: githubReleaseURL(for: manifest.latestVersion)
                 )
             }
-        }
-    }
-
-    private func sha256Hex(_ data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-    }
-
-    private func unzip(zipPath: URL, to outputDir: URL) throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-        process.arguments = ["-o", zipPath.path, "-d", outputDir.path]
-        try process.run()
-        process.waitUntilExit()
-        if process.terminationStatus != 0 {
-            throw NSError(domain: "UpdateService", code: 1004, userInfo: [NSLocalizedDescriptionKey: appL10n("解压安装包失败。", "Failed to unzip update package.")])
-        }
-    }
-
-    private func findInstallScript(in root: URL) -> URL? {
-        let fm = FileManager.default
-        if fm.fileExists(atPath: root.appendingPathComponent("install.sh").path) {
-            return root.appendingPathComponent("install.sh")
-        }
-        let commandURL = root.appendingPathComponent("Install.command")
-        if fm.fileExists(atPath: commandURL.path) {
-            return commandURL
-        }
-        if let e = fm.enumerator(at: root, includingPropertiesForKeys: nil) {
-            for case let file as URL in e {
-                if file.lastPathComponent == "install.sh" {
-                    return file
-                }
-                if file.lastPathComponent == "Install.command" {
-                    return file
-                }
-            }
-        }
-        return nil
-    }
-
-    private func runInstallScriptInTerminal(scriptURL: URL) throws {
-        let fm = FileManager.default
-        let preferredScriptURL: URL
-        if scriptURL.lastPathComponent == "Install.command" {
-            let siblingInstall = scriptURL.deletingLastPathComponent().appendingPathComponent("install.sh")
-            preferredScriptURL = fm.fileExists(atPath: siblingInstall.path) ? siblingInstall : scriptURL
-        } else {
-            preferredScriptURL = scriptURL
-        }
-
-        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: preferredScriptURL.path)
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        process.arguments = ["-a", "Terminal", preferredScriptURL.path]
-        try process.run()
-        process.waitUntilExit()
-
-        if process.terminationStatus != 0 {
-            throw NSError(
-                domain: "UpdateService",
-                code: 1005,
-                userInfo: [NSLocalizedDescriptionKey: appL10n("无法启动安装终端。请手动将 install.sh 拖入终端执行。", "Failed to launch installer terminal. Please drag install.sh into Terminal and run it manually.")]
-            )
         }
     }
 

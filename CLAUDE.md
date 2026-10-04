@@ -38,11 +38,9 @@ open /Applications/iFanControl.app
 
 ## 发布纪律
 
-发布**必须同步以下四项**，缺一不可：
-1. 新 ZIP 包
-2. 官网 `docs/iFanControl-macOS.zip`
-3. `docs/update-manifest.json`
-4. GitHub Release
+发布必须同步最新 PKG、新通道 `docs/update-manifest-pkg.json`、GitHub Release 和官网下载入口。
+
+旧通道 `docs/update-manifest.json` 永久停在 2.9.9/build52，旧 ZIP `docs/iFanControl-legacy-2.9.9.zip` 与兼容别名 `docs/iFanControl-macOS.zip` 必须永久保留；后续版本禁止覆盖它们。旧客户端先通过 ZIP 升至 2.9.9，再进入新 PKG 通道。发布前运行 `python3 packaging/pkg/verify_channels.py`，固定元数据为 `packaging/pkg/legacy-channel.json`。
 
 不要只推 GitHub 代码就认为用户能收到更新。
 
@@ -50,7 +48,7 @@ open /Applications/iFanControl.app
 
 ```bash
 cd '/Users/puremilk/Documents/mac fancontrol/docs'
-npx wrangler pages deploy ./ --project-name ifan --no-bundle --skip-caching
+npx wrangler pages deploy ./ --project-name ifan --branch main --no-bundle --skip-caching
 ```
 
 **禁止**：不要在 `docs/` 放 `_worker.js` 或 `_worker.bundle`（会覆盖 functions/ 自动构建）
@@ -88,5 +86,5 @@ npx wrangler pages deploy ./ --project-name ifan-stats --no-bundle --skip-cachin
 2. **区分确信度** — 确认的 bug 直接说，疑似问题用试探语气（"这里的设计意图是什么？"）
 3. **移动状态变量前画调用图** — `hasXxx` / `isXxx` guard flag 位置敏感，移错会引发无限递归（CODE_AUDIT.md#2）
 4. **不要预防性加固** — 如果原始代码工作正常，不要为了"理论上更安全"而改动（CODE_AUDIT.md#6）
-5. **发布前核对清单** — ZIP / 官网 / manifest / GitHub Release 四项必须同步
+5. **发布前核对清单** — 新通道 / PKG / 官网 / GitHub Release 必须同步，旧通道版本与哈希不得改动
 6. **部署前确认运行路径** — 用户跑的是 `/Applications/`，不是开发目录

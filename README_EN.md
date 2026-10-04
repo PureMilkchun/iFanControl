@@ -46,7 +46,7 @@ Download the PKG from [GitHub Releases](https://github.com/PureMilkchun/iFanCont
 2. Follow the macOS installation steps. Existing settings are preserved.
 3. Open iFanControl from Applications. If macOS blocks it, go to System Settings → Privacy & Security, click Open Anyway, then confirm Open.
 
-Older versions continue to receive ZIP updates through the existing in-app updater. For a manual ZIP installation, unzip the archive, drag `install.sh` into Terminal, and press Return.
+Versions 2.9.8 and earlier first update to 2.9.9 through the existing ZIP updater, then use PKG updates for later versions. The [legacy upgrade archive](https://ifan-59w.pages.dev/iFanControl-legacy-2.9.9.zip) remains available. For manual use, unzip it, drag `install.sh` into Terminal, and press Return.
 
 ## Usage
 
@@ -89,7 +89,8 @@ CI is defined in `.github/workflows/swift.yml`.
 
 - Manual check: `About iFanControl... -> Check for Updates`
 - Automatic check: delayed on launch; when enabled, it fetches the manifest directly so new releases are not missed
-- Update source: `pages.dev` manifest and ZIP
+- From 2.9.9: the separate `update-manifest-pkg.json` channel downloads and verifies PKG, opens macOS Installer, then quits the app
+- Legacy channel: `update-manifest.json` remains frozen at 2.9.9 with a compatible ZIP and never offers later releases
 - Failure fallback: open GitHub Releases for manual download
 
 ## Uninstall

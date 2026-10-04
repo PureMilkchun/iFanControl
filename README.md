@@ -58,7 +58,7 @@ English readers can use [README_EN.md](README_EN.md).
 2. 按系统安装向导操作，现有设置会保留。
 3. 完成后从“应用程序”打开 iFanControl；若系统阻止打开，前往“系统设置 → 隐私与安全性”，点“仍要打开”，再确认“打开”。
 
-旧版应用内更新继续使用 ZIP，按原有提示升级即可。若手动下载 ZIP，请解压后把 `install.sh` 拖入终端并按回车。
+2.9.8 及更早版本先通过原有应用内更新升级到 2.9.9，再通过 PKG 更新到后续版本。[旧版升级包](https://ifan-59w.pages.dev/iFanControl-legacy-2.9.9.zip)长期保留；若手动使用它，请解压后把 `install.sh` 拖入终端并按回车。
 
 ## Support & Logs / 反馈与日志
 
@@ -125,7 +125,8 @@ CI 位于 `.github/workflows/swift.yml`，默认会对 `main` 执行构建检查
 
 - 手动检查：`关于 iFanControl... -> 检查更新`
 - 自动检查：启动后延迟检查，并带 24 小时节流
-- 更新包来源：`pages.dev` 上的 `update-manifest.json` 与 ZIP
+- 2.9.9 起：独立的 `update-manifest-pkg.json` 通道，直接下载并校验 PKG，打开系统安装器后退出 App
+- 旧版通道：`update-manifest.json` 永久停在 2.9.9，提供兼容 ZIP；不会向旧版推送后续版本
 - 更新失败时：会直接引导到 GitHub Releases 手动下载
 
 ## 卸载

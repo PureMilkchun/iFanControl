@@ -3,7 +3,7 @@
 关联时间戳记忆：`/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_TIMELINE.md`
 读取建议：先读本文件，再读时间戳记忆，避免遗漏最新变更。
 
-更新时间：2026-10-04
+更新时间：2026-10-05
 
 ## 1. 项目当前基线
 
@@ -13,14 +13,21 @@ iFanControl 是一个面向 Apple Silicon 带风扇机型的风扇控制工具�
 - 自动 / 手动模式
 - 5 点风扇曲线编辑 + 3 预设 Tab 切换（双击重命名，切换即时生效，关闭自动保存）+ 拖拽时实时显示温度/RPM
 - 温度源选择 + 安全兜底转速
-- 应用内自动更新（ZIP 链路）
+- 应用内自动更新（独立 PKG 通道，旧 ZIP 通道永久停在 2.9.9）
 - 中英文切换（菜单切换，重启生效）
 - 匿名活跃统计（每日上报，可关闭）
 - 告诉开发者（菜单栏反馈入口）
 - 开机自启动（SMAppService 原生登录项 API，系统设置中可直接管理）
 - 信息栏展示设置（完整/简洁/迷你三种模式，弹窗设置，存 `ifancontrol.ui.display_mode`，切换即时生效）
 
-当前版本：`2.9.9` / build 51
+当前版本：`2.9.9` / build 52
+
+### build 52 说明
+
+- 撤下 build 51 后修正应用内更新：新版本只读取 update-manifest-pkg.json，下载并校验 PKG 后打开系统安装器并正常退出 App，不再解压 ZIP 或打开终端。
+- 旧 update-manifest.json 永久固定在 2.9.9/build52；2.9.8 和误发的 build51 先通过原有 ZIP 更新进入新通道。后续版本不得修改旧通道或覆盖旧 ZIP。
+- 官网常规下载为最新 PKG，同时保留“旧版升级至 2.9.9”入口。legacy-channel.json 和 verify_channels.py 保护冻结版本及哈希。
+- /Applications/iFanControl.app 保留用户现有 2.9.8/build50，实际旧版升级由用户测试。
 
 ### build 51 说明
 
@@ -111,10 +118,11 @@ iFanControl 是一个面向 Apple Silicon 带风扇机型的风扇控制工具�
 
 ## 3. 分发策略
 
-- **首装走 ZIP，更新走 ZIP**（全链路 ZIP）
-- 安装指导：将 `install.sh` 拖入终端执行
-- 官网下载入口：`https://ifan-59w.pages.dev/download`（302 到 ZIP）
-- 自动更新 manifest：`https://ifan-59w.pages.dev/update-manifest.json`
+- **首装和新版更新使用 PKG**；2.9.8 等旧版先按原有 ZIP 升级至 2.9.9/build52
+- 官网下载入口：`https://ifan-59w.pages.dev/download`（302 到最新 PKG）
+- 新版更新 manifest：`https://ifan-59w.pages.dev/update-manifest-pkg.json`
+- 旧版更新 manifest：`https://ifan-59w.pages.dev/update-manifest.json`（永久冻结 2.9.9/build52）
+- 旧版升级 ZIP：`https://ifan-59w.pages.dev/iFanControl-legacy-2.9.9.zip`（永久保留，同时保留 iFanControl-macOS.zip 别名）
 - GitHub Release：`https://github.com/PureMilkchun/iFanControl/releases`
 
 ## 4. 官网部署纪律
@@ -290,7 +298,7 @@ cd /tmp/staging && zip -r /tmp/iFanControl-macOS-X.Y.Z.zip .
 
 - 不误改历史目录、不误用旧图标
 - App 改动只动 `macfan-control-v2`，官网只动 `docs`，实验只动 `distribution-a`
-- 发布必须同步：新包 + 官网 ZIP + update-manifest.json + GitHub Release
+- 发布必须同步：最新 PKG + 官网下载 + update-manifest-pkg.json + GitHub Release；旧 manifest 和旧 ZIP 保持冻结
 - `iFanControl-2.8.27/` 是打包参考目录（含 kentsmc、icon.png、安装说明.html 等）
 
 ## 10. 已解决问题
