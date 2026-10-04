@@ -981,6 +981,12 @@ final class InstallationCoordinator {
           fi
         done
 
+        if [ -t 2 ]; then
+          PASSWORD_PROMPT=$(printf '\\033[1;35m请输入你的 Mac 登录密码。\\n输入时不会显示字符或星号，输入后按回车即可。\\033[0m\\n密码：')
+        else
+          PASSWORD_PROMPT=$(printf '请输入你的 Mac 登录密码。\\n输入时不会显示字符或星号，输入后按回车即可。\\n密码：')
+        fi
+
         echo ""
         echo "步骤 1/6: 删除 App..."
         rm -rf "$APP_PATH"
@@ -989,7 +995,7 @@ final class InstallationCoordinator {
         echo ""
         echo "步骤 2/6: 删除 kentsmc..."
         if [ -f "$KENTSMC_PATH" ]; then
-          sudo rm -f "$KENTSMC_PATH"
+          sudo -p "$PASSWORD_PROMPT" rm -f "$KENTSMC_PATH"
           echo "✓ kentsmc 已删除"
         else
           echo "kentsmc 不存在，跳过"
@@ -998,7 +1004,7 @@ final class InstallationCoordinator {
         echo ""
         echo "步骤 3/6: 删除 sudoers 规则..."
         if [ -f "$SUDOERS_PATH" ]; then
-          sudo rm -f "$SUDOERS_PATH"
+          sudo -p "$PASSWORD_PROMPT" rm -f "$SUDOERS_PATH"
           echo "✓ sudoers 规则已删除"
         else
           echo "sudoers 规则不存在，跳过"

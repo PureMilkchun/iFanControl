@@ -12,10 +12,16 @@ if [ "$EUID" -eq 0 ]; then
     exit 1
 fi
 
+if [ -t 2 ]; then
+    PASSWORD_PROMPT=$(printf '\033[1;35m请输入你的 Mac 登录密码。\n输入时不会显示字符或星号，输入后按回车即可。\033[0m\n密码：')
+else
+    PASSWORD_PROMPT=$(printf '请输入你的 Mac 登录密码。\n输入时不会显示字符或星号，输入后按回车即可。\n密码：')
+fi
+
 # 步骤 1: 删除 kentsmc
 echo "步骤 1/4: 删除 kentsmc..."
 if [ -f "/usr/local/bin/kentsmc" ]; then
-    sudo rm -f /usr/local/bin/kentsmc
+    sudo -p "$PASSWORD_PROMPT" rm -f /usr/local/bin/kentsmc
     echo "✓ kentsmc 已删除"
 else
     echo "kentsmc 未安装，跳过"
@@ -25,7 +31,7 @@ fi
 echo ""
 echo "步骤 2/4: 删除免密配置..."
 if [ -f "/etc/sudoers.d/kentsmc" ]; then
-    sudo rm -f /etc/sudoers.d/kentsmc
+    sudo -p "$PASSWORD_PROMPT" rm -f /etc/sudoers.d/kentsmc
     echo "✓ sudoers 配置已删除"
 else
     echo "sudoers 配置不存在，跳过"

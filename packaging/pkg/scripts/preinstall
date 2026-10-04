@@ -1,0 +1,24 @@
+#!/bin/bash
+set -eu
+
+if [ "$(/usr/bin/id -u)" -ne 0 ]; then
+    echo "iFanControl: 请通过系统安装器提供管理员授权。" >&2
+    exit 1
+fi
+
+if [ "${3:-/}" != "/" ]; then
+    echo "iFanControl: 只支持安装到当前启动磁盘。" >&2
+    exit 1
+fi
+
+if /usr/bin/pgrep -x iFanControl >/dev/null 2>&1; then
+    echo "iFanControl: 请先从菜单栏退出 iFanControl，再重新安装。" >&2
+    exit 1
+fi
+
+if ! /usr/bin/dscl . -read /Groups/admin >/dev/null 2>&1; then
+    echo "iFanControl: 找不到管理员组，安装已停止。" >&2
+    exit 1
+fi
+
+echo "iFanControl: 安装前检查通过；保留用户配置与日志。"

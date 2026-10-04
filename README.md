@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/macOS-13.0+-black" alt="Platform">
+  <img src="https://img.shields.io/badge/macOS-26.0+-black" alt="Platform">
   <img src="https://img.shields.io/badge/Apple%20Silicon-M%20Series-black" alt="Architecture">
   <img src="https://img.shields.io/badge/license-MIT-black" alt="License">
 </p>
@@ -44,33 +44,21 @@ English readers can use [README_EN.md](README_EN.md).
 
 ## 适用范围
 
-- macOS 13 及以上
+- macOS 26 及以上
 - 带风扇的 Apple Silicon Mac
-- 重点覆盖 M1 / M2 / M3 / M4 / M5 系列
+- 开发者仅有一台 Mac mini M4，已稳定运行数月；其他机型理论上可用，实际需试用确认
 
 说明：无风扇设备不会获得有效的风扇控制能力。温度源列表展示的是系统实际暴露的热传感器，不一定与 CPU / GPU 核心数量一一对应。
 
 ## 安装
 
-### 方式一：从 GitHub Releases 下载
+从 [GitHub Releases](https://github.com/PureMilkchun/iFanControl/releases) 或[官网](https://ifancontrol.puremilkchun.top)下载 PKG。
 
-前往 [Releases](https://github.com/PureMilkchun/iFanControl/releases) 下载最新 ZIP，解压后运行：
+1. 先从菜单栏退出 iFanControl，再双击安装包。
+2. 按系统安装向导操作，现有设置会保留。
+3. 完成后从“应用程序”打开 iFanControl；若系统阻止打开，前往“系统设置 → 隐私与安全性”，点“仍要打开”，再确认“打开”。
 
-```bash
-cd ~/Downloads/iFanControl-* && ./install.sh
-```
-
-推荐方式：打开终端后，将 `install.sh` 直接拖入终端并按回车。  
-说明：从网络下载后，`.command` 文件可能被 macOS 持续拦截，因此不建议依赖双击 `.command` 进行安装。
-
-解压后可打开 `安装说明.html` 查看图文安装指南。
-
-### 方式二：从官网下载安装
-
-- 官网：[ifancontrol.puremilkchun.top](https://ifancontrol.puremilkchun.top)
-- 更新源：[ifan-59w.pages.dev](https://ifan-59w.pages.dev/update-manifest.json)
-
-解压后也可直接运行 `install.sh`。如果需要图文说明，可打开仓库中的 [安装说明.html](安装说明.html)。
+旧版应用内更新继续使用 ZIP，按原有提示升级即可。若手动下载 ZIP，请解压后把 `install.sh` 拖入终端并按回车。
 
 ## Support & Logs / 反馈与日志
 

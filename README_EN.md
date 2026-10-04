@@ -32,31 +32,21 @@ This repository now keeps only source code, scripts, and essential resources. Re
 
 ## Supported Scope
 
-- macOS 13 or later
+- macOS 26 or later
 - Apple Silicon Macs with built-in fans
-- Primarily tested for M1 / M2 / M3 / M4 devices
+- The developer only has a Mac mini M4, used reliably for months. Other models may work in theory but require an actual trial.
 
 Note: fanless devices will not expose controllable fan hardware. Temperature sources shown in the UI are thermal sensors exposed by the system and do not necessarily map one-to-one to CPU or GPU core counts.
 
 ## Installation
 
-### From GitHub Releases
+Download the PKG from [GitHub Releases](https://github.com/PureMilkchun/iFanControl/releases) or the [official website](https://ifancontrol.puremilkchun.top).
 
-Download the latest ZIP from [Releases](https://github.com/PureMilkchun/iFanControl/releases), unzip it, then run:
+1. Quit iFanControl from the menu bar, then double-click the installer.
+2. Follow the macOS installation steps. Existing settings are preserved.
+3. Open iFanControl from Applications. If macOS blocks it, go to System Settings → Privacy & Security, click Open Anyway, then confirm Open.
 
-```bash
-cd ~/Downloads/iFanControl-* && ./install.sh
-```
-
-Recommended method: open Terminal, drag `install.sh` into the window, then press Enter.  
-Note: after downloading from the internet, `.command` files may be repeatedly blocked by macOS, so do not rely on double-clicking `.command` for installation.
-
-### From the official website
-
-- Website: [ifancontrol.puremilkchun.top](https://ifancontrol.puremilkchun.top)
-- Update manifest: [ifan-59w.pages.dev](https://ifan-59w.pages.dev/update-manifest.json)
-
-You can also open [安装说明.html](安装说明.html) for the illustrated install guide.
+Older versions continue to receive ZIP updates through the existing in-app updater. For a manual ZIP installation, unzip the archive, drag `install.sh` into Terminal, and press Return.
 
 ## Usage
 

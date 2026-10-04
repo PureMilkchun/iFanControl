@@ -1,0 +1,30 @@
+#!/bin/bash
+set -eu
+
+APP_PATH="/Applications/iFanControl.app"
+TOOL_PATH="/usr/local/bin/kentsmc"
+RULE_PATH="/private/etc/sudoers.d/kentsmc"
+
+if [ "$(/usr/bin/id -u)" -ne 0 ] || [ "${3:-/}" != "/" ]; then
+    echo "iFanControl: 安装目标或管理员授权异常。" >&2
+    exit 1
+fi
+
+test -d "$APP_PATH"
+test -f "$TOOL_PATH"
+test -f "$RULE_PATH"
+
+# Keep the app maintainable by administrators, matching the legacy ZIP
+# installer's expectations. Privileged control components stay root-owned.
+/usr/sbin/chown -R root:admin "$APP_PATH"
+/bin/chmod -R g+w "$APP_PATH"
+/usr/sbin/chown root:wheel "$TOOL_PATH" "$RULE_PATH"
+/bin/chmod 755 "$TOOL_PATH"
+/bin/chmod 440 "$RULE_PATH"
+
+/usr/sbin/visudo -c -f "$RULE_PATH"
+/usr/bin/codesign --verify --strict "$APP_PATH"
+/usr/bin/codesign --verify "$TOOL_PATH"
+
+# Do not launch a GUI app or create user settings from the root installer.
+echo "iFanControl: 安装完成。请从“应用程序”手动打开 iFanControl。"

@@ -3,7 +3,7 @@
 关联时间戳记忆：`/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_TIMELINE.md`
 读取建议：先读本文件，再读时间戳记忆，避免遗漏最新变更。
 
-更新时间：2026-07-23
+更新时间：2026-10-04
 
 ## 1. 项目当前基线
 
@@ -20,7 +20,15 @@ iFanControl 是一个面向 Apple Silicon 带风扇机型的风扇控制工具�
 - 开机自启动（SMAppService 原生登录项 API，系统设置中可直接管理）
 - 信息栏展示设置（完整/简洁/迷你三种模式，弹窗设置，存 `ifancontrol.ui.display_mode`，切换即时生效）
 
-当前版本：`2.9.8` / build 50
+当前版本：`2.9.9` / build 51
+
+### build 51 说明
+
+- **发布口径**：优化安装体验。
+- **安装分发**：官网新安装提供 PKG，保留真实 App 图标与系统完成页打钩，提供打开提示；macOS 26+、Apple Silicon。开发者仅在 Mac mini M4 长期验证，其他机型实际需试用确认。
+- **旧版更新**：manifest 的 ZIP 字段与 install.sh 路径保持兼容，build 51 高于 2.9.8 的 build 50；旧版实际升级由用户测试。
+- **卸载说明**：在实际密码输入提示处显示加粗紫色说明，告知输入不显示字符或星号、按回车继续。
+- **构建来源**：正式 PKG 构建脚本与界面资源在 active 源码树 packaging/pkg，发布源码与包版本保持可追踪。
 
 ### build 50 说明
 
