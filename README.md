@@ -121,7 +121,7 @@ iFanControl 会默认发送定期的匿名用户量统计数据，用于改进�
 python3 scripts/build_app.py
 ```
 
-生成的 App 位于 `build/iFanControl.app`，构建不会启动或安装它。CI 位于 `.github/workflows/swift.yml`，检查正式/Beta开发分支的构建、更新、原生控制器与启动回归。分支、提交、标签与发布记录规则见 [开发约定](CONTRIBUTING.md)。
+生成的 App 位于 `build/iFanControl.app`，构建不会启动或安装它。构建workflow已停用，只保留手动入口，Git推送不会自动构建或发布。历史保存、版本标签和回退方法见 [Git约定](CONTRIBUTING.md)。
 
 ## 更新机制
 

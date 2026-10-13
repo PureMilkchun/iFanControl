@@ -84,7 +84,7 @@ iFanControl sends periodic anonymous user-count stats by default to improve prod
 python3 scripts/build_app.py
 ```
 
-CI is defined in `.github/workflows/swift.yml`.
+The build workflow is disabled and keeps a manual-only trigger. Git pushes do not build or deploy the app.
 
 ## Update Flow
 
@@ -113,4 +113,4 @@ If the script came from a downloaded ZIP, drag `uninstall.sh` into Terminal and 
 
 ## Git and release provenance
 
-Run `python3 scripts/build_app.py` to assemble an ad-hoc signed `build/iFanControl.app` from tracked source, `packaging/app/Info.plist`, and `icon.png`. It does not launch or install the application. See [development and release conventions](CONTRIBUTING.md) for protected branches, native regression checks, immutable Beta tags, and package/source provenance.
+Run `python3 scripts/build_app.py` to assemble an ad-hoc signed `build/iFanControl.app` from tracked source, `packaging/app/Info.plist`, and `icon.png`. It does not launch or install the application. See [development and release conventions](CONTRIBUTING.md) for history, rollback branches, immutable Beta tags, and package/source provenance.

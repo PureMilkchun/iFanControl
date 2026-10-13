@@ -1,10 +1,7 @@
 name: macOS checks
 
 on:
-  push:
-    branches: [ "main", "codex/**" ]
-  pull_request:
-    branches: [ "main", "codex/3.0-beta" ]
+  workflow_dispatch:
 
 permissions:
   contents: read

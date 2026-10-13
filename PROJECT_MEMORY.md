@@ -38,11 +38,11 @@ Release、原生控制器、真实updater回归通过；新增实际AppDelegate�
 
 ### Git机制（2026-10-13）
 
-Beta70基线在 `codex/3.0-beta`，对应注释标签 `v2.9.10-beta.70`；main继续保留正式build52。长期分支要求PR、build检查，禁止强推/删除；单维护者不强制第二人批准。v*版本标签通过仓库ruleset禁止更新/删除。规则见CONTRIBUTING.md，发布输入/包/部署证据见docs/releases/2.9.10-beta.70.json。
+Beta70基线在 `codex/3.0-beta`，对应注释标签 `v2.9.10-beta.70`；main继续保留正式build52。长期分支只禁止强推/删除；没有构建/PR门槛。用户明确缩小范围为Git历史、追踪、回退，已停用自动构建并取消在途CI。v*版本标签通过仓库ruleset禁止更新/删除。规则见CONTRIBUTING.md，发布输入/包/部署证据见docs/releases/2.9.10-beta.70.json。
 
 Info.plist提交来源为packaging/app/Info.plist，root icon.png和kentsmc作为固定输入；scripts/build_app.py生成build/iFanControl.app并记录提交/是否有改动/哈希。生成App、签名、PKG、Cloudflare状态停止追踪但磁盘文件不删除；历史Git不改写。实验源码/HTML/旧公告仍在本机exclude，反馈邮件全局ignore；原生证据图纳入docs/development/assets。
 
-CI真正执行release、更新契约/真实updater、原生UI、实际AppDelegate启动回归；C桥在各隔离夹具内按本机架构编译，不依赖SPM内部产物路径。既有70标签/source-input哈希单独校验，不阻止后续源码发展。源码推送不触发部署或正式Release。70是发布后补录源码基线，未伪造62～69提交。
+现有构建/回归脚本保留供以后明确需要时使用，本阶段不再运行。GitHub构建workflow已停用，源码触发方式仅手动；推送不会触发构建、测试、打包、部署或正式Release。反向提交git revert用于共享历史回退，标签恢复分支用于检查旧状态，不使用reset/force覆盖历史。70是发布后补录源码基线，未伪造62～69提交。
 
 ### 2.9.10 / build 62 筹备
 

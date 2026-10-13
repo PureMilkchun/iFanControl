@@ -30,7 +30,7 @@ iFanControl 是一个面向 Apple Silicon Mac 的原生菜单栏风扇控制工�
 
 ## 构建与Git约定
 
-遵循 `CONTRIBUTING.md`。main维持正式代码，codex/3.0-beta保存Beta开发基线；日常工作用codex任务分支与PR，build检查通过后合入，禁止强推/删除长期分支。Beta标签与发布记录必须对应真实源码输入；不能用Git推送或CI触发正式部署。
+遵循 `CONTRIBUTING.md`。main维持正式代码，codex/3.0-beta保存Beta开发基线；日常直接小步提交/推送开发分支，较大修改按需用任务分支和PR；禁止强推/删除长期分支，不要求构建/PR作为保存代码门槛。Beta标签与发布记录对应真实源码输入。构建workflow已停用、只保留手动触发，不得为了保存Git历史运行构建/测试/打包；用户明确要求本阶段只建立历史、追踪和回退。不能用Git推送触发部署。
 
 App元数据来源为 `packaging/app/Info.plist`，不要修改本机生成的App来代替源码版本提交。
 
