@@ -48,6 +48,8 @@ Info.plist提交来源为packaging/app/Info.plist，root icon.png和kentsmc作�
 
 独立分支 `codex/stats-compatibility` 固定 Stats `88d5359ad3466efaa16985646a0bb15c6599109f`，保存 193 条 SMC/11 条 HID 温度声明、平台与平均资格、源文件哈希及 MIT 许可。离线目录审计确认现有 97 个静态 key 覆盖上游 M1～M5 专属 key；20 个 key 的定义随平台变化，未知 Tf 不能仅凭前缀证明属于 CPU。现有 kentsmc 哈希 `56b9b4f7239b4b043b8b69c92ed23f184eaf55a6b7d67c419d899da3a7254605`，对应源码版本尚未确定，公开候选缺 `--unlock-fans`，不能直接替换。研究与 23 个待实现/待执行的合成验收场景见 `docs/development/3.0-device-compatibility.md`；没有改变产品/控制/版本/线上线路，没有构建或实际硬件验证。首个补丁建议传感器元数据及平均资格，恢复与后端分开推进；不是已完成适配。
 
+维护者随后明确 MacBook 反馈为“启动正常，睡眠或合盖后失效”。优先级调整为风扇生命周期恢复：当前没有 sleep/wake 订阅，lastSetRPM 小差值去重不检查当前控制权，可能在系统接管后挡住相同目标的恢复；这是条件路径证据，尚未实机确定反馈根因。只读 nm/反汇编进一步确认现有工具包含 `modeKey` 小写 md/大写 Md 选择、直接模式写入、Ftst 回退和重试，不能误判为这些功能缺失。保留 lastSetRPM 从实际 RPM 初始化和平滑用途，单独设计控制确认/唤醒恢复；系统恢复目前提示早于命令确认也需单独验收。详见 `docs/development/3.0-fan-wake-recovery.md`；仍没有改产品代码或构建/硬件执行。
+
 ### 2.9.10 / build 62 筹备
 
 - 简介大 App 图标同次开窗累计点击十次解锁开发者模式；未解锁时关窗清零，解锁状态跨启动/升级保留。
