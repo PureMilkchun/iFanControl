@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "status": "design requirements; not connected to product tests; not executed",
+  "input_kind": "synthetic, not captured from devices",
+  "upstream_commit": "88d5359ad3466efaa16985646a0bb15c6599109f",
+  "note": "Expected values describe existing invariants or proposed behavior. A future runner must exercise the actual Swift decision code and record results separately.",
+  "scenarios": [
+    {
+      "id": "same_key_different_platform",
+      "scope": "catalog",
+      "policy": "proposed",
+      "input": {"key": "Tp09", "value_celsius": 62, "platforms": ["m1", "m2", "m4Pro"]},
+      "expected": {"m1_name": "CPU efficiency core 1", "m2_name": "CPU performance core 3", "m4Pro_name": "CPU performance core 3", "category": "CPU", "reading_unchanged": true},
+      "evidence": ["Modules/Sensors/values.swift:389", "Modules/Sensors/values.swift:418", "Modules/Sensors/values.swift:464"]
+    },
+    {
+      "id": "m4_gpu_variants",
+      "scope": "catalog",
+      "policy": "proposed",
+      "input": {"platforms": ["m4", "m4Pro", "m4Max"], "keys": ["Tg0G", "Tg0H", "Tg1U", "Tg1k"]},
+      "expected": {"m4_gpu_specific_keys": ["Tg0G", "Tg0H"], "m4Pro_gpu_specific_keys": ["Tg1U", "Tg1k"], "m4Max_gpu_specific_keys": ["Tg1U", "Tg1k"], "do_not_hide_other_valid_discovered_temperatures": true},
+      "evidence": ["Modules/Sensors/values.swift:471-482"]
+    },
+    {
+      "id": "m3_tf_is_gpu",
+      "scope": "catalog",
+      "policy": "existing invariant",
+      "input": {"platform": "m3", "temperatures": {"Tf04": 70, "Tf14": 50}},
+      "expected": {"cpu_average_celsius": 70, "gpu_average_celsius": 50, "hottest_celsius": 70},
+      "evidence": ["Modules/Sensors/values.swift:435-455", "Sources/MacFanControl/SensorCatalog.swift"]
+    },
+    {
+      "id": "unknown_tf_does_not_prove_cpu",
+      "scope": "catalog",
+      "policy": "proposed",
+      "input": {"platform": "m3", "known_temperatures": {"Tf04": 72}, "unknown_key": "TfZZ", "unknown_reads_celsius": [62, 63]},
+      "expected": {"cpu_average_celsius": 72, "unknown_visible_with_raw_key": true, "unknown_excluded_from_component_average": true, "hottest_policy_unchanged": true},
+      "evidence": ["Modules/Sensors/readers.swift:103-120", "Modules/Sensors/values.swift:448-455"]
+    },
+    {
+      "id": "unknown_platform_conflict",
+      "scope": "catalog",
+      "policy": "proposed",
+      "input": {"cpu_brand": "Apple Future Chip", "valid_temperatures": {"Tp0P": 60}},
+      "expected": {"do_not_assume_m1": true, "raw_temperature_preserved": true, "ambiguous_definition_not_eligible_for_component_average": true},
+      "evidence": ["Modules/Sensors/values.swift:363", "Modules/Sensors/values.swift:396"]
+    },
+    {
+      "id": "brand_tokens_are_exact",
+      "scope": "platform",
+      "policy": "proposed",
+      "input": {"brands": ["Apple M1", "Apple M4 Pro", "Apple M10", "", "Unknown"]},
+      "expected": {"Apple M1": "m1", "Apple M4 Pro": "m4Pro", "Apple M10": "unknown until explicitly supported", "": "unknown", "Unknown": "unknown"},
+      "evidence": ["Kit/plugins/SystemKit.swift:781-849"]
+    },
+    {
+      "id": "proximity_excluded_from_average",
+      "scope": "catalog",
+      "policy": "proposed",
+      "input": {"platform": "m1", "temperatures": {"Tp01": 55, "TC0D": 75}},
+      "expected": {"cpu_average_celsius": 55, "TC0D_still_visible": true, "hottest_celsius": 75},
+      "evidence": ["Modules/Sensors/values.swift:341-346", "Modules/Sensors/readers.swift:164-165"]
+    },
+    {
+      "id": "empty_component_average",
+      "scope": "selection",
+      "policy": "existing invariant",
+      "input": {"source_mode": "cpu_average", "temperatures": {"TaLP": 35}},
+      "expected": {"selected_temperature": null, "missing_telemetry_path": true, "do_not_return_zero_or_airflow_average": true},
+      "evidence": ["Sources/MacFanControl/main.swift:39-70"]
+    },
+    {
+      "id": "manual_missing_falls_back_to_hottest",
+      "scope": "selection",
+      "policy": "existing invariant",
+      "input": {"source_mode": "manual", "selected_key": "Tp09", "temperatures": {"Tg05": 68, "TaLP": 35}},
+      "expected": {"selected_key": "Tg05", "selected_celsius": 68},
+      "evidence": ["Sources/MacFanControl/main.swift:71-80"]
+    },
+    {
+      "id": "rejected_temperature_does_not_refresh_age",
+      "scope": "telemetry",
+      "policy": "existing invariant plus proposed per-key validation",
+      "input": {"platform": "m2", "key": "Tp01", "last_valid_celsius": 60, "last_valid_at_seconds": 0, "new_reads": [{"at_seconds": 16, "value_celsius": 0}, {"at_seconds": 46, "value_celsius": 125}]},
+      "expected": {"if_read_rejected_last_valid_at_seconds": 0, "never_keep_old_value_as_fresh_indefinitely": true, "zero_value_policy_requires_platform_evidence": true, "expired_after_seconds": 45},
+      "evidence": ["Modules/Sensors/readers.swift:155-161", "Sources/MacFanControl/main.swift:93-94"]
+    },
+    {
+      "id": "fanless_vs_unavailable_count",
+      "scope": "capability",
+      "policy": "proposed",
+      "input": {"observations": [{"FNum": {"status": "success", "value": 0}, "F0Ac": {"status": "not_found"}}, {"FNum": {"status": "permission_denied"}, "F0Ac": {"status": "permission_denied"}}]},
+      "expected": {"first": "fanless", "second": "probe_unavailable", "no_new_fan_writes_during_capability_probe": true, "temperature_monitoring_independent": true},
+      "evidence": ["Sources/MacFanControl/main.swift:1977-1995", "Tests/SMC.swift:232-252"]
+    },
+    {
+      "id": "valid_stopped_fan",
+      "scope": "telemetry",
+      "policy": "existing invariant",
+      "input": {"FNum": 1, "F0Ac": 0, "F0Md": 0},
+      "expected": {"fan_count": 1, "rpm": 0, "mode": "automatic", "zero_rpm_is_not_missing": true},
+      "evidence": ["Sources/MacFanControl/main.swift:1981-1987", "Tests/SMC.swift:214-219"]
+    },
+    {
+      "id": "shared_target_asymmetric_limits",
+      "scope": "control",
+      "policy": "existing invariant",
+      "input": {"fan_maxima": [4900, 5800], "requested_shared_rpm": 5400},
+      "expected": {"global_max_rpm": 4900, "shared_target_rpm": 4900, "do_not_use_highest_maximum_for_all_fans": true},
+      "evidence": ["Sources/MacFanControl/main.swift:1861-1876"]
+    },
+    {
+      "id": "lowercase_mode_and_fallback",
+      "scope": "backend",
+      "policy": "proposed; current binary implementation unknown",
+      "input": {"variants": [{"F0md": {"status": "success", "value": 0}}, {"F0md": {"status": "not_found"}, "F0Md": {"status": "success", "value": 0}}, {"F0md": {"status": "transport_error"}, "F0Md": {"status": "transport_error"}}]},
+      "expected": {"first_mode_key": "F0md", "second_mode_key": "F0Md", "third_mode": "unavailable, not automatic", "transient_errors_allow_later_reprobe": true},
+      "evidence": ["SMC/smc.swift:368-378", "Tests/SMC.swift:431-441"]
+    },
+    {
+      "id": "no_ftst_direct_mode",
+      "scope": "backend",
+      "policy": "proposed; current binary implementation unknown",
+      "input": {"F0md": {"value": 0, "writable": true}, "Ftst": {"status": "not_found"}, "requested_operation": "user_requested_manual_mode"},
+      "expected": {"direct_mode_write_allowed": true, "do_not_require_ftst": true, "system_restore_uses_per_fan_modes": true},
+      "evidence": ["SMC/smc.swift:559-587", "SMC/smc.swift:607-638", "Tests/SMC.swift:442-449"]
+    },
+    {
+      "id": "target_encoding_and_limit",
+      "scope": "backend",
+      "policy": "proposed; current binary implementation unknown",
+      "input": {"target_types": ["flt ", "fpe2", "xxxx"], "requested_rpm": 6000, "max_rpm": 5500},
+      "expected": {"effective_target_rpm": 5500, "flt_bytes": "Float32 5500 in backend-defined byte order", "fpe2_bytes_hex": "55 f0", "xxxx": "reject without target write", "fpe2_max_integer": 16383},
+      "evidence": ["SMC/smc.swift:470-521", "Tests/SMC.swift:386-421"]
+    },
+    {
+      "id": "restore_partial_failure",
+      "scope": "backend",
+      "policy": "proposed; current binary implementation unknown",
+      "input": {"fans": [{"id": 0, "mode": 1, "restore_result": "firmware_error"}, {"id": 1, "mode": 3, "restore_result": "success"}]},
+      "expected": {"attempt_other_fans_after_failure": true, "overall_success": false, "mode_3_is_system_automatic": true, "do_not_report_every_fan_restored": true},
+      "evidence": ["Tests/SMC.swift:423-429", "Tests/SMC.swift:564-587"]
+    },
+    {
+      "id": "invalid_fan_metadata",
+      "scope": "parser",
+      "policy": "proposed",
+      "input": {"FNum_outputs": ["FNum [ui8 ] (2)", "FNum [ui8 ] (-1)", "FNum [ui8 ] (99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999)", "diagnostic text without a number"]},
+      "expected": {"valid_count": 2, "reject_negative_nonfinite_or_out_of_contract_counts": true, "no_int_conversion_trap": true, "bounded_enumeration": true},
+      "evidence": ["Sources/MacFanControl/main.swift:1818-1859", "SMC/smc.swift:471-475"]
+    },
+    {
+      "id": "discovery_recovers_after_initial_failure",
+      "scope": "discovery",
+      "policy": "proposed",
+      "input": {"attempt_results": ["launch_error", "nonzero_exit", "success_with_Tf04_and_Tf14"], "wake_event": true},
+      "expected": {"retry_with_bounded_backoff": true, "one_attempt_in_flight": true, "successful_keys_reprofiled": true, "no_permanent_attempted_failure": true, "no_zero_delay_timer_loop": true},
+      "evidence": ["Sources/MacFanControl/main.swift:1891-1945", "Modules/Sensors/reader.m:39-56"]
+    },
+    {
+      "id": "large_discovery_output",
+      "scope": "process lifecycle",
+      "policy": "proposed verification before process changes",
+      "input": {"fake_child_stdout_bytes": 1048576, "fake_child_stderr_bytes": 1048576, "contains_valid_key": "Tf04"},
+      "expected": {"drain_both_pipes_without_main_thread_blocking": true, "child_can_exit_without_pipe_backpressure_deadlock": true, "no_reintroduction_of_reverted_semaphore_wrapper": true},
+      "evidence": ["Sources/MacFanControl/main.swift:1900-1916", "CODE_AUDIT.md:114-134"]
+    },
+    {
+      "id": "cache_ages_and_control_throttle",
+      "scope": "control",
+      "policy": "existing invariant",
+      "input": {"last_valid_temperature_at_seconds": 0, "ages_seconds": [15, 16, 45, 46], "last_command_at_seconds": 2, "next_command_at_seconds": 3, "command_in_flight": true},
+      "expected": {"age_15": "fresh", "age_16": "cached_stale", "age_45": "cached_stale", "age_46": "expired", "skip_next_command": true, "retain_missing_data_safety_and_system_fallback": true},
+      "evidence": ["Sources/MacFanControl/main.swift:93-94", "docs/development/3.0-preparation.md"]
+    },
+    {
+      "id": "power_channel_missing_or_reset",
+      "scope": "power",
+      "policy": "proposed",
+      "input": {"cases": [{"subscription": "valid", "channels": ["GPU Energy"]}, {"channel": "CPU Energy", "previous_energy": 1000, "current_energy": 10, "elapsed_seconds": 2}, {"channel": "CPU Energy", "unit": "unknown"}]},
+      "expected": {"missing_cpu_channel": "unavailable, not measured 0W", "counter_reset": "reset baseline rather than negative watts", "unknown_unit": "explicit uncertainty, not verified unit conversion", "missing_power_does_not_trigger_false_anomaly": true},
+      "evidence": ["Sources/MacFanControl/main.swift:300-400", "Modules/Sensors/readers.swift:594-630"]
+    },
+    {
+      "id": "smc_hid_same_zone",
+      "scope": "telemetry sources",
+      "policy": "proposed for later HID work",
+      "input": {"smc": {"key": "Tp01", "value_celsius": 60}, "hid": {"name": "pACC MTR Temp Sensor0", "value_celsius": 60}},
+      "expected": {"source_identifiers_preserved": true, "hid_name_not_passed_to_smc_reader": true, "do_not_assume_two_independent_zones": true, "average_weighting_requires_explicit_policy": true},
+      "evidence": ["Modules/Sensors/values.swift:639-653", "Modules/Sensors/readers.swift:169-186"]
+    }
+  ]
+}

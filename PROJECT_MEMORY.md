@@ -44,6 +44,10 @@ Info.plist提交来源为packaging/app/Info.plist，root icon.png和kentsmc作�
 
 现有构建/回归脚本保留供以后明确需要时使用，本阶段不再运行。GitHub构建workflow已停用，源码触发方式仅手动；推送不会触发构建、测试、打包、部署或正式Release。反向提交git revert用于共享历史回退，标签恢复分支用于检查旧状态，不使用reset/force覆盖历史。70是发布后补录源码基线，未伪造62～69提交。
 
+### 设备适配研究（2026-10-13）
+
+独立分支 `codex/stats-compatibility` 固定 Stats `88d5359ad3466efaa16985646a0bb15c6599109f`，保存 193 条 SMC/11 条 HID 温度声明、平台与平均资格、源文件哈希及 MIT 许可。离线目录审计确认现有 97 个静态 key 覆盖上游 M1～M5 专属 key；20 个 key 的定义随平台变化，未知 Tf 不能仅凭前缀证明属于 CPU。现有 kentsmc 哈希 `56b9b4f7239b4b043b8b69c92ed23f184eaf55a6b7d67c419d899da3a7254605`，对应源码版本尚未确定，公开候选缺 `--unlock-fans`，不能直接替换。研究与 23 个待实现/待执行的合成验收场景见 `docs/development/3.0-device-compatibility.md`；没有改变产品/控制/版本/线上线路，没有构建或实际硬件验证。首个补丁建议传感器元数据及平均资格，恢复与后端分开推进；不是已完成适配。
+
 ### 2.9.10 / build 62 筹备
 
 - 简介大 App 图标同次开窗累计点击十次解锁开发者模式；未解锁时关窗清零，解锁状态跨启动/升级保留。

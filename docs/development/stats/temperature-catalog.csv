@@ -1,0 +1,205 @@
+backend,key,name,group,platforms,average,source_line
+SMC,TA%P,Ambient %,sensor,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,337
+SMC,Th%H,Heatpipe %,sensor,intel,false,338
+SMC,TZ%C,Thermal zone %,sensor,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,339
+SMC,TC0D,CPU diode,CPU,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,341
+SMC,TC0E,CPU diode virtual,CPU,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,342
+SMC,TC0F,CPU diode filtered,CPU,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,343
+SMC,TC0H,CPU heatsink,CPU,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,344
+SMC,TC0P,CPU proximity,CPU,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,345
+SMC,TCAD,CPU package,CPU,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,346
+SMC,TCAC,CPU A core die,CPU,intel,true,348
+SMC,TCBC,CPU B core die,CPU,intel,true,349
+SMC,TCAH,CPU A heatsink,CPU,intel,false,350
+SMC,TCBH,CPU B heatsink,CPU,intel,false,351
+SMC,TC%c,CPU core %,CPU,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,true,353
+SMC,TC%C,CPU Core %,CPU,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,true,354
+SMC,TCGC,GPU Intel Graphics,GPU,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,356
+SMC,TG0D,GPU diode,GPU,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,357
+SMC,TGDD,GPU AMD Radeon,GPU,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,358
+SMC,TG0H,GPU heatsink,GPU,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,359
+SMC,TG0P,GPU proximity,GPU,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,360
+SMC,Tm0P,Mainboard,system,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,362
+SMC,Tp0P,Powerboard,system,intel,false,363
+SMC,TB1T,Battery,system,intel,false,364
+SMC,TW0P,Airport,system,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,365
+SMC,TL0P,Display,system,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,366
+SMC,TI%P,Thunderbolt %,system,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,367
+SMC,TH%A,Disk % (A),system,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,368
+SMC,TH%B,Disk % (B),system,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,369
+SMC,TH%C,Disk % (C),system,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,370
+SMC,TTLD,Thunderbolt left,system,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,372
+SMC,TTRD,Thunderbolt right,system,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,373
+SMC,TN0D,Northbridge diode,system,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,375
+SMC,TN0H,Northbridge heatsink,system,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,376
+SMC,TN0P,Northbridge proximity,system,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,377
+SMC,TMA1,Memory riser A slot 1,system,intel,false,379
+SMC,TMA2,Memory riser A slot 2,system,intel,false,380
+SMC,TMA3,Memory riser A slot 3,system,intel,false,381
+SMC,TMA4,Memory riser A slot 4,system,intel,false,382
+SMC,TMB1,Memory riser B slot 1,system,intel,false,383
+SMC,TMB2,Memory riser B slot 2,system,intel,false,384
+SMC,TMB3,Memory riser B slot 3,system,intel,false,385
+SMC,TMB4,Memory riser B slot 4,system,intel,false,386
+SMC,Tp09,CPU efficiency core 1,CPU,m1|m1Pro|m1Max|m1Ultra,true,389
+SMC,Tp0T,CPU efficiency core 2,CPU,m1|m1Pro|m1Max|m1Ultra,true,390
+SMC,Tp01,CPU performance core 1,CPU,m1|m1Pro|m1Max|m1Ultra,true,391
+SMC,Tp05,CPU performance core 2,CPU,m1|m1Pro|m1Max|m1Ultra,true,392
+SMC,Tp0D,CPU performance core 3,CPU,m1|m1Pro|m1Max|m1Ultra,true,393
+SMC,Tp0H,CPU performance core 4,CPU,m1|m1Pro|m1Max|m1Ultra,true,394
+SMC,Tp0L,CPU performance core 5,CPU,m1|m1Pro|m1Max|m1Ultra,true,395
+SMC,Tp0P,CPU performance core 6,CPU,m1|m1Pro|m1Max|m1Ultra,true,396
+SMC,Tp0X,CPU performance core 7,CPU,m1|m1Pro|m1Max|m1Ultra,true,397
+SMC,Tp0b,CPU performance core 8,CPU,m1|m1Pro|m1Max|m1Ultra,true,398
+SMC,Tg05,GPU 1,GPU,m1|m1Pro|m1Max|m1Ultra,true,400
+SMC,Tg0D,GPU 2,GPU,m1|m1Pro|m1Max|m1Ultra,true,401
+SMC,Tg0L,GPU 3,GPU,m1|m1Pro|m1Max|m1Ultra,true,402
+SMC,Tg0T,GPU 4,GPU,m1|m1Pro|m1Max|m1Ultra,true,403
+SMC,Tm02,Memory 1,sensor,m1|m1Pro|m1Max|m1Ultra,false,405
+SMC,Tm06,Memory 2,sensor,m1|m1Pro|m1Max|m1Ultra,false,406
+SMC,Tm08,Memory 3,sensor,m1|m1Pro|m1Max|m1Ultra,false,407
+SMC,Tm09,Memory 4,sensor,m1|m1Pro|m1Max|m1Ultra,false,408
+SMC,Tp1h,CPU efficiency core 1,CPU,m2|m2Pro|m2Max|m2Ultra,true,411
+SMC,Tp1t,CPU efficiency core 2,CPU,m2|m2Pro|m2Max|m2Ultra,true,412
+SMC,Tp1p,CPU efficiency core 3,CPU,m2|m2Pro|m2Max|m2Ultra,true,413
+SMC,Tp1l,CPU efficiency core 4,CPU,m2|m2Pro|m2Max|m2Ultra,true,414
+SMC,Tp01,CPU performance core 1,CPU,m2|m2Pro|m2Max|m2Ultra,true,416
+SMC,Tp05,CPU performance core 2,CPU,m2|m2Pro|m2Max|m2Ultra,true,417
+SMC,Tp09,CPU performance core 3,CPU,m2|m2Pro|m2Max|m2Ultra,true,418
+SMC,Tp0D,CPU performance core 4,CPU,m2|m2Pro|m2Max|m2Ultra,true,419
+SMC,Tp0X,CPU performance core 5,CPU,m2|m2Pro|m2Max|m2Ultra,true,420
+SMC,Tp0b,CPU performance core 6,CPU,m2|m2Pro|m2Max|m2Ultra,true,421
+SMC,Tp0f,CPU performance core 7,CPU,m2|m2Pro|m2Max|m2Ultra,true,422
+SMC,Tp0j,CPU performance core 8,CPU,m2|m2Pro|m2Max|m2Ultra,true,423
+SMC,Tg0f,GPU 1,GPU,m2|m2Pro|m2Max|m2Ultra,true,425
+SMC,Tg0j,GPU 2,GPU,m2|m2Pro|m2Max|m2Ultra,true,426
+SMC,Te05,CPU efficiency core 1,CPU,m3|m3Pro|m3Max|m3Ultra,true,429
+SMC,Te0L,CPU efficiency core 2,CPU,m3|m3Pro|m3Max|m3Ultra,true,430
+SMC,Te0P,CPU efficiency core 3,CPU,m3|m3Pro|m3Max|m3Ultra,true,431
+SMC,Te0S,CPU efficiency core 4,CPU,m3|m3Pro|m3Max|m3Ultra,true,432
+SMC,Tf04,CPU performance core 1,CPU,m3|m3Pro|m3Max|m3Ultra,true,434
+SMC,Tf09,CPU performance core 2,CPU,m3|m3Pro|m3Max|m3Ultra,true,435
+SMC,Tf0A,CPU performance core 3,CPU,m3|m3Pro|m3Max|m3Ultra,true,436
+SMC,Tf0B,CPU performance core 4,CPU,m3|m3Pro|m3Max|m3Ultra,true,437
+SMC,Tf0D,CPU performance core 5,CPU,m3|m3Pro|m3Max|m3Ultra,true,438
+SMC,Tf0E,CPU performance core 6,CPU,m3|m3Pro|m3Max|m3Ultra,true,439
+SMC,Tf44,CPU performance core 7,CPU,m3|m3Pro|m3Max|m3Ultra,true,440
+SMC,Tf49,CPU performance core 8,CPU,m3|m3Pro|m3Max|m3Ultra,true,441
+SMC,Tf4A,CPU performance core 9,CPU,m3|m3Pro|m3Max|m3Ultra,true,442
+SMC,Tf4B,CPU performance core 10,CPU,m3|m3Pro|m3Max|m3Ultra,true,443
+SMC,Tf4D,CPU performance core 11,CPU,m3|m3Pro|m3Max|m3Ultra,true,444
+SMC,Tf4E,CPU performance core 12,CPU,m3|m3Pro|m3Max|m3Ultra,true,445
+SMC,Tf14,GPU 1,GPU,m3|m3Pro|m3Max|m3Ultra,true,447
+SMC,Tf18,GPU 2,GPU,m3|m3Pro|m3Max|m3Ultra,true,448
+SMC,Tf19,GPU 3,GPU,m3|m3Pro|m3Max|m3Ultra,true,449
+SMC,Tf1A,GPU 4,GPU,m3|m3Pro|m3Max|m3Ultra,true,450
+SMC,Tf24,GPU 5,GPU,m3|m3Pro|m3Max|m3Ultra,true,451
+SMC,Tf28,GPU 6,GPU,m3|m3Pro|m3Max|m3Ultra,true,452
+SMC,Tf29,GPU 7,GPU,m3|m3Pro|m3Max|m3Ultra,true,453
+SMC,Tf2A,GPU 8,GPU,m3|m3Pro|m3Max|m3Ultra,true,454
+SMC,Te05,CPU efficiency core 1,CPU,m4|m4Pro|m4Max,true,457
+SMC,Te0S,CPU efficiency core 2,CPU,m4|m4Pro|m4Max,true,458
+SMC,Te09,CPU efficiency core 3,CPU,m4|m4Pro|m4Max,true,459
+SMC,Te0H,CPU efficiency core 4,CPU,m4|m4Pro|m4Max,true,460
+SMC,Tp01,CPU performance core 1,CPU,m4|m4Pro|m4Max,true,462
+SMC,Tp05,CPU performance core 2,CPU,m4|m4Pro|m4Max,true,463
+SMC,Tp09,CPU performance core 3,CPU,m4|m4Pro|m4Max,true,464
+SMC,Tp0D,CPU performance core 4,CPU,m4|m4Pro|m4Max,true,465
+SMC,Tp0V,CPU performance core 5,CPU,m4|m4Pro|m4Max,true,466
+SMC,Tp0Y,CPU performance core 6,CPU,m4|m4Pro|m4Max,true,467
+SMC,Tp0b,CPU performance core 7,CPU,m4|m4Pro|m4Max,true,468
+SMC,Tp0e,CPU performance core 8,CPU,m4|m4Pro|m4Max,true,469
+SMC,Tg0G,GPU 1,GPU,m4,true,471
+SMC,Tg0H,GPU 2,GPU,m4,true,472
+SMC,Tg1U,GPU 1,GPU,m4Pro|m4Max,true,473
+SMC,Tg1k,GPU 2,GPU,m4Pro|m4Max,true,474
+SMC,Tg0K,GPU 3,GPU,m4|m4Pro|m4Max,true,476
+SMC,Tg0L,GPU 4,GPU,m4|m4Pro|m4Max,true,477
+SMC,Tg0d,GPU 5,GPU,m4|m4Pro|m4Max,true,478
+SMC,Tg0e,GPU 6,GPU,m4|m4Pro|m4Max,true,479
+SMC,Tg0j,GPU 7,GPU,m4|m4Pro|m4Max,true,480
+SMC,Tg0k,GPU 8,GPU,m4|m4Pro|m4Max,true,481
+SMC,Tm0p,Memory Proximity 1,sensor,m4|m4Pro|m4Max,false,483
+SMC,Tm1p,Memory Proximity 2,sensor,m4|m4Pro|m4Max,false,484
+SMC,Tm2p,Memory Proximity 3,sensor,m4|m4Pro|m4Max,false,485
+SMC,Tp00,CPU super core 1,CPU,m5|m5Pro|m5Max|m5Ultra,true,488
+SMC,Tp04,CPU super core 2,CPU,m5|m5Pro|m5Max|m5Ultra,true,489
+SMC,Tp08,CPU super core 3,CPU,m5|m5Pro|m5Max|m5Ultra,true,490
+SMC,Tp0C,CPU super core 4,CPU,m5|m5Pro|m5Max|m5Ultra,true,491
+SMC,Tp0G,CPU super core 5,CPU,m5|m5Pro|m5Max|m5Ultra,true,492
+SMC,Tp0K,CPU super core 6,CPU,m5|m5Pro|m5Max|m5Ultra,true,493
+SMC,Tp0O,CPU performance core 1,CPU,m5|m5Pro|m5Max|m5Ultra,true,495
+SMC,Tp0R,CPU performance core 2,CPU,m5|m5Pro|m5Max|m5Ultra,true,496
+SMC,Tp0U,CPU performance core 3,CPU,m5|m5Pro|m5Max|m5Ultra,true,497
+SMC,Tp0X,CPU performance core 4,CPU,m5|m5Pro|m5Max|m5Ultra,true,498
+SMC,Tp0a,CPU performance core 5,CPU,m5|m5Pro|m5Max|m5Ultra,true,499
+SMC,Tp0d,CPU performance core 6,CPU,m5|m5Pro|m5Max|m5Ultra,true,500
+SMC,Tp0g,CPU performance core 7,CPU,m5|m5Pro|m5Max|m5Ultra,true,501
+SMC,Tp0j,CPU performance core 8,CPU,m5|m5Pro|m5Max|m5Ultra,true,502
+SMC,Tp0m,CPU performance core 9,CPU,m5|m5Pro|m5Max|m5Ultra,true,503
+SMC,Tp0p,CPU performance core 10,CPU,m5|m5Pro|m5Max|m5Ultra,true,504
+SMC,Tp0u,CPU performance core 11,CPU,m5|m5Pro|m5Max|m5Ultra,true,505
+SMC,Tp0y,CPU performance core 12,CPU,m5|m5Pro|m5Max|m5Ultra,true,506
+SMC,Tg0U,GPU 1,GPU,m5|m5Pro|m5Max|m5Ultra,true,508
+SMC,Tg0X,GPU 2,GPU,m5|m5Pro|m5Max|m5Ultra,true,509
+SMC,Tg0d,GPU 3,GPU,m5|m5Pro|m5Max|m5Ultra,true,510
+SMC,Tg0g,GPU 4,GPU,m5|m5Pro|m5Max|m5Ultra,true,511
+SMC,Tg0j,GPU 5,GPU,m5|m5Pro|m5Max|m5Ultra,true,512
+SMC,Tg1Y,GPU 6,GPU,m5|m5Pro|m5Max|m5Ultra,true,513
+SMC,Tg1c,GPU 7,GPU,m5|m5Pro|m5Max|m5Ultra,true,514
+SMC,Tg1g,GPU 8,GPU,m5|m5Pro|m5Max|m5Ultra,true,515
+SMC,Tp0j,CPU super core 1,CPU,m6|m6Pro|m6Max,true,519
+SMC,Tp0g,CPU super core 2,CPU,m6|m6Pro|m6Max,true,520
+SMC,Tp09,CPU super core 3,CPU,m6|m6Pro|m6Max,true,521
+SMC,Tp07,CPU super core 4,CPU,m6|m6Pro|m6Max,true,522
+SMC,Tp0m,CPU performance core 1,CPU,m6|m6Pro|m6Max,true,524
+SMC,Tp0L,CPU performance core 2,CPU,m6|m6Pro|m6Max,true,525
+SMC,Tp0I,CPU performance core 3,CPU,m6|m6Pro|m6Max,true,526
+SMC,Tp0d,CPU performance core 4,CPU,m6|m6Pro|m6Max,true,527
+SMC,Tp0E,CPU performance core 5,CPU,m6|m6Pro|m6Max,true,528
+SMC,Tp0G,CPU performance core 6,CPU,m6|m6Pro|m6Max,true,529
+SMC,Tp0b,CPU performance core 7,CPU,m6|m6Pro|m6Max,true,530
+SMC,Tp05,CPU performance core 8,CPU,m6|m6Pro|m6Max,true,531
+SMC,Te07,CPU efficiency core 1,CPU,m6|m6Pro|m6Max,true,533
+SMC,Te08,CPU efficiency core 2,CPU,m6|m6Pro|m6Max,true,534
+SMC,Te09,CPU efficiency core 3,CPU,m6|m6Pro|m6Max,true,535
+SMC,Te0c,CPU efficiency core 4,CPU,m6|m6Pro|m6Max,true,536
+SMC,Te0h,CPU efficiency core 5,CPU,m6|m6Pro|m6Max,true,537
+SMC,Te0i,CPU efficiency core 6,CPU,m6|m6Pro|m6Max,true,538
+SMC,Tg1e,GPU 1,GPU,m6|m6Pro|m6Max,true,540
+SMC,Tg0d,GPU 2,GPU,m6|m6Pro|m6Max,true,541
+SMC,Tg0c,GPU 3,GPU,m6|m6Pro|m6Max,true,542
+SMC,Tg0b,GPU 4,GPU,m6|m6Pro|m6Max,true,543
+SMC,Tg1c,GPU 5,GPU,m6|m6Pro|m6Max,true,544
+SMC,Tg1d,GPU 6,GPU,m6|m6Pro|m6Max,true,545
+SMC,Tg07,GPU 7,GPU,m6|m6Pro|m6Max,true,546
+SMC,Tg1f,GPU 8,GPU,m6|m6Pro|m6Max,true,547
+SMC,Tg09,GPU 9,GPU,m6|m6Pro|m6Max,true,548
+SMC,Tg0a,GPU 10,GPU,m6|m6Pro|m6Max,true,549
+SMC,Tg1g,GPU 11,GPU,m6|m6Pro|m6Max,true,550
+SMC,Tg1h,GPU 12,GPU,m6|m6Pro|m6Max,true,551
+SMC,Te05,CPU efficiency core 1,CPU,a18Pro,true,554
+SMC,Te0S,CPU efficiency core 2,CPU,a18Pro,true,555
+SMC,Tp05,CPU performance core 1,CPU,a18Pro,true,557
+SMC,Tp0D,CPU performance core 2,CPU,a18Pro,true,558
+SMC,Tg05,GPU 1,GPU,a18Pro,true,560
+SMC,Tg0D,GPU 2,GPU,a18Pro,true,561
+SMC,Tg0L,GPU 3,GPU,a18Pro,true,562
+SMC,Tg0e,GPU 4,GPU,a18Pro,true,563
+SMC,TaLP,Airflow left,sensor,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro,false,566
+SMC,TaRF,Airflow right,sensor,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro,false,567
+SMC,TH0x,NAND,system,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro,false,569
+SMC,TB1T,Battery 1,system,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro,false,570
+SMC,TB2T,Battery 2,system,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro,false,571
+SMC,TW0P,Airport,system,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro,false,572
+HID,pACC MTR Temp Sensor%,CPU performance core %,CPU,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,640
+HID,eACC MTR Temp Sensor%,CPU efficiency core %,CPU,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,641
+HID,GPU MTR Temp Sensor%,GPU core %,GPU,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,643
+HID,SOC MTR Temp Sensor%,SOC core %,sensor,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,644
+HID,ANE MTR Temp Sensor%,Neural engine %,sensor,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,645
+HID,ISP MTR Temp Sensor%,Image Signal Processor %,sensor,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,646
+HID,PMGR SOC Die Temp Sensor%,Power manager die %,sensor,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,648
+HID,PMU tdev%,Power management unit dev %,sensor,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,649
+HID,PMU tdie%,Power management unit die %,sensor,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,650
+HID,gas gauge battery,Battery,sensor,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,652
+HID,NAND CH% temp,Disk %s,GPU,m1|m1Pro|m1Max|m1Ultra|m2|m2Pro|m2Max|m2Ultra|m3|m3Pro|m3Max|m3Ultra|m4|m4Pro|m4Max|m5|m5Pro|m5Max|m5Ultra|m6|m6Pro|m6Max|a18Pro|intel,false,653

@@ -1,0 +1,110 @@
+{
+  "repository": "https://github.com/exelban/stats",
+  "commit": "88d5359ad3466efaa16985646a0bb15c6599109f",
+  "retrieved_on": "2026-10-13",
+  "evidence": "upstream source declarations, not device observations",
+  "platform_sets": {
+    "apple": [
+      "m1",
+      "m1Pro",
+      "m1Max",
+      "m1Ultra",
+      "m2",
+      "m2Pro",
+      "m2Max",
+      "m2Ultra",
+      "m3",
+      "m3Pro",
+      "m3Max",
+      "m3Ultra",
+      "m4",
+      "m4Pro",
+      "m4Max",
+      "m5",
+      "m5Pro",
+      "m5Max",
+      "m5Ultra",
+      "m6",
+      "m6Pro",
+      "m6Max",
+      "a18Pro"
+    ],
+    "m1Gen": [
+      "m1",
+      "m1Pro",
+      "m1Max",
+      "m1Ultra"
+    ],
+    "m2Gen": [
+      "m2",
+      "m2Pro",
+      "m2Max",
+      "m2Ultra"
+    ],
+    "m3Gen": [
+      "m3",
+      "m3Pro",
+      "m3Max",
+      "m3Ultra"
+    ],
+    "m4Gen": [
+      "m4",
+      "m4Pro",
+      "m4Max"
+    ],
+    "m5Gen": [
+      "m5",
+      "m5Pro",
+      "m5Max",
+      "m5Ultra"
+    ],
+    "m6Gen": [
+      "m6",
+      "m6Pro",
+      "m6Max"
+    ],
+    "all": [
+      "m1",
+      "m1Pro",
+      "m1Max",
+      "m1Ultra",
+      "m2",
+      "m2Pro",
+      "m2Max",
+      "m2Ultra",
+      "m3",
+      "m3Pro",
+      "m3Max",
+      "m3Ultra",
+      "m4",
+      "m4Pro",
+      "m4Max",
+      "m5",
+      "m5Pro",
+      "m5Max",
+      "m5Ultra",
+      "m6",
+      "m6Pro",
+      "m6Max",
+      "a18Pro",
+      "intel"
+    ]
+  },
+  "temperature_row_count": 204,
+  "source_files": {
+    "Kit/constants.swift": "c3a53bb8fa8736ad95ca2d6225990131945c8426c8bba13338376a7901142d14",
+    "Kit/helpers.swift": "5f7474d6bd1fe4dbb021296f0ba32e8ba514810aee932c125a89d082d6432d61",
+    "Kit/plugins/SystemKit.swift": "60a69825eeaf27cb766deb3e5ea9c3b94019df155def6b5dfe62b346d8e2d6b2",
+    "Kit/plugins/SystemStats.swift": "88ba0c46b954cc7da8d885f8e17ec3a007cf5e53999cdf9c66e9dd13a4634bb1",
+    "Kit/types.swift": "f9659d99f5653f448e6f03d036762870ed91b7df88e177f5e229fbff913dc5f4",
+    "LICENSE": "79a58cb749dcc8b569c432f92ed37cf05527e505e4de4999199aed22b6a6cbf8",
+    "Modules/Sensors/reader.m": "f8671f178a242b2e349688649c9bad8b18c3b3f725b880002599b19a94a7c896",
+    "Modules/Sensors/readers.swift": "674a310977bf4cc7504f1082e1bcdcad6efe4b2cdfddd7edfd3fdf0705232757",
+    "Modules/Sensors/values.swift": "4ba67389c956f56e5bd31a6f966f3175a1ed1bbac4bec8a9fb92681dcf643b7d",
+    "README.md": "bf1d2292afaa757c9bdb82c651786dbcdd91dbcf6359c0fb56fd7b79ee13a8e5",
+    "SMC/Helper/main.swift": "52de6188f0e7ab38538d9e65d444a5fe44228e361b923cbb669b2dc41dd47927",
+    "SMC/Helper/protocol.swift": "6da12e8cb26d135c1fd194ba5f068b933ac3ee4add987e0bd7328d95393a0976",
+    "SMC/smc.swift": "a4a614937cbff46723990c1b1e3e8e3ccc810fd1f690d7f445c361f167de9692",
+    "Tests/SMC.swift": "383297ad4dfb6a0956375738a69e21291b2ea7cfc9692f44e83f69b83c765d48"
+  }
+}
