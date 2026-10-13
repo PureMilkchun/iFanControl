@@ -101,7 +101,10 @@ iFanControl 会默认发送定期的匿名用户量统计数据，用于改进�
 ├── Sources/
 │   ├── FanCurveEditor/
 │   └── MacFanControl/
-├── iFanControl.app/        # App bundle 模板资源
+├── packaging/app/         # 提交的 App 元数据
+├── packaging/pkg/         # PKG 构建和回归测试
+├── scripts/               # App 构建、发布源码校验
+├── docs/development/      # 研发记录和原生界面证据
 ├── install.sh
 ├── diagnose.sh
 ├── uninstall.sh
@@ -115,16 +118,15 @@ iFanControl 会默认发送定期的匿名用户量统计数据，用于改进�
 本项目使用 Swift Package Manager：
 
 ```bash
-swift build
-swift run
+python3 scripts/build_app.py
 ```
 
-CI 位于 `.github/workflows/swift.yml`，默认会对 `main` 执行构建检查。
+生成的 App 位于 `build/iFanControl.app`，构建不会启动或安装它。CI 位于 `.github/workflows/swift.yml`，检查正式/Beta开发分支的构建、更新、原生控制器与启动回归。分支、提交、标签与发布记录规则见 [开发约定](CONTRIBUTING.md)。
 
 ## 更新机制
 
 - 手动检查：`关于 iFanControl... -> 检查更新`
-- 自动检查：启动后延迟检查，并带 24 小时节流
+- 自动检查：启动后延迟检查；启用时直接读取更新线路，不设置24小时节流
 - 2.9.9 起：独立的 `update-manifest-pkg.json` 通道，直接下载并校验 PKG，打开系统安装器后退出 App
 - 旧版通道：`update-manifest.json` 永久停在 2.9.9，提供兼容 ZIP；不会向旧版推送后续版本
 - 更新失败时：会直接引导到 GitHub Releases 手动下载

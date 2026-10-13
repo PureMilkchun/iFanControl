@@ -2,7 +2,7 @@ import Foundation
 import CryptoKit
 
 // This endpoint is separate from the frozen pre-2.9.9 ZIP update channel.
-struct UpdateManifest: Decodable {
+struct UpdateManifest: Decodable, Sendable {
     static let channelURL = URL(string: "https://ifan-59w.pages.dev/update-manifest-pkg.json")!
 
     let latestVersion: String
@@ -11,15 +11,35 @@ struct UpdateManifest: Decodable {
     let notes: String?
     let mandatory: Bool?
     let assets: Assets?
+    let releaseChannel: String?
+    let releaseURL: String?
+
+    var versionDisplay: String {
+        releaseChannel == "beta" ? "\(latestVersion) Beta" : latestVersion
+    }
+
+    // A Beta feed may point to a promoted stable package. Stable never accepts Beta metadata.
+    func isCompatible(with channel: UpdateChannel) -> Bool {
+        releaseChannel == nil || releaseChannel == "stable" || (channel == .beta && releaseChannel == "beta")
+    }
+
+    var betaReleaseURL: URL? {
+        guard let releaseURL, let url = URL(string: releaseURL),
+              url.scheme == "https", url.host == "github.com",
+              url.path.hasPrefix("/PureMilkchun/iFanControl/releases/") else { return nil }
+        return url
+    }
 
     enum CodingKeys: String, CodingKey {
         case latestVersion = "latest_version"
         case latestBuild = "latest_build"
         case publishedAt = "published_at"
         case notes, mandatory, assets
+        case releaseChannel = "release_channel"
+        case releaseURL = "release_url"
     }
 
-    struct Assets: Decodable {
+    struct Assets: Decodable, Sendable {
         let packageURL: String?
         let packageSHA256: String?
 

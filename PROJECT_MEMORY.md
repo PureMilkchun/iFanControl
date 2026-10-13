@@ -3,7 +3,7 @@
 关联时间戳记忆：`/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_TIMELINE.md`
 读取建议：先读本文件，再读时间戳记忆，避免遗漏最新变更。
 
-更新时间：2026-10-05
+更新时间：2026-10-13
 
 ## 1. 项目当前基线
 
@@ -20,7 +20,40 @@ iFanControl 是一个面向 Apple Silicon 带风扇机型的风扇控制工具�
 - 开机自启动（SMAppService 原生登录项 API，系统设置中可直接管理）
 - 信息栏展示设置（完整/简洁/迷你三种模式，弹窗设置，存 `ifancontrol.ui.display_mode`，切换即时生效）
 
-当前版本：`2.9.9` / build 52
+当前正式版本：`2.9.9` / build 52
+
+开发者种子版本：`2.9.10` / build 62（由 52 递增 10），用户手动本地安装。独立 Beta 线路已部署；正式渠道仍为 `2.9.9` / build52，未正式发布 build62。
+
+当前Beta版本：`2.9.10 Beta` / build70，Production `6066e693-f572-417a-b5b9-cd784c371078`。维护者可从69在线升级；下一build须大于70。正式/旧线路和官网下载维持2.9.9/build52，最终核验见 output/beta-70/verification.json。
+
+UI意图保留项：主菜单“告诉开发者”下的文本框外观有意用于鼓励反馈，虽不直接输入、与标题打开同一反馈窗口，也必须保留，不能按“重复/假输入”删掉。68恢复原文案/圆角/留白，点击区域使用透明原生按钮，先结束菜单追踪再打开独立反馈窗口。中英文实际控件点击已验证正文获得焦点。
+
+顶部明确显示“控制正常 · 自动/手动”，记录时间放在提示文字中并命名“最近一次状态记录”。ControlStatusStore的recordedAt是状态记录写入时间；正常mode/detail签名未变化时不逐次重写，启动/交还系统等force路径例外。不能把它当实时采样/最后正常检查时间，也不能为让时间新鲜而改写原控温/记录规则。
+
+70增加启动面板：在硬件识别前显示非激活原生窗口与独立线程等待指示器，依真实执行阶段更新文案，菜单/控制循环和后台任务准备好后收起。“已更新至…”与首次语言/无风扇/温度源提示延到收起后。初始化本身的探测、硬件顺序、控温及安全逻辑不变，没有假百分比或最低展示计时。
+
+Release、原生控制器、真实updater回归通过；新增实际AppDelegate隔离回归覆盖普通/6秒同步等待/无风扇/解锁失败/未来回执/首次语言六种场景，断言等待面板先于探测、菜单/计时器完整初始化后收起、之后回执和引导。实际中文浅色、英文深色、阶段切换和完成勾已查看。测试硬件/命令/网络为替身，状态/配置/日志隔离；没有真实安装/控温、替换用户应用或发送反馈。源文件保护见 output/beta-70/protected-invariants.json。
+
+70PKG SHA256 `b446cf03a71c2d3e3652c715f702d7ad14ce4f4c52cc4fe5f53a709090b5cf7a`。Beta单独发布保留60个非Beta-feed旧资产及后端/绑定，官网和稳定/旧manifest为52；以最终verification记录为准。当前说明见 `docs/development/3.0-ui-startup.md`。69帮助侧栏/官网、68反馈意图及更早UI交付记录作为历史保留。自动预下载/设备适配尚未混入，正式发布另行决定。真实安装后的启动等待体验由维护者通过69→70验收。
+
+### Git机制（2026-10-13）
+
+Beta70基线在 `codex/3.0-beta`，对应注释标签 `v2.9.10-beta.70`；main继续保留正式build52。长期分支要求PR、build检查，禁止强推/删除；单维护者不强制第二人批准。规则见CONTRIBUTING.md，发布输入/包/部署证据见docs/releases/2.9.10-beta.70.json。
+
+Info.plist提交来源为packaging/app/Info.plist，root icon.png和kentsmc作为固定输入；scripts/build_app.py生成build/iFanControl.app并记录提交/是否有改动/哈希。生成App、签名、PKG、Cloudflare状态停止追踪但磁盘文件不删除；历史Git不改写。实验源码/HTML/旧公告仍在本机exclude，反馈邮件全局ignore；原生证据图纳入docs/development/assets。
+
+CI真正执行release、更新契约/真实updater、原生UI、实际AppDelegate启动回归；C桥在各隔离夹具内按本机架构编译，不依赖SPM内部产物路径。既有70标签/source-input哈希单独校验，不阻止后续源码发展。源码推送不触发部署或正式Release。70是发布后补录源码基线，未伪造62～69提交。
+
+### 2.9.10 / build 62 筹备
+
+- 简介大 App 图标同次开窗累计点击十次解锁开发者模式；未解锁时关窗清零，解锁状态跨启动/升级保留。
+- 独立开发者页中单独勾选 Beta，默认仍为正式线路；退出开发者模式会关闭 Beta 并隐藏入口，仅改变后续更新路线，不自动降级。
+- Beta 使用 `update-manifest-beta.json`，与正式版共用现有 PKG 提示、下载、SHA256、系统安装器和正常退出流程；检查/下载中切换路线会忽略旧结果。
+- 正式和 Beta 共用递增 build；Beta 身份用独立 Info.plist/manifest 字段，保持系统数字版本字段及既有统计格式。
+- 未改变硬件、控温、曲线、配置、遥测、菜单轮询和安装脚本。首次发布仅增加隐藏入口及更新通道支持，不混入 3.0 UI/硬件/预下载改动。
+- 种子 PKG 与待正式发布预览：`packaging/pkg/output/release-candidate/`；不要整体部署预览为 Beta 测试。Beta 单独发布只改 Beta feed、独立 PKG 与其缓存规则，正式/旧线路、官网下载/时间线及正式 GitHub Release 保持 build52。
+- 已上线 Beta 基线：2.9.10/build62 种子包独立副本，Production `cb249cea-6cb3-4703-84b2-477f13454a28`；53 个旧静态资产哈希、7 个函数源码及运行绑定未变。部署/核验记录在 `packaging/pkg/output/beta-bootstrap-62/`。
+- 构建、通道/校验测试、真实 updater 隔离夹具通过，原生窗口验证十次点击/隐藏/退出及深浅色；实际在线 PKG 安装升级仍需发布前验证。
 
 ### build 52 说明
 

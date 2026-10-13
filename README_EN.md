@@ -67,7 +67,9 @@ iFanControl sends periodic anonymous user-count stats by default to improve prod
 ├── Sources/
 │   ├── FanCurveEditor/
 │   └── MacFanControl/
-├── iFanControl.app/
+├── packaging/app/          # Tracked App metadata
+├── packaging/pkg/          # Installer and regressions
+├── scripts/                # Build and provenance helpers
 ├── install.sh
 ├── diagnose.sh
 ├── uninstall.sh
@@ -79,8 +81,7 @@ iFanControl sends periodic anonymous user-count stats by default to improve prod
 ## Development
 
 ```bash
-swift build
-swift run
+python3 scripts/build_app.py
 ```
 
 CI is defined in `.github/workflows/swift.yml`.
@@ -109,3 +110,7 @@ If the script came from a downloaded ZIP, drag `uninstall.sh` into Terminal and 
 ## License
 
 [MIT](LICENSE)
+
+## Git and release provenance
+
+Run `python3 scripts/build_app.py` to assemble an ad-hoc signed `build/iFanControl.app` from tracked source, `packaging/app/Info.plist`, and `icon.png`. It does not launch or install the application. See [development and release conventions](CONTRIBUTING.md) for protected branches, native regression checks, immutable Beta tags, and package/source provenance.

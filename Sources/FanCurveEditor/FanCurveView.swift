@@ -22,6 +22,7 @@ public struct FanPoint: Codable {
 
 // 风扇曲线视图
 class FanCurveView: NSView {
+    var onCurveChanged: (([FanPoint]) -> Void)?
     var fanCurve: [FanPoint] = [] {
         didSet {
             setNeedsDisplay(bounds)
@@ -61,10 +62,14 @@ class FanCurveView: NSView {
         super.draw(dirtyRect)
         
         guard let context = NSGraphicsContext.current?.cgContext else { return }
+        // Keep custom drawing inside the chart even when AppKit coalesces a larger dirty region.
+        context.saveGState()
+        context.clip(to: bounds)
+        defer { context.restoreGState() }
         
         // 绘制背景
         NSColor.windowBackgroundColor.setFill()
-        dirtyRect.fill()
+        dirtyRect.intersection(bounds).fill()
         
         // 绘制坐标轴
         drawAxes(context: context)
@@ -83,15 +88,31 @@ class FanCurveView: NSView {
     }
     
     private func drawAxes(context: CGContext) {
+        let axisAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor]
+        let english = UserDefaults.standard.string(forKey: "ifancontrol.ui.language") == "en"
+        (english ? "Target RPM" : "目标转速 RPM").draw(at: NSPoint(x: padding, y: bounds.height - 20), withAttributes: axisAttributes)
+        (english ? "Temperature °C" : "温度 ℃").draw(at: NSPoint(x: bounds.width - padding - 110, y: 4), withAttributes: axisAttributes)
+
         let width = bounds.width - 2 * padding
         let height = bounds.height - 2 * padding
         
+        // Quiet guides make numeric relationships readable without competing with the curve.
+        context.saveGState()
+        context.setStrokeColor(NSColor.separatorColor.withAlphaComponent(0.3).cgColor)
+        context.setLineWidth(0.5)
+        context.setLineDash(phase: 0, lengths: [3, 4])
+        for fraction in [0.25, 0.5, 0.75] {
+            let y = padding + height * fraction
+            context.move(to: CGPoint(x: padding, y: y)); context.addLine(to: CGPoint(x: padding + width, y: y)); context.strokePath()
+        }
+        context.restoreGState()
+
         // X轴（温度）
         let xAxisPath = CGMutablePath()
         xAxisPath.move(to: CGPoint(x: padding, y: padding))
         xAxisPath.addLine(to: CGPoint(x: padding + width, y: padding))
         context.addPath(xAxisPath)
-        context.setStrokeColor(NSColor.gray.cgColor)
+        context.setStrokeColor(NSColor.separatorColor.cgColor)
         context.setLineWidth(1)
         context.strokePath()
         
@@ -105,7 +126,7 @@ class FanCurveView: NSView {
         // 绘制标签
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 10),
-            .foregroundColor: NSColor.gray
+            .foregroundColor: NSColor.secondaryLabelColor
         ]
         
         // 温度标签
@@ -194,7 +215,7 @@ class FanCurveView: NSView {
             let y = yPosition(forRPM: point.rpm, height: height)
             
             let circlePath = CGMutablePath()
-            circlePath.addArc(center: CGPoint(x: x, y: y), radius: 6, startAngle: 0, endAngle: .pi * 2, clockwise: false)
+            circlePath.addArc(center: CGPoint(x: x, y: y), radius: selectedPointIndex == index ? 6 : 4.5, startAngle: 0, endAngle: .pi * 2, clockwise: false)
             
             context.addPath(circlePath)
             
@@ -301,9 +322,20 @@ class FanCurveView: NSView {
             fanCurve[index].rpm = max(0, min(maxRPM, newRPM))
         }
         
+        onCurveChanged?(fanCurve)
         setNeedsDisplay(bounds)
     }
     
+    func updatePoint(_ index: Int, temperature: Double, rpm: Int) {
+        guard fanCurve.indices.contains(index), temperature.isFinite else { return }
+        if index == 0 { fanCurve[index].temperature = minTemp }
+        else if index == fanCurve.count - 1 { fanCurve[index].temperature = maxTemp }
+        else { fanCurve[index].temperature = max(fanCurve[index-1].temperature + 1, min(fanCurve[index+1].temperature - 1, temperature)) }
+        fanCurve[index].rpm = max(0, min(maxRPM, rpm))
+        onCurveChanged?(fanCurve)
+        setNeedsDisplay(bounds)
+    }
+
     override func mouseUp(with event: NSEvent) {
         selectedPointIndex = nil
         setNeedsDisplay(bounds)

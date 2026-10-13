@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "tag": "v2.9.10-beta.70",
+  "version": "2.9.10",
+  "build": 70,
+  "channel": "beta",
+  "source_hashes": {
+    "Sources/FanCurveEditor/FanCurveWindow.swift": "88531c31050719d848befd9afbfdc39bd0bd04f9e178af1204f458f19035003c",
+    "Sources/FanCurveEditor/FanCurveView.swift": "152d2535b91301b994f900ad39f39395dba5f02ed82a7a478e5590432f4fc628",
+    "Sources/MacFanControl/UpdatePreferences.swift": "dc2ca7248821b63b8062b2dbb3749b42f897f5c53e22ee1ed8c1defa3d6027f3",
+    "Sources/MacFanControl/SensorCatalog.swift": "cc56f4afb4c92d5dcb9b5b68fd59bee8641b5c1717a993028997ab3b919aeee8",
+    "Sources/MacFanControl/UpdatePackageDownloader.swift": "a17b6c5465311ad4a3a87490c57e1c5a67ce89e1e335b404e023258c93b0ee8f",
+    "Sources/MacFanControl/MiniDisplayFormatter.swift": "5e63e8f67996a61c4bbfce06426ad9842939daf254bfa68f22522619770d22ef",
+    "Sources/MacFanControl/NativeInterface.swift": "276c9920f2328232587448f9105503260f8dd9b53d98622f7b8494e541443eed",
+    "Sources/MacFanControl/UpdateManifest.swift": "009865d8739a1273eb9db1a9781b9d08816cc312ca30281c2b8f17d4b3d379b5",
+    "Sources/MacFanControl/UpdateProgressWindow.swift": "25bb00e169fb369524118ec5146ecd2ac21eb0cd4169237a531ea57b9e9af501",
+    "Sources/MacFanControl/main.swift": "c417f4a4e939e0955a3e6aec253fcf36051c467ff38768fec08d3db92d777920",
+    "Sources/MacFanControl/InteractionNotice.swift": "82865a5ab883fe68e02f28bcc3d896bccebb772321a9975ed2b1d9cff1e85c60",
+    "packaging/pkg/scripts/preinstall": "40b9a82c8f6d015a47d30616567f71ee920da5ff52ad92ffb2a8fb8d502b31aa",
+    "packaging/pkg/scripts/postinstall": "d254053b6341f7fce5b24816462ba92611cf7bd40ec18b4a019e64cb64934bfa",
+    "Sources/MacFanControl/StartupProgressWindow.swift": "4a5bcfc96ac3aee968058c06c807968d48ab0529310777ca0abeab70acaf6057",
+    "packaging/app/Info.plist": "96e5bea941d983b527d45c71bf75fca18b6c0c2170f74a71185816e3c2deffb6",
+    "icon.png": "b460e15c3834479a771bcc200a7a7622c53a5fd84dd62392bb179cc646b52324",
+    "kentsmc": "56b9b4f7239b4b043b8b69c92ed23f184eaf55a6b7d67c419d899da3a7254605",
+    "Sources/IOReportBridge/bridge.c": "8a06e4da0d02bccd33220b67fceb05bd3cb6c5606c224308a9a8e3beea30f98d",
+    "Sources/IOReportBridge/include/bridge.h": "1e03653689f855d2748d1cc2cf9b31211c2d376cd21b199dfb27bfebda7168f9",
+    "Package.swift": "7368576abd0cb188d9d6af3a6ca0d993a6d742102072f32fab7138532e018916"
+  },
+  "package": {
+    "url": "https://ifan-59w.pages.dev/iFanControl-beta-2.9.10-70.pkg?build=70",
+    "sha256": "b446cf03a71c2d3e3652c715f702d7ad14ce4f4c52cc4fe5f53a709090b5cf7a",
+    "executable_sha256": "c63a0ec8505c2b5b78d395363340bebb8027cb7ed0920f077b591b6d2cf87481"
+  },
+  "publication": {
+    "deployment": "6066e693-f572-417a-b5b9-cd784c371078",
+    "url": "https://6066e693.ifan-59w.pages.dev",
+    "published_at": "2026-10-13T08:39:12.510Z",
+    "stable_build": 52,
+    "legacy_build": 52,
+    "download_route_build": 52,
+    "prior_non_beta_feed_assets_preserved": 60
+  },
+  "validation": {
+    "release_build": true,
+    "update_contracts_and_real_updater": true,
+    "native_ui_controller_regressions": true,
+    "actual_delegate_launch_scenarios": [
+      "normal",
+      "synchronous_probe_wait_6s",
+      "fanless",
+      "unlock_failure",
+      "future_receipt",
+      "first_language"
+    ],
+    "native_ui_inspected": true,
+    "actual_package_install_performed_by_agent": false
+  },
+  "provenance": "Recorded after publication. Tag matches the preserved Beta70 source/input hashes; it was not embedded in the previously published PKG."
+}

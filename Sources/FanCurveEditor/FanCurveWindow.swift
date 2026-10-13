@@ -250,7 +250,7 @@ public class FanCurveWindowController: NSWindowController {
 // MARK: - 新窗口控制器（混合架构：AppKit 布局 + AppKit 预设按钮）
 
 @MainActor
-public class FanCurvePresetWindowController: NSWindowController {
+public class FanCurvePresetWindowController: NSWindowController, NSWindowDelegate, NSTextFieldDelegate {
     private let initialFanCurve: [FanPoint]
     private let maxRPM: Int
     private let initialPresetNames: [String]?
@@ -263,6 +263,15 @@ public class FanCurvePresetWindowController: NSWindowController {
     private var presetNames: [String]
     private var presets: [[FanPoint]]
     private var activePresetIndex: Int
+    private let editStatus = NSTextField(labelWithString: "")
+    private let activeLabel = NSTextField(labelWithString: "")
+    private var originalFieldText: [ObjectIdentifier: String] = [:]
+    private var hasInvalidPointInput = false
+    private var pointFields: [(temperature: NSTextField, rpm: NSTextField)] = []
+    private var presetButtons: [NSButton] = []
+    private let pointStack = NSStackView()
+    private var numericToggle: NSButton?
+    private var showNumericEditor = UserDefaults.standard.bool(forKey: "ifancontrol.curve.numeric_editor")
     private var isYAxisReversed = UserDefaults.standard.bool(forKey: fanCurveYAxisReversedKey)
 
     public init(fanCurve: [FanPoint], maxRPM: Int,
@@ -292,25 +301,21 @@ public class FanCurvePresetWindowController: NSWindowController {
         self.currentFanCurve = self.presets[self.activePresetIndex]
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 800, height: 530),
+            contentRect: NSRect(x: 0, y: 0, width: showNumericEditor ? 900 : 720, height: 450),
             styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
         )
-        window.title = fanCurveL10n("风扇曲线编辑器 v33", "Fan Curve Editor v33")
+        window.title = fanCurveL10n("风扇曲线", "Fan Curve")
         window.center()
 
         super.init(window: window)
 
         setupUI()
 
-        // 窗口关闭时自动保存
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(windowWillClose),
-            name: NSWindow.willCloseNotification,
-            object: window
-        )
+        window.delegate = self
+        window.minSize = NSSize(width: 720, height: 470)
+
     }
 
     required init?(coder: NSCoder) {
@@ -319,89 +324,143 @@ public class FanCurvePresetWindowController: NSWindowController {
 
     private func setupUI() {
         guard let contentView = window?.contentView else { return }
-
-        // 1. 曲线视图
-        fanCurveView.fanCurve = currentFanCurve
-        fanCurveView.maxRPM = maxRPM
-        fanCurveView.isYAxisReversed = isYAxisReversed
-        fanCurveView.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(fanCurveView)
-
-        // 2. 底部：预设按钮 + 分隔符 + 操作按钮（一行）
-        // 左侧：预设按钮
-        let presetStack = NSStackView()
-        presetStack.spacing = 6
+        let root = NSStackView(); root.orientation = .vertical; root.alignment = .leading; root.spacing = 12
+        root.translatesAutoresizingMaskIntoConstraints = false; contentView.addSubview(root)
+        activeLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        activeLabel.textColor = .secondaryLabelColor
+        activeLabel.lineBreakMode = .byTruncatingTail
+        root.addArrangedSubview(activeLabel)
+        activeLabel.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
+        let presetRow = NSStackView(); presetRow.spacing = 4
         for i in 0..<3 {
-            let btn = NSButton(title: presetNames[i], target: self, action: #selector(presetButtonClicked(_:)))
-            btn.bezelStyle = .recessed
-            btn.setButtonType(.pushOnPushOff)
-            btn.tag = i
-            btn.state = (i == activePresetIndex) ? .on : .off
-            // 双击重命名
+            let button = NSButton(title: presetNames[i], target: self, action: #selector(presetButtonClicked(_:)))
+            button.controlSize = .small; button.font = .systemFont(ofSize: 12)
+            button.bezelStyle = .recessed; button.setButtonType(.pushOnPushOff); button.tag = i
+            button.state = i == activePresetIndex ? .on : .off
+            button.widthAnchor.constraint(equalToConstant: 106).isActive = true
+            button.cell?.lineBreakMode = .byTruncatingTail
+            button.toolTip = presetNames[i]
             let doubleClick = NSClickGestureRecognizer(target: self, action: #selector(presetDoubleClicked(_:)))
-            doubleClick.numberOfClicksRequired = 2
-            btn.addGestureRecognizer(doubleClick)
-            presetStack.addArrangedSubview(btn)
+            doubleClick.numberOfClicksRequired = 2; button.addGestureRecognizer(doubleClick)
+            presetButtons.append(button); presetRow.addArrangedSubview(button)
         }
-
-        // 分隔符
-        let separator = NSTextField(labelWithString: "│")
-        separator.textColor = .separatorColor
-        separator.font = NSFont.systemFont(ofSize: 16)
-
-        // Y 轴方向：只影响曲线编辑器的显示和拖拽坐标换算，不修改曲线数据。
-        let yAxisLabel = NSTextField(labelWithString: fanCurveL10n("Y 轴", "Y Axis"))
-        let yAxisSeparator = NSTextField(labelWithString: "│")
-        yAxisSeparator.textColor = .separatorColor
-        yAxisSeparator.font = NSFont.systemFont(ofSize: 16)
-        let yAxisDirectionControl = NSSegmentedControl(
-            labels: [
-                fanCurveL10n("正向", "Normal"),
-                fanCurveL10n("反向", "Reversed")
-            ],
-            trackingMode: .selectOne,
-            target: self,
-            action: #selector(yAxisDirectionChanged(_:))
-        )
-        yAxisDirectionControl.selectedSegment = isYAxisReversed ? 1 : 0
-        let yAxisStack = NSStackView(views: [yAxisLabel, yAxisSeparator, yAxisDirectionControl])
-        yAxisStack.spacing = 4
-        yAxisStack.alignment = .centerY
-
-        // 右侧：操作按钮
-        let resetButton = NSButton(title: fanCurveL10n("重置", "Reset"), target: self, action: #selector(resetCurve))
-        let closeButton = NSButton(title: fanCurveL10n("关闭", "Close"), target: self, action: #selector(closeWindow))
-
-        let actionStack = NSStackView(views: [resetButton, closeButton])
-        actionStack.spacing = 12
-
-        // 整行
-        let bottomStack = NSStackView(views: [presetStack, separator, yAxisStack, actionStack])
-        bottomStack.spacing = 12
-        bottomStack.alignment = .centerY
-        bottomStack.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(bottomStack)
-
-        // 提示标签
-        let hintLabel = NSTextField(labelWithString: fanCurveL10n("双击预设名称可重命名 · 关闭窗口自动保存", "Double-click preset name to rename · Saved on close"))
-        hintLabel.font = NSFont.systemFont(ofSize: 11)
-        hintLabel.textColor = .secondaryLabelColor
-        hintLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(hintLabel)
-
+        let rename = NSButton(title: fanCurveL10n("重命名…", "Rename…"), target: self, action: #selector(renameActivePreset))
+        rename.controlSize = .small; rename.font = .systemFont(ofSize: 12)
+        presetRow.addArrangedSubview(rename); presetRow.addArrangedSubview(NSView())
+        let numeric = NSButton(checkboxWithTitle: fanCurveL10n("数值编辑", "Edit values"), target: self, action: #selector(toggleNumericEditor))
+        numeric.state = showNumericEditor ? .on : .off; numeric.controlSize = .small; numeric.font = .systemFont(ofSize: 12)
+        numeric.keyEquivalent = "i"; numeric.keyEquivalentModifierMask = [.command, .option]
+        numeric.toolTip = fanCurveL10n("显示精确数值输入 · ⌘⌥I", "Show precise value fields · ⌘⌥I")
+        numericToggle = numeric; presetRow.addArrangedSubview(numeric); root.addArrangedSubview(presetRow)
+        presetRow.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
+        fanCurveView.fanCurve = currentFanCurve; fanCurveView.maxRPM = maxRPM; fanCurveView.isYAxisReversed = isYAxisReversed
+        fanCurveView.setAccessibilityElement(true); fanCurveView.setAccessibilityRole(.image)
+        fanCurveView.setAccessibilityLabel(fanCurveL10n("温度与目标转速曲线，可在控制点输入框编辑数值", "Temperature and target RPM curve. Edit values in the control point fields."))
+        fanCurveView.onCurveChanged = { [weak self] curve in
+            guard let self else { return }
+            self.currentFanCurve = curve; self.syncPointFields(); self.markEdited()
+        }
+        pointStack.orientation = .vertical; pointStack.alignment = .leading; pointStack.spacing = 6
+        pointStack.widthAnchor.constraint(equalToConstant: 162).isActive = true
+        let graphRow = NSStackView(views: [fanCurveView, pointStack]); graphRow.spacing = 20; graphRow.alignment = .top
+        root.addArrangedSubview(graphRow)
+        graphRow.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
+        fanCurveView.heightAnchor.constraint(equalToConstant: 280).isActive = true
+        graphRow.heightAnchor.constraint(equalToConstant: 280).isActive = true
+        rebuildPointFields()
+        pointStack.isHidden = !showNumericEditor
+        let direction = NSSegmentedControl(labels: [fanCurveL10n("正向", "Normal"), fanCurveL10n("反向", "Reversed")], trackingMode: .selectOne, target: self, action: #selector(yAxisDirectionChanged(_:)))
+        direction.controlSize = .small; direction.font = .systemFont(ofSize: 11)
+        direction.selectedSegment = isYAxisReversed ? 1 : 0
+        let directionLabel = NSTextField(labelWithString: fanCurveL10n("坐标显示", "Axis Direction"))
+        let reset = NSButton(title: fanCurveL10n("重置", "Reset"), target: self, action: #selector(resetCurve))
+        let close = NSButton(title: fanCurveL10n("保存并关闭", "Save and Close"), target: self, action: #selector(closeWindow))
+        reset.toolTip = fanCurveL10n("重置当前预设", "Reset current preset")
+        reset.bezelStyle = .rounded; reset.controlSize = .small
+        directionLabel.font = .systemFont(ofSize: 11); directionLabel.textColor = .secondaryLabelColor
+        close.bezelStyle = .rounded; close.keyEquivalent = "\r"
+        let actions = NSStackView(views: [directionLabel, direction, NSView(), reset, close]); actions.spacing = 10
+        root.addArrangedSubview(actions); actions.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
+        editStatus.font = .systemFont(ofSize: 11); editStatus.textColor = .secondaryLabelColor
+        editStatus.stringValue = fanCurveL10n("拖动控制点或输入数值 · 关闭窗口自动保存", "Drag a point or enter values · Saved when you close this window")
+        root.addArrangedSubview(editStatus)
         NSLayoutConstraint.activate([
-            fanCurveView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
-            fanCurveView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            fanCurveView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            fanCurveView.bottomAnchor.constraint(equalTo: bottomStack.topAnchor, constant: -16),
-
-            bottomStack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            bottomStack.bottomAnchor.constraint(equalTo: hintLabel.topAnchor, constant: -4),
-
-            hintLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            hintLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8)
+            root.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20), root.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            root.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20), root.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -16)
         ])
+        refreshPresetLabels()
     }
+
+    @objc private func toggleNumericEditor(_ sender: NSButton) {
+        showNumericEditor = sender.state == .on
+        UserDefaults.standard.set(showNumericEditor, forKey: "ifancontrol.curve.numeric_editor")
+        pointStack.isHidden = !showNumericEditor
+        guard let window else { return }
+        var frame = window.frame; frame.size.width = showNumericEditor ? 900 : 720
+        window.setFrame(frame, display: true, animate: !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+    }
+
+    private func rebuildPointFields() {
+        for view in pointStack.arrangedSubviews { pointStack.removeArrangedSubview(view); view.removeFromSuperview() }
+        pointFields.removeAll(); originalFieldText.removeAll()
+        let title = NSTextField(labelWithString: fanCurveL10n("控制点 · ℃ / RPM", "Points · °C / RPM"))
+        title.font = .systemFont(ofSize: 11, weight: .medium)
+        title.textColor = .secondaryLabelColor; pointStack.addArrangedSubview(title)
+        for (index, point) in fanCurveView.fanCurve.enumerated() {
+            let temperature = NSTextField(string: String(format: "%.1f", point.temperature))
+            let rpm = NSTextField(string: "\(point.rpm)")
+            temperature.tag = index; rpm.tag = index
+            temperature.isEditable = index > 0 && index < fanCurveView.fanCurve.count - 1
+            for field in [temperature, rpm] { field.controlSize = .small; field.target = self; field.action = #selector(pointEdited(_:)); field.delegate = self; field.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular); field.widthAnchor.constraint(equalToConstant: 62).isActive = true }
+            temperature.setAccessibilityLabel(fanCurveL10n("控制点\(index+1)温度，摄氏度", "Point \(index+1) temperature, Celsius"))
+            rpm.setAccessibilityLabel(fanCurveL10n("控制点\(index+1)目标转速，RPM", "Point \(index+1) target speed, RPM"))
+            pointStack.addArrangedSubview(NSStackView(views: [NSTextField(labelWithString: "\(index+1)"), temperature, rpm]))
+            pointFields.append((temperature, rpm))
+            originalFieldText[ObjectIdentifier(temperature)] = temperature.stringValue
+            originalFieldText[ObjectIdentifier(rpm)] = rpm.stringValue
+        }
+    }
+    private func syncPointFields() {
+        if pointFields.count != fanCurveView.fanCurve.count { rebuildPointFields(); return }
+        for (index, point) in fanCurveView.fanCurve.enumerated() {
+            pointFields[index].temperature.stringValue = String(format: "%.1f", point.temperature)
+            pointFields[index].rpm.stringValue = "\(point.rpm)"
+            originalFieldText[ObjectIdentifier(pointFields[index].temperature)] = pointFields[index].temperature.stringValue
+            originalFieldText[ObjectIdentifier(pointFields[index].rpm)] = pointFields[index].rpm.stringValue
+        }
+    }
+    public func controlTextDidEndEditing(_ notification: Notification) {
+        if let field = notification.object as? NSTextField { pointEdited(field) }
+    }
+    @objc private func pointEdited(_ sender: NSTextField) {
+        guard pointFields.indices.contains(sender.tag) else { return }
+        let valid = pointFields.allSatisfy { fields in
+            guard let temperature = Double(fields.temperature.stringValue), temperature.isFinite, Int(fields.rpm.stringValue) != nil else { return false }
+            return true
+        }
+        guard valid else {
+            hasInvalidPointInput = true
+            editStatus.stringValue = fanCurveL10n("请输入有效的温度和整数转速，原曲线仍保留。", "Enter a valid temperature and whole-number RPM. Your curve is retained.")
+            editStatus.textColor = .systemRed; return
+        }
+        hasInvalidPointInput = false
+        guard originalFieldText[ObjectIdentifier(sender)] != sender.stringValue else { return }
+        let point = fanCurveView.fanCurve[sender.tag]
+        let temperature = sender === pointFields[sender.tag].temperature ? Double(sender.stringValue)! : point.temperature
+        let rpm = sender === pointFields[sender.tag].rpm ? Int(sender.stringValue)! : point.rpm
+        fanCurveView.updatePoint(sender.tag, temperature: temperature, rpm: rpm)
+    }
+    private func markEdited() {
+        hasInvalidPointInput = false
+        editStatus.stringValue = fanCurveL10n("有修改 · 关闭窗口时保存", "Changes pending · Saved when you close")
+        editStatus.textColor = .secondaryLabelColor
+    }
+    private func refreshPresetLabels() {
+        activeLabel.toolTip = presetNames[activePresetIndex]
+        activeLabel.stringValue = fanCurveL10n("当前预设：\(presetNames[activePresetIndex])", "Current preset: \(presetNames[activePresetIndex])")
+        for (index, button) in presetButtons.enumerated() { button.title = presetNames[index]; button.toolTip = presetNames[index]; button.state = index == activePresetIndex ? .on : .off }
+    }
+    @objc private func renameActivePreset() { renamePreset(index: activePresetIndex) }
 
     @objc private func yAxisDirectionChanged(_ sender: NSSegmentedControl) {
         let reversed = sender.selectedSegment == 1
@@ -424,8 +483,11 @@ public class FanCurvePresetWindowController: NSWindowController {
     }
 
     @objc private func presetDoubleClicked(_ sender: NSClickGestureRecognizer) {
-        guard let btn = sender.view as? NSButton else { return }
-        let index = btn.tag
+        guard let button = sender.view as? NSButton else { return }
+        renamePreset(index: button.tag)
+    }
+
+    private func renamePreset(index: Int) {
         let alert = NSAlert()
         alert.messageText = fanCurveL10n("重命名预设", "Rename Preset")
         alert.informativeText = fanCurveL10n("输入新名称：", "Enter new name:")
@@ -440,7 +502,8 @@ public class FanCurvePresetWindowController: NSWindowController {
             let newName = textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             if !newName.isEmpty {
                 presetNames[index] = newName
-                btn.title = newName
+                refreshPresetLabels()
+                markEdited()
             }
         }
     }
@@ -453,6 +516,7 @@ public class FanCurvePresetWindowController: NSWindowController {
         activePresetIndex = newIndex
         currentFanCurve = presets[newIndex]
         fanCurveView.fanCurve = currentFanCurve
+        syncPointFields(); refreshPresetLabels(); markEdited()
         // 立即应用新曲线
         NotificationCenter.default.post(name: NSNotification.Name("FanCurveDidSwitch"), object: nil, userInfo: ["curve": currentFanCurve])
     }
@@ -462,22 +526,28 @@ public class FanCurvePresetWindowController: NSWindowController {
         presets[activePresetIndex] = defaultCurve
         currentFanCurve = defaultCurve
         fanCurveView.fanCurve = defaultCurve
+        syncPointFields(); markEdited()
         // 立即应用
         NotificationCenter.default.post(name: NSNotification.Name("FanCurveDidSwitch"), object: nil, userInfo: ["curve": defaultCurve])
     }
 
     @objc private func closeWindow() {
-        window?.close()
+        window?.performClose(nil)
     }
 
-    @objc private func windowWillClose(_ notification: Notification) {
-        // 关闭时自动保存当前编辑状态
+    public func windowShouldClose(_ sender: NSWindow) -> Bool {
+        sender.makeFirstResponder(nil)
+        guard !hasInvalidPointInput else {
+            numericToggle?.state = .on
+            if let numericToggle { toggleNumericEditor(numericToggle) }
+            return false
+        }
         currentFanCurve = fanCurveView.fanCurve
         presets[activePresetIndex] = currentFanCurve
-        handleSave(curve: currentFanCurve, names: presetNames, presets: presets, activeIndex: activePresetIndex)
+        return handleSave(curve: currentFanCurve, names: presetNames, presets: presets, activeIndex: activePresetIndex)
     }
 
-    private func handleSave(curve: [FanPoint], names: [String], presets: [[FanPoint]], activeIndex: Int) {
+    private func handleSave(curve: [FanPoint], names: [String], presets: [[FanPoint]], activeIndex: Int) -> Bool {
         let configDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!.appendingPathComponent("MacFanControl")
         try? FileManager.default.createDirectory(at: configDir, withIntermediateDirectories: true)
         let configFile = configDir.appendingPathComponent("config.json")
@@ -522,7 +592,7 @@ public class FanCurvePresetWindowController: NSWindowController {
                 activeCurvePreset: activeIndex
             )
             let data = try JSONEncoder().encode(config)
-            try data.write(to: configFile)
+            try data.write(to: configFile, options: .atomic)
 
             NotificationCenter.default.post(name: NSNotification.Name("FanCurveDidSave"), object: nil, userInfo: [
                 "curve": curve,
@@ -530,8 +600,15 @@ public class FanCurvePresetWindowController: NSWindowController {
                 "curvePresets": presets,
                 "activeCurvePreset": activeIndex
             ])
+            return true
         } catch {
+            let alert = NSAlert()
+            alert.messageText = fanCurveL10n("保存未完成", "Save Not Completed")
+            alert.informativeText = fanCurveL10n("无法写入配置，编辑内容仍保留在窗口中。\n", "Could not write settings. Your edits are retained in this window.\n") + error.localizedDescription
+            alert.addButton(withTitle: fanCurveL10n("返回编辑", "Back to Editing"))
+            alert.runModal()
             NSLog("iFanControl: Failed to save fan curve: \(error.localizedDescription)")
+            return false
         }
     }
 }

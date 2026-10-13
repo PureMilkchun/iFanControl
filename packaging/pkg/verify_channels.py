@@ -18,6 +18,7 @@ def verify(docs, pin):
         assert legacy[key] == pin[key], f"Frozen legacy channel changed: {key}"
     assert legacy["latest_version"] == "2.9.9" and legacy["latest_build"] == 52
     assert latest["latest_build"] >= 52
+    assert latest.get("release_channel", "stable") == "stable", "Stable feed must not offer Beta"
     assert "macos_arm64_zip_url" not in latest["assets"], "Native channel must only offer PKG"
     assert "macos_arm64_pkg_url" not in legacy["assets"], "Keep legacy channel isolated"
 
@@ -36,6 +37,19 @@ def verify(docs, pin):
     assert package.suffix == ".pkg"
     assert hashlib.sha256(package.read_bytes()).hexdigest() == latest["assets"]["pkg_sha256"]
     assert f'?build={latest["latest_build"]}' in latest["assets"]["macos_arm64_pkg_url"]
+    beta_path = docs / "update-manifest-beta.json"
+    if beta_path.is_file():
+        beta = json.loads(beta_path.read_text())
+        assert beta.get("release_channel") in ("stable", "beta")
+        assert beta["latest_build"] >= latest["latest_build"], "Promote the newest stable release into the Beta feed too"
+        assert "macos_arm64_zip_url" not in beta["assets"]
+        beta_url = urlparse(beta["assets"]["macos_arm64_pkg_url"])
+        assert beta_url.scheme == "https" and beta_url.netloc
+        beta_package = docs / Path(beta_url.path).name
+        assert beta_package.suffix == ".pkg" and beta_package.name != "iFanControl-macOS.pkg", "Use a separate immutable Beta artifact"
+        assert hashlib.sha256(beta_package.read_bytes()).hexdigest() == beta["assets"]["pkg_sha256"]
+        assert f'?build={beta["latest_build"]}' in beta["assets"]["macos_arm64_pkg_url"]
+        print("PASS: Beta feed isolated; package SHA256 and shared build sequence valid")
     print("PASS: legacy channel frozen at 2.9.9/build52; native PKG channel and both artifact hashes valid")
 
 

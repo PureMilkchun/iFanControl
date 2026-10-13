@@ -3,3 +3,20 @@
 *.dmg
 *.zip
 /v*/
+
+# Generated applications, packages and developer-machine state
+*.app/
+*.pkg
+/build/
+.swiftpm/
+.wrangler/
+.learnings/
+__pycache__/
+*.py[cod]
+.claude/settings.local.json
+
+# Private feedback correspondence stays on the developer's machine
+/feedback-consent-emails.md
+
+# Offline experiments: keep source available; exclude generated data
+/analysis/thermal_ml/artifacts/

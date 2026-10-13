@@ -1,13 +1,17 @@
-# This workflow will build a Swift project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-swift
-
-name: Swift
+name: macOS checks
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "codex/**" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "codex/3.0-beta" ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -16,12 +20,17 @@ jobs:
 
     steps:
     - uses: actions/checkout@v5
-    - name: Build
-      run: swift build -v
-    - name: Run tests (if present)
-      run: |
-        if [ -d Tests ] && find Tests -name "*.swift" -print -quit | grep -q .; then
-          swift test -v
-        else
-          echo "No test files found. Skipping swift test."
-        fi
+      with:
+        fetch-depth: 0
+    - name: Check whitespace
+      run: git diff --check origin/main...HEAD
+    - name: Build release
+      run: swift build -c release
+    - name: Verify stable and Beta update contracts
+      run: bash packaging/pkg/test_updates.sh
+    - name: Verify native UI controllers
+      run: python3 packaging/pkg/test_ui.py
+    - name: Verify actual startup sequence
+      run: python3 packaging/pkg/test_startup.py
+    - name: Verify published Beta70 source baseline
+      run: python3 scripts/verify_release_source.py docs/releases/2.9.10-beta.70.json --ref v2.9.10-beta.70

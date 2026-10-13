@@ -16,6 +16,10 @@ iFanControl 是一个面向 Apple Silicon Mac 的原生菜单栏风扇控制工�
 
 ## App 架构红线
 
+- **UI意图保护**：主菜单“告诉开发者”下的邀请文本框是维护者明确保留的设计，用于鼓励反馈；点击进入独立窗口而不直接编辑是预期行为，不得当重复/假输入移除。
+- **启动呈现边界**：等待面板必须先于硬件探测显示，按真实步骤更新，到菜单/控制循环初始化后收起；无假百分比/最低等待。更新回执仍按运行build校验，显示在面板收起之后。首次引导与无风扇提示仍保留；不要为缩短等待误改原硬件/遥测/安全逻辑。
+- **状态时间语义**：recordedAt是最近一次状态记录写入时间，普通相同签名不会重写，force路径可强制记录；不能与“正常”并列呈现为过去才正常，不能为了UI时间刷新改控温/记录频率。68显示当前状态/配置模式，记录时间在明确标注的tooltip中。
+
 - 菜单一次性构建 + 原地更新（`buildMenuOnce` + `updateDynamicMenuItems`），不要每 2 秒重建 NSMenu
 - `BackgroundHardwareReader` 在后台线程执行硬件 I/O，NSLock 保护缓存
 - `FanManager` 是 `@MainActor`，硬件调用**必须**在后台线程
@@ -24,17 +28,18 @@ iFanControl 是一个面向 Apple Silicon Mac 的原生菜单栏风扇控制工�
 - ZIP 包 app bundle 里**绝不能包含 config.json**（2026-04-27 教训：误带旧 config 导致误判无风扇）
 - 开机自启动用 `SMAppService.mainApp.register()`，旧 LaunchAgent plist 首次启动时自动清理
 
-## 构建与替换
+## 构建与Git约定
+
+遵循 `CONTRIBUTING.md`。main维持正式代码，codex/3.0-beta保存Beta开发基线；日常工作用codex任务分支与PR，build检查通过后合入，禁止强推/删除长期分支。Beta标签与发布记录必须对应真实源码输入；不能用Git推送或CI触发正式部署。
+
+App元数据来源为 `packaging/app/Info.plist`，不要修改本机生成的App来代替源码版本提交。
 
 ```bash
-swift build -c release
-cp .build/release/MacFanControl iFanControl.app/Contents/MacOS/iFanControl
-cp iFanControl.app/Contents/MacOS/iFanControl /Applications/iFanControl.app/Contents/MacOS/iFanControl
-codesign --force --sign - /Applications/iFanControl.app
-open /Applications/iFanControl.app
+python3 scripts/build_app.py
+python3 packaging/pkg/build.py --app build/iFanControl.app --tool kentsmc
 ```
 
-部署前先确认用户实际运行路径：`/Applications/iFanControl.app/`，不是开发目录（CODE_AUDIT.md#3）
+产物位于build/与packaging/pkg/output/，不追踪二进制App/签名/Cloudflare缓存。本机历史文件保留；实验与反馈邮件不要混入公开提交。禁止自动替换用户实际安装的 `/Applications/iFanControl.app`；安装体验通过现有PKG路线验收。
 
 ## 发布纪律
 
@@ -43,6 +48,12 @@ open /Applications/iFanControl.app
 旧通道 `docs/update-manifest.json` 永久停在 2.9.9/build52，旧 ZIP `docs/iFanControl-legacy-2.9.9.zip` 与兼容别名 `docs/iFanControl-macOS.zip` 必须永久保留；后续版本禁止覆盖它们。旧客户端先通过 ZIP 升至 2.9.9，再进入新 PKG 通道。发布前运行 `python3 packaging/pkg/verify_channels.py`，固定元数据为 `packaging/pkg/legacy-channel.json`。
 
 不要只推 GitHub 代码就认为用户能收到更新。
+
+### Beta 独立发布（2026-10-12 用户确认）
+
+开发者手动本地安装 2.9.10/build62 作为种子版本，先只部署 Beta 线路。Beta 迭代只改 `update-manifest-beta.json`、独立含 build 的 PKG 与该 feed 的 no-store 规则；不要同步推进正式 manifest、`iFanControl-macOS.pkg`、`/download`、官网版本/时间线或正式 GitHub Release。正式/旧线路保持 2.9.9/build52，直到用户决定正式发布。
+
+`output/release-candidate/channel-preview/` 包含待正式发布的 build62 文件，**不能整体部署为 Beta 测试线路**。首次 Beta 部署使用 `output/beta-bootstrap-62/site/`，以线上 Production 资产清单逐一校验后构建；后端 functions 保持原源码，保留与线上不同的本地文件，避免将无关工作顺带发布。后续 Beta build 必须大于 62；正式发布时 build 必须大于此前所有 Beta build。
 
 ## 官网部署
 
@@ -64,7 +75,13 @@ npx wrangler pages deploy ./ --project-name ifan-stats --no-bundle --skip-cachin
 
 数据库结构、表设计等细节见 `ifan-stats/` 目录内代码。
 
-## 多语言
+## 3.0 UI 设计约束（2026-10-13）
+
+用户要求先全面梳理再改善。简洁、优雅、高效涵盖进入、等待、反馈、失败恢复和真实完成；现状与方案见 `docs/development/3.0-ui-audit.md`。保留PKG的系统完成勾与打开说明，不用自定义conclusion覆盖它，不在root安装脚本中自动启动GUI。检查/下载/校验/打开Installer不能提前宣称安装成功。
+
+菜单一次构建原地刷新、即时展示偏好、转速显式应用、曲线关闭保存/预设切换通知都有现有理由。UI重构应明确这些语义，不能把有意的差异当bug一并改掉。安全窗口95℃与代码/历史110℃的差异应按真实规则统一说明，不能改控温来迁就文案。第一轮64/65行为验收通过但视觉被用户否定；第二轮已应用原生设计skill并发布Beta66，原从65→66验收。66记录见 `docs/development/3.0-ui-polish.md`。Beta67曾进一步精简主菜单并修复提示白边/放大勾，信息栏设置维持66原样；新记录见 `docs/development/3.0-ui-menu-notice.md`。Beta68恢复反馈邀请框并说明状态记录时间，记录见 `docs/development/3.0-ui-feedback-intent.md`；原58个非Beta-feed资产及后端保持，正式build52线路继续保留；Beta69放大帮助侧栏导航并收紧选择区域、添加官网按钮，记录见 `docs/development/3.0-ui-help-sidebar.md`；保留59个非Beta-feed资产和后端，正式/旧/download仍52，当前Beta70增加真实启动阶段面板，菜单/控制循环初始化后收起，再显示更新回执/首次引导；保留60个旧非Beta-feed资产，正式/旧/download仍52，记录见 `docs/development/3.0-ui-startup.md`，下一build须大于70。
+
+## 多语言约定
 
 中 / 英存储在 `UserDefaults("ifancontrol.ui.language")`，切换后需重启。三个模块各自定义 `currentLanguage`（main.swift / SensorCatalog.swift / FanCurveWindow.swift）。
 

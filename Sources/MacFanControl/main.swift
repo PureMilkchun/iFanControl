@@ -1735,6 +1735,7 @@ class FanManager {
     static let shared = FanManager()
     private let kentsmcPath = "/usr/local/bin/kentsmc"
     let defaultSafetyRPM = 3500
+    var criticalTemperatureForDisplay: Double { criticalTemp }
     private let fallbackMaxRPM = 4900
     private let telemetryRefreshInterval: TimeInterval = 2.0
     private let validTemperatureRange = 0.0...120.0
@@ -2320,14 +2321,17 @@ class ConfigManager {
         )
     }
     
-    func saveConfig(_ config: Config) {
+    @discardableResult
+    func saveConfig(_ config: Config) -> Bool {
         do {
             let data = try JSONEncoder().encode(config)
             try data.write(to: configFile)
             cachedConfig = config
             cachedConfigMtime = try? configFile.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+            return true
         } catch {
             print("Error saving config: \(error)")
+            return false
         }
     }
 
@@ -2353,15 +2357,49 @@ class ConfigManager {
 
 // 自动更新服务
 @MainActor
-class UpdateService {
+class UpdateService: NSObject {
     static let shared = UpdateService()
     private let logger = Logger(subsystem: appSubsystem, category: "Updater")
 
-    private let manifestURL = UpdateManifest.channelURL
+    private let updatePreferences = UpdatePreferences.shared
     private let releasesHomeURL = URL(string: "https://github.com/PureMilkchun/iFanControl/releases")!
     private let lastCheckKey = "ifancontrol.update.last_check"
     private let automaticCheckEnabledKey = "ifancontrol.update.automatic_check_enabled"
     private var isChecking = false
+    private var isDownloading = false
+    private var checkTask: Task<Void, Never>?
+    private var downloadTask: Task<Void, Never>?
+    private var downloader: UpdatePackageDownloader?
+    private var activeSelection: UpdateSelection?
+    private var isTransferring = false
+    private var transferID = UUID()
+    private var manualCheckRequested = false
+    private let progressWindow = UpdateProgressWindowController()
+
+    override init() {
+        super.init()
+        NotificationCenter.default.addObserver(self, selector: #selector(routeChanged(_:)),
+            name: UpdatePreferences.channelDidChange, object: nil)
+    }
+
+    @objc private func routeChanged(_ notification: Notification) {
+        if let activeSelection, activeSelection != updatePreferences.selection { cancelCurrentOperation() }
+    }
+
+    private func cancelCurrentOperation() {
+        checkTask?.cancel(); downloadTask?.cancel(); downloader?.cancel()
+        transferID = UUID()
+        isTransferring = false
+        progressWindow.dismiss()
+    }
+
+    func presentInstalledUpdateIfNeeded() {
+        let defaults = UserDefaults.standard
+        let expected = defaults.integer(forKey: "ifancontrol.update.pending_build")
+        guard expected > 0, currentBuild >= expected else { return }
+        defaults.removeObject(forKey: "ifancontrol.update.pending_build")
+        InteractionNotice.shared.show(appL10n("已更新至 \(currentVersionDisplay)", "Updated to \(currentVersionDisplay)"))
+    }
 
     private var currentShortVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? appL10n("未知版本", "Unknown")
@@ -2372,7 +2410,8 @@ class UpdateService {
     }
 
     var currentVersionDisplay: String {
-        "\(currentShortVersion) (\(currentBuild))"
+        let betaLabel = Bundle.main.object(forInfoDictionaryKey: "IFanControlReleaseChannel") as? String == "beta" ? " Beta" : ""
+        return "\(currentShortVersion)\(betaLabel) (\(currentBuild))"
     }
 
     var releasesURL: URL {
@@ -2393,31 +2432,49 @@ class UpdateService {
     }
 
     func checkForUpdates(triggeredByUser: Bool) {
-        if isChecking { return }
+        if isChecking || isDownloading {
+            if triggeredByUser {
+                manualCheckRequested = true
+                if isChecking { progressWindow.present(title: appL10n("正在检查更新", "Checking for Updates"), detail: appL10n("请稍候，正在读取可用版本。", "Please wait while we check the available version."), cancel: { [weak self] in self?.cancelCurrentOperation() }) }
+                else { progressWindow.bringForward() }
+            }
+            return
+        }
         if !triggeredByUser && !automaticChecksEnabled {
             logger.info("Skipping automatic update check because automatic checks are disabled.")
             return
         }
 
         isChecking = true
+        let selection = updatePreferences.selection
+        activeSelection = selection
+        manualCheckRequested = triggeredByUser
+        if triggeredByUser {
+            progressWindow.present(title: appL10n("正在检查更新", "Checking for Updates"), detail: appL10n("当前通道：\(selection.channel == .beta ? "Beta" : "正式版")", "Update channel: \(selection.channel == .beta ? "Beta" : "Stable")"), cancel: { [weak self] in self?.cancelCurrentOperation() })
+        }
         logger.info("Starting update check. triggeredByUser=\(triggeredByUser, privacy: .public)")
 
-        Task {
-            defer { isChecking = false }
+        checkTask = Task { [self] in
+            defer { isChecking = false; checkTask = nil }
 
             do {
-                let (data, _) = try await URLSession.shared.data(from: manifestURL)
+                let (data, _) = try await URLSession.shared.data(from: selection.channel.manifestURL)
+                guard !Task.isCancelled, updatePreferences.selection == selection else { return }
                 let manifest = try JSONDecoder().decode(UpdateManifest.self, from: data)
+                guard manifest.isCompatible(with: selection.channel) else {
+                    throw NSError(domain: "UpdateService", code: 1005, userInfo: [NSLocalizedDescriptionKey: appL10n("更新通道信息不匹配，请稍后重试。", "Update channel information does not match. Please try again later.")])
+                }
                 recordLastCheckNow()
 
                 if manifest.latestBuild <= currentBuild {
                     self.logger.info("No update available. currentBuild=\(self.currentBuild, privacy: .public) remoteBuild=\(manifest.latestBuild, privacy: .public)")
-                    if triggeredByUser {
+                    if manualCheckRequested {
+                        progressWindow.dismiss()
                         showInfoAlert(
                             title: appL10n("已是最新版本", "Up to Date"),
                             message: appL10n(
-                                "当前版本：\(currentVersionDisplay)\n远端版本：\(manifest.latestVersion) (\(manifest.latestBuild))",
-                                "Current: \(currentVersionDisplay)\nLatest: \(manifest.latestVersion) (\(manifest.latestBuild))"
+                                "当前版本：\(currentVersionDisplay)\n可用版本：\(manifest.versionDisplay) (\(manifest.latestBuild))",
+                                "Current: \(currentVersionDisplay)\nLatest: \(manifest.versionDisplay) (\(manifest.latestBuild))"
                             )
                         )
                     }
@@ -2425,11 +2482,15 @@ class UpdateService {
                 }
 
                 self.logger.info("Update available. currentBuild=\(self.currentBuild, privacy: .public) remoteBuild=\(manifest.latestBuild, privacy: .public)")
-                presentUpdatePrompt(manifest: manifest)
+                progressWindow.dismiss()
+                presentUpdatePrompt(manifest: manifest, selection: selection)
             } catch {
+                guard !Task.isCancelled, updatePreferences.selection == selection else { return }
                 self.logger.error("Update check failed: \(error.localizedDescription, privacy: .public)")
-                if triggeredByUser {
-                    showUpdateFailureAlert(title: appL10n("检查更新失败", "Update Check Failed"), message: error.localizedDescription, releaseURL: releasesHomeURL)
+                if manualCheckRequested {
+                    progressWindow.present(title: appL10n("检查更新失败", "Update Check Failed"), detail: error.localizedDescription,
+                        retry: { [weak self] in self?.checkForUpdates(triggeredByUser: true) },
+                        manual: { [weak self] in guard let self else { return }; NSWorkspace.shared.open(self.releasesHomeURL) })
                 } else {
                     print("Update check failed: \(error)")
                 }
@@ -2441,25 +2502,34 @@ class UpdateService {
         UserDefaults.standard.set(Date(), forKey: lastCheckKey)
     }
 
-    private func presentUpdatePrompt(manifest: UpdateManifest) {
+    private func presentUpdatePrompt(manifest: UpdateManifest, selection: UpdateSelection) {
         let notes = manifest.notes?.isEmpty == false ? manifest.notes! : appL10n("包含稳定性与功能改进。", "Includes stability and feature improvements.")
         let alert = NSAlert()
-        alert.messageText = appL10n("发现新版本 \(manifest.latestVersion)", "New Version Available \(manifest.latestVersion)")
+        alert.messageText = appL10n("发现新版本 \(manifest.versionDisplay)", "New Version Available \(manifest.versionDisplay)")
         alert.informativeText = appL10n(
-            "当前版本：\(currentVersionDisplay)\n远端版本：\(manifest.latestVersion) (\(manifest.latestBuild))\n\n\(notes)",
-            "Current: \(currentVersionDisplay)\nLatest: \(manifest.latestVersion) (\(manifest.latestBuild))\n\n\(notes)"
+            "当前版本：\(currentVersionDisplay)\n可用版本：\(manifest.versionDisplay) (\(manifest.latestBuild))\n\n\(notes)\n\n下载安装包并验证后，应用会退出并打开系统安装器。",
+            "Current: \(currentVersionDisplay)\nLatest: \(manifest.versionDisplay) (\(manifest.latestBuild))\n\n\(notes)\n\nAfter download and verification, the app will quit and open the system installer."
         )
         alert.alertStyle = .informational
         alert.addButton(withTitle: appL10n("立即更新", "Update Now"))
         alert.addButton(withTitle: appL10n("稍后", "Later"))
 
         if alert.runModal() == .alertFirstButtonReturn {
-            startDownloadAndInstall(manifest: manifest)
+            startDownloadAndInstall(manifest: manifest, selection: selection)
         }
     }
 
-    private func startDownloadAndInstall(manifest: UpdateManifest) {
-        Task {
+    private func startDownloadAndInstall(manifest: UpdateManifest, selection: UpdateSelection) {
+        guard !isDownloading, updatePreferences.selection == selection else { return }
+        isDownloading = true
+        let id = UUID()
+        transferID = id
+        isTransferring = true
+        activeSelection = selection
+        progressWindow.present(title: appL10n("正在下载安装包", "Downloading Installer"),
+            detail: manifest.versionDisplay, cancel: { [weak self] in self?.cancelCurrentOperation() })
+        downloadTask = Task { [self] in
+            defer { isDownloading = false; isTransferring = false; downloader = nil; downloadTask = nil }
             do {
                 let packageURL: URL
                 do {
@@ -2468,16 +2538,28 @@ class UpdateService {
                     throw NSError(domain: "UpdateService", code: 1001, userInfo: [NSLocalizedDescriptionKey: appL10n("更新信息暂不可用，请稍后重试。", "Update information is unavailable. Please try again later.")])
                 }
                 logger.info("Downloading update package from \(packageURL.absoluteString, privacy: .public)")
-                let (data, response) = try await URLSession.shared.data(from: packageURL)
+                let transfer = UpdatePackageDownloader()
+                downloader = transfer
+                let (data, response) = try await transfer.download(packageURL) { [weak self] received, total in
+                    Task { @MainActor in
+                        guard let self, self.isTransferring, self.transferID == id, self.updatePreferences.selection == selection else { return }
+                        self.progressWindow.updateTransfer(received: received, total: total)
+                    }
+                }
+                isTransferring = false
+                guard !Task.isCancelled, updatePreferences.selection == selection else { return }
                 guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
                     throw NSError(domain: "UpdateService", code: 1002, userInfo: [NSLocalizedDescriptionKey: appL10n("下载安装包失败，请稍后重试。", "Could not download the installer. Please try again later.")])
                 }
+                progressWindow.present(title: appL10n("正在验证安装包", "Verifying Installer"),
+                    detail: appL10n("下载已完成，正在确认文件完整性。", "Download complete. Checking file integrity."), cancel: { [weak self] in self?.cancelCurrentOperation() })
                 do {
-                    try manifest.verifyPackage(data)
+                    try await Task.detached(priority: .userInitiated) { try manifest.verifyPackage(data) }.value
                 } catch {
                     throw NSError(domain: "UpdateService", code: 1003, userInfo: [NSLocalizedDescriptionKey: appL10n("安装包校验失败，请重新下载。", "Installer verification failed. Please download it again.")])
                 }
 
+                try Task.checkCancellation()
                 // Keep each downloaded installer at its own path while Installer uses it.
                 let stagingDir = URL(fileURLWithPath: NSTemporaryDirectory())
                     .appendingPathComponent("iFanControlUpdate-\(UUID().uuidString)", isDirectory: true)
@@ -2485,19 +2567,23 @@ class UpdateService {
                 let packagePath = stagingDir.appendingPathComponent("iFanControl-macOS.pkg")
                 try data.write(to: packagePath, options: .atomic)
 
+                try Task.checkCancellation()
+                progressWindow.present(title: appL10n("即将打开系统安装器", "Opening Installer"),
+                    detail: appL10n("iFanControl 将退出。请按系统向导安装，完成后重新打开应用。", "iFanControl will quit. Follow the system installer, then reopen the app."), cancel: { [weak self] in self?.cancelCurrentOperation() })
                 guard NSWorkspace.shared.open(packagePath) else {
                     throw NSError(domain: "UpdateService", code: 1004, userInfo: [NSLocalizedDescriptionKey: appL10n("无法打开系统安装器，请从官网下载后打开安装包。", "Could not open Installer. Please download the package from our website and open it.")])
                 }
                 logger.info("Native PKG installer launched for version \(manifest.latestVersion, privacy: .public)")
                 // Normal termination restores automatic fan control before installation.
+                UserDefaults.standard.set(manifest.latestBuild, forKey: "ifancontrol.update.pending_build")
                 NSApp.terminate(nil)
             } catch {
+                guard !Task.isCancelled, updatePreferences.selection == selection else { return }
                 logger.error("Update download/install failed: \(error.localizedDescription, privacy: .public)")
-                showUpdateFailureAlert(
-                    title: appL10n("更新失败", "Update Failed"),
-                    message: error.localizedDescription,
-                    releaseURL: githubReleaseURL(for: manifest.latestVersion)
-                )
+                let releaseURL = selection.channel == .beta ? (manifest.betaReleaseURL ?? releasesHomeURL) : githubReleaseURL(for: manifest.latestVersion)
+                progressWindow.present(title: appL10n("更新未完成", "Update Not Completed"), detail: error.localizedDescription,
+                    retry: { [weak self] in self?.checkForUpdates(triggeredByUser: true) },
+                    manual: { NSWorkspace.shared.open(releaseURL) })
             }
         }
     }
@@ -2650,14 +2736,8 @@ class MenuBarManager: NSObject {
     private var currentSensorItem: NSMenuItem?
     private var controlStatusItem: NSMenuItem?
     private var controlStatusContainerView: NSView?
-    private var controlStatusBackgroundView: NSView?
-    private var controlStatusTopSeparator: NSBox?
-    private var controlStatusBottomSeparator: NSBox?
-    private var controlStatusDividerField: NSTextField?
-    private var controlStatusTopLeftField: NSTextField?
-    private var controlStatusTopRightField: NSTextField?
     private var controlStatusBottomLeftField: NSTextField?
-    private var controlStatusBottomRightField: NSTextField?
+    private var controlModeField: NSTextField?
     private var modeItem: NSMenuItem?
     private var speedItem: NSMenuItem?
     private var autoStartItem: NSMenuItem?
@@ -2728,19 +2808,7 @@ class MenuBarManager: NSObject {
             let effectiveSources = sources.isEmpty ? [.temperature] : sources
             let values = effectiveSources.map { sourceTexts(for: $0).value }
             let units = effectiveSources.map { sourceTexts(for: $0).unit }
-            let joinedValue = values.joined(separator: "｜")
-            let joinedUnit = units.joined(separator: "｜")
-
-            switch style {
-            case .value:
-                return (joinedValue, "")
-            case .unit:
-                return (joinedUnit, "")
-            case .mode:
-                return ("\(joinedValue)｜", modeLetter)
-            case .full:
-                return ("\(joinedUnit)｜", modeLetter)
-            }
+            return MiniDisplayFormatter.line(values: values, units: units, style: style.rawValue, mode: modeLetter)
         }
     }
 
@@ -2847,7 +2915,6 @@ class MenuBarManager: NSObject {
         menuTimer.resume()
         self.menuPollTimer = menuTimer
 
-        maybeShowStartupGuidance()
     }
 
     private func createStatusItem() {
@@ -2902,6 +2969,7 @@ class MenuBarManager: NSObject {
     }
     
     @objc private func handleCurveSaved(_ notification: Notification) {
+        InteractionNotice.shared.show(appL10n("曲线已保存", "Curve saved"))
         if let curve = notification.userInfo?["curve"] as? [FanPoint] {
             fanCurve = curve
         }
@@ -2940,100 +3008,51 @@ class MenuBarManager: NSObject {
             action: nil, keyEquivalent: ""
         )
         hwItem.isEnabled = false
-        menu.addItem(hwItem)
         self.hardwareItem = hwItem
 
         // 温度源信息
         let sensorItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         sensorItem.isEnabled = false
-        menu.addItem(sensorItem)
         self.currentSensorItem = sensorItem
 
+        // A quiet status line replaces the nested card and duplicate headings.
         let controlStatusItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-        let controlStatusView = NSView(frame: NSRect(x: 0, y: 0, width: 210, height: 52))
-        let smallMenuFont = NSFont.systemFont(ofSize: 11)
-        let textColor = NSColor.textColor
-        let cardFrame = NSRect(x: 10, y: 4, width: 190, height: 44)
-        let leftX: CGFloat = cardFrame.minX + 14
-        let separatorX: CGFloat = cardFrame.midX
-        let rightX: CGFloat = separatorX + 10
-        let leftWidth: CGFloat = separatorX - leftX - 8
-        let rightWidth: CGFloat = cardFrame.maxX - rightX - 12
-        let topY: CGFloat = cardFrame.minY + 24
-        let bottomY: CGFloat = cardFrame.minY + 8
-
-        let cardBackground = NSView(frame: cardFrame)
-        cardBackground.wantsLayer = true
-        cardBackground.layer?.cornerRadius = 8
-        cardBackground.layer?.borderWidth = 1
-        controlStatusView.addSubview(cardBackground)
-
-        let topSeparator = NSBox(frame: NSRect(x: cardFrame.minX + 8, y: cardFrame.maxY - 1, width: cardFrame.width - 16, height: 1))
-        topSeparator.boxType = .separator
-        controlStatusView.addSubview(topSeparator)
-
-        let bottomSeparator = NSBox(frame: NSRect(x: cardFrame.minX + 8, y: cardFrame.minY, width: cardFrame.width - 16, height: 1))
-        bottomSeparator.boxType = .separator
-        controlStatusView.addSubview(bottomSeparator)
-
-        let topLeftField = NSTextField(labelWithString: "")
-        topLeftField.frame = NSRect(x: leftX, y: topY, width: leftWidth, height: 14)
-        topLeftField.font = smallMenuFont
-        topLeftField.textColor = .secondaryLabelColor
-        topLeftField.alignment = .left
-        topLeftField.lineBreakMode = .byTruncatingTail
-
-        let topRightField = NSTextField(labelWithString: "")
-        topRightField.frame = NSRect(x: rightX, y: topY, width: rightWidth, height: 14)
-        topRightField.font = smallMenuFont
-        topRightField.textColor = .secondaryLabelColor
-        topRightField.alignment = .right
-        topRightField.lineBreakMode = .byTruncatingHead
-
-        let bottomLeftField = NSTextField(labelWithString: "")
-        bottomLeftField.frame = NSRect(x: leftX, y: bottomY, width: leftWidth, height: 14)
-        bottomLeftField.font = NSFont.boldSystemFont(ofSize: 11)
-        bottomLeftField.textColor = textColor
-        bottomLeftField.alignment = .left
-        bottomLeftField.lineBreakMode = .byTruncatingTail
-
-        let bottomRightField = NSTextField(labelWithString: "")
-        bottomRightField.frame = NSRect(x: rightX, y: bottomY, width: rightWidth, height: 14)
-        bottomRightField.font = smallMenuFont
-        bottomRightField.textColor = .secondaryLabelColor
-        bottomRightField.alignment = .right
-        bottomRightField.lineBreakMode = .byTruncatingHead
-
-        let separatorField = NSTextField(labelWithString: "│")
-        separatorField.frame = NSRect(x: separatorX - 6, y: cardFrame.minY + 13, width: 12, height: 18)
-        separatorField.font = NSFont.systemFont(ofSize: 12)
-        separatorField.textColor = .separatorColor
-        separatorField.alignment = .center
-
-        controlStatusView.addSubview(topLeftField)
-        controlStatusView.addSubview(topRightField)
-        controlStatusView.addSubview(bottomLeftField)
-        controlStatusView.addSubview(bottomRightField)
-        controlStatusView.addSubview(separatorField)
-
-        controlStatusItem.view = controlStatusView
-        menu.addItem(controlStatusItem)
+        let statusView = NSView(frame: NSRect(x: 0, y: 0, width: 250, height: 28))
+        let statusLabel = NSTextField(labelWithString: "")
+        statusLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        statusLabel.frame = NSRect(x: 20, y: 6, width: 160, height: 16)
+        statusLabel.lineBreakMode = .byTruncatingTail
+        let modeLabel = NSTextField(labelWithString: "")
+        modeLabel.font = .systemFont(ofSize: 11)
+        modeLabel.textColor = .secondaryLabelColor
+        modeLabel.alignment = .right
+        modeLabel.frame = NSRect(x: 170, y: 6, width: 60, height: 16)
+        statusView.addSubview(statusLabel); statusView.addSubview(modeLabel)
+        controlStatusItem.view = statusView; menu.addItem(controlStatusItem)
         self.controlStatusItem = controlStatusItem
-        self.controlStatusContainerView = controlStatusView
-        self.controlStatusBackgroundView = cardBackground
-        self.controlStatusTopSeparator = topSeparator
-        self.controlStatusBottomSeparator = bottomSeparator
-        self.controlStatusDividerField = separatorField
-        self.controlStatusTopLeftField = topLeftField
-        self.controlStatusTopRightField = topRightField
-        self.controlStatusBottomLeftField = bottomLeftField
-        self.controlStatusBottomRightField = bottomRightField
-        layoutControlStatusView()
-        refreshControlStatusAppearance()
+        self.controlStatusContainerView = statusView
+        self.controlStatusBottomLeftField = statusLabel
+        self.controlModeField = modeLabel
+        menu.addItem(NSMenuItem.separator())
+
+        // 模式切换
+        let modeItem = NSMenuItem(title: "", action: #selector(toggleMode), keyEquivalent: "m")
+        modeItem.target = self
+        menu.addItem(modeItem)
+        self.modeItem = modeItem
+
+        // 手动转速（仅手动模式显示）
+        let spdItem = NSMenuItem(title: appL10n("设置转速...", "Set Speed..."), action: #selector(showSpeedSetting), keyEquivalent: "")
+        spdItem.target = self
+        spdItem.isHidden = true
+        menu.addItem(spdItem)
+        self.speedItem = spdItem
 
         // 温度源子菜单
         let temperatureSourceItem = NSMenuItem(title: appL10n("选择温度源", "Select Temperature Source"), action: nil, keyEquivalent: "")
         let temperatureSourceMenu = NSMenu()
+        temperatureSourceMenu.addItem(sensorItem)
+        temperatureSourceMenu.addItem(NSMenuItem.separator())
 
         let hottestItem = NSMenuItem(title: appL10n("自动选择（最热）", "Auto (Hottest)"), action: #selector(selectAutomaticTemperatureSource), keyEquivalent: "")
         hottestItem.target = self
@@ -3090,49 +3109,36 @@ class MenuBarManager: NSObject {
         }
 
         menu.setSubmenu(temperatureSourceMenu, for: temperatureSourceItem)
-        menu.addItem(temperatureSourceItem)
 
         // 编辑曲线
         let curveItem = NSMenuItem(title: appL10n("编辑曲线...", "Edit Curve..."), action: #selector(showFanCurveEditor), keyEquivalent: "c")
         curveItem.target = self
         menu.addItem(curveItem)
 
+        menu.addItem(temperatureSourceItem)
+        let powerItem = NSMenuItem(title: appL10n("电力消耗...", "Power Consumption..."), action: #selector(showPowerConsumption), keyEquivalent: "")
+        powerItem.target = self; menu.addItem(powerItem)
         menu.addItem(NSMenuItem.separator())
 
-        // 模式切换
-        let modeItem = NSMenuItem(title: "", action: #selector(toggleMode), keyEquivalent: "m")
-        modeItem.target = self
-        menu.addItem(modeItem)
-        self.modeItem = modeItem
-
-        // 手动转速（仅手动模式显示）
-        let spdItem = NSMenuItem(title: appL10n("设置转速...", "Set Speed..."), action: #selector(showSpeedSetting), keyEquivalent: "")
-        spdItem.target = self
-        spdItem.isHidden = true
-        menu.addItem(spdItem)
-        self.speedItem = spdItem
-
-        menu.addItem(NSMenuItem.separator())
-
+        let settingsItem = NSMenuItem(title: appL10n("设置", "Settings"), action: nil, keyEquivalent: "")
+        let settingsMenu = NSMenu()
+        settingsMenu.addItem(hwItem)
+        settingsMenu.addItem(NSMenuItem.separator())
         // 安全兜底转速
         let safetyItem = NSMenuItem(title: appL10n("安全兜底转速...", "Safety Floor RPM..."), action: #selector(showSafetyFloorSetting), keyEquivalent: "")
         safetyItem.target = self
-        menu.addItem(safetyItem)
+        settingsMenu.addItem(safetyItem)
 
         // 开机自启动
         let autoItem = NSMenuItem(title: appL10n("开机自启动", "Launch at Login"), action: #selector(toggleAutoStart), keyEquivalent: "")
         autoItem.target = self
-        menu.addItem(autoItem)
+        settingsMenu.addItem(autoItem)
         self.autoStartItem = autoItem
 
         // 信息栏展示
         let displayItem = NSMenuItem(title: appL10n("信息栏展示...", "Display..."), action: #selector(showDisplaySettings), keyEquivalent: "")
         displayItem.target = self
-        menu.addItem(displayItem)
-
-        let powerItem = NSMenuItem(title: appL10n("电力消耗...", "Power Consumption..."), action: #selector(showPowerConsumption), keyEquivalent: "")
-        powerItem.target = self
-        menu.addItem(powerItem)
+        settingsMenu.addItem(displayItem)
 
         // 语言
         let languageItem = NSMenuItem(title: appL10n("语言", "Language"), action: nil, keyEquivalent: "")
@@ -3145,28 +3151,30 @@ class MenuBarManager: NSObject {
         en.target = self
         languageMenu.addItem(en)
         self.enItem = en
-        menu.setSubmenu(languageMenu, for: languageItem)
-        menu.addItem(languageItem)
+        settingsMenu.setSubmenu(languageMenu, for: languageItem)
+        settingsMenu.addItem(languageItem)
 
-        menu.addItem(NSMenuItem.separator())
+        menu.setSubmenu(settingsMenu, for: settingsItem)
+        menu.addItem(settingsItem)
 
         // 关于/帮助
         let aboutItem = NSMenuItem(title: appL10n("关于/帮助...", "About / Help..."), action: #selector(showHelp), keyEquivalent: "")
         aboutItem.target = self
         menu.addItem(aboutItem)
 
-        menu.addItem(NSMenuItem.separator())
-
         // 反馈入口（标准菜单项，自然对齐）
         let feedbackTitleItem = NSMenuItem(title: appL10n("告诉开发者 👋", "Talk to Dev 👋"), action: #selector(showFeedback), keyEquivalent: "")
         feedbackTitleItem.target = self
         menu.addItem(feedbackTitleItem)
 
-        // 模拟输入框（自定义视图）
+        // Intentional invitation: it looks like a text field to encourage feedback,
+        // and opens the dedicated composer rather than editing inside NSMenu.
         let feedbackItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-        let feedbackContainer = NSView(frame: NSRect(x: 0, y: 0, width: 210, height: 76))
-        let feedbackField = NSTextField(frame: NSRect(x: 20, y: 6, width: 170, height: 64))
+        let feedbackContainer = NSView(frame: NSRect(x: 0, y: 0, width: 250, height: 76))
+        let feedbackField = NSTextField(frame: NSRect(x: 20, y: 6, width: 210, height: 64))
+        feedbackField.identifier = NSUserInterfaceItemIdentifier("feedback-invitation")
         feedbackField.isEditable = false
+        feedbackField.isSelectable = false
         feedbackField.isBezeled = true
         feedbackField.bezelStyle = .roundedBezel
         feedbackField.font = NSFontManager.shared.convert(.systemFont(ofSize: 13), toHaveTrait: .italicFontMask)
@@ -3176,10 +3184,19 @@ class MenuBarManager: NSObject {
         feedbackField.lineBreakMode = .byWordWrapping
         feedbackField.maximumNumberOfLines = 2
         feedbackContainer.addSubview(feedbackField)
-        let clickGesture = NSClickGestureRecognizer(target: self, action: #selector(showFeedback))
-        feedbackContainer.addGestureRecognizer(clickGesture)
+        // Native button hit testing also works during NSMenu tracking. Keep the
+        // inviting text-field appearance while making its entire area clickable.
+        let feedbackButton = NSButton(title: "", target: self, action: #selector(showFeedback))
+        feedbackButton.frame = feedbackField.frame
+        feedbackButton.isTransparent = true
+        feedbackButton.identifier = NSUserInterfaceItemIdentifier("feedback-invitation-button")
+        feedbackButton.setAccessibilityLabel(feedbackField.stringValue)
+        feedbackButton.toolTip = appL10n("打开反馈窗口", "Open the feedback window")
+        feedbackField.setAccessibilityElement(false)
+        feedbackContainer.addSubview(feedbackButton)
         feedbackItem.view = feedbackContainer
         menu.addItem(feedbackItem)
+
 
         menu.addItem(NSMenuItem.separator())
 
@@ -3199,8 +3216,6 @@ class MenuBarManager: NSObject {
     /// 原地更新动态菜单项（每 2 秒调用，不重建菜单）
     func updateDynamicMenuItems() {
         guard let statusItem = statusItem else { return }
-        layoutControlStatusView()
-        refreshControlStatusAppearance()
 
         let config = ConfigManager.shared.loadConfig()
 
@@ -3298,11 +3313,11 @@ class MenuBarManager: NSObject {
         // 温度源
         currentSensorItem?.title = appL10n("温度源 \(currentTemperatureSensorName)", "Temperature Source \(currentTemperatureSensorName)")
         let controlStatus = currentControlStatusLine()
-        controlStatusTopLeftField?.stringValue = controlStatus.topLeft
-        controlStatusTopRightField?.stringValue = controlStatus.topRight
         controlStatusBottomLeftField?.stringValue = controlStatus.bottomLeft
         controlStatusBottomLeftField?.textColor = controlStatus.statusColor
-        controlStatusBottomRightField?.stringValue = controlStatus.bottomRight
+        controlModeField?.stringValue = isAutoMode ? appL10n("自动", "Auto") : appL10n("手动", "Manual")
+        controlStatusContainerView?.toolTip = controlStatus.detailText
+        controlStatusContainerView?.setAccessibilityLabel(appL10n("控制状态", "Control status"))
 
         // 温度源子菜单：更新传感器数值和选中态
         hottestItem?.state = (config.temperatureSourceMode == "manual" || averagedTemperatureSourceDefinition(for: config.temperatureSourceMode) != nil) ? .off : .on
@@ -3322,7 +3337,7 @@ class MenuBarManager: NSObject {
         }
 
         // 模式切换
-        modeItem?.title = isAutoMode ? appL10n("手动模式", "Manual Mode") : appL10n("自动模式", "Auto Mode")
+        modeItem?.title = isAutoMode ? appL10n("切换至手动控制", "Switch to Manual Control") : appL10n("切换至自动控制", "Switch to Auto Control")
 
         // 手动转速项（仅手动模式可见）
         speedItem?.isHidden = isAutoMode
@@ -3333,59 +3348,6 @@ class MenuBarManager: NSObject {
         // 语言选中态
         zhItem?.state = currentLanguage == "zh" ? .on : .off
         enItem?.state = currentLanguage == "en" ? .on : .off
-    }
-
-    private func layoutControlStatusView() {
-        guard let containerView = controlStatusContainerView,
-              let cardBackground = controlStatusBackgroundView,
-              let topSeparator = controlStatusTopSeparator,
-              let bottomSeparator = controlStatusBottomSeparator,
-              let dividerField = controlStatusDividerField,
-              let topLeftField = controlStatusTopLeftField,
-              let topRightField = controlStatusTopRightField,
-              let bottomLeftField = controlStatusBottomLeftField,
-              let bottomRightField = controlStatusBottomRightField else { return }
-
-        let baseWidth: CGFloat = 210
-        let cardWidth: CGFloat = 190
-        let containerWidth = baseWidth
-        containerView.frame = NSRect(x: 0, y: 0, width: containerWidth, height: 52)
-
-        let cardX: CGFloat = 14
-        let cardFrame = NSRect(x: cardX, y: 4, width: cardWidth, height: 44)
-        let leftX: CGFloat = cardFrame.minX + 14
-        let separatorX: CGFloat = cardFrame.midX
-        let rightX: CGFloat = separatorX + 10
-        let leftWidth: CGFloat = separatorX - leftX - 8
-        let rightWidth: CGFloat = cardFrame.maxX - rightX - 12
-        let topY: CGFloat = cardFrame.minY + 24
-        let bottomY: CGFloat = cardFrame.minY + 8
-
-        cardBackground.frame = cardFrame
-        topSeparator.frame = NSRect(x: cardFrame.minX + 8, y: cardFrame.maxY - 1, width: cardFrame.width - 16, height: 1)
-        bottomSeparator.frame = NSRect(x: cardFrame.minX + 8, y: cardFrame.minY, width: cardFrame.width - 16, height: 1)
-        dividerField.frame = NSRect(x: separatorX - 6, y: cardFrame.minY + 13, width: 12, height: 18)
-
-        topLeftField.frame = NSRect(x: leftX, y: topY, width: leftWidth, height: 14)
-        topRightField.frame = NSRect(x: rightX, y: topY, width: rightWidth, height: 14)
-        bottomLeftField.frame = NSRect(x: leftX, y: bottomY, width: leftWidth, height: 14)
-        bottomRightField.frame = NSRect(x: rightX, y: bottomY, width: rightWidth, height: 14)
-    }
-
-    private func refreshControlStatusAppearance() {
-        guard let backgroundView = controlStatusBackgroundView else { return }
-        let appearance = statusItem?.button?.effectiveAppearance ?? NSApp.effectiveAppearance
-        let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-
-        let fillColor: NSColor = isDark
-            ? NSColor.white.withAlphaComponent(0.07)
-            : NSColor.black.withAlphaComponent(0.035)
-        let borderColor: NSColor = isDark
-            ? NSColor.white.withAlphaComponent(0.12)
-            : NSColor.black.withAlphaComponent(0.07)
-
-        backgroundView.layer?.backgroundColor = fillColor.cgColor
-        backgroundView.layer?.borderColor = borderColor.cgColor
     }
 
     private func currentControlStatusLine() -> (topLeft: String, topRight: String, bottomLeft: String, bottomRight: String, statusColor: NSColor, detailText: String) {
@@ -3416,7 +3378,7 @@ class MenuBarManager: NSObject {
         let statusColor: NSColor
         switch snapshot.mode {
         case "normal":
-            modeText = appL10n("正常", "Normal")
+            modeText = appL10n("控制正常", "Control normal")
             statusColor = .systemGreen
         case "sensor_loss_fixed_rpm":
             modeText = appL10n("⚠ 传感器丢失", "⚠ Sensor Lost")
@@ -3440,7 +3402,13 @@ class MenuBarManager: NSObject {
             bottomLeft = ""
         }
 
-        let detailText = snapshot.mode == "normal" ? bottomLeft : ""
+        // recordedAt is a status/detail transition timestamp, not a health-check
+        // freshness timestamp. Keep it out of the visible current-status row.
+        let recordExplanation = appL10n(
+            "最近一次状态记录：\(ageText)",
+            "Last status record: \(ageText)"
+        )
+        let detailText = [bottomLeft, recordExplanation].filter { !$0.isEmpty }.joined(separator: "\n")
 
         return (
             appL10n("控制状态", "Status"),
@@ -3459,6 +3427,7 @@ class MenuBarManager: NSObject {
     }
     
     @objc func showFanCurveEditor() {
+        if let window = fanCurveWindowController?.window, window.isVisible { presentWindowFront(window); return }
         NSLog("iFanControl: showFanCurveEditor - creating FanCurvePresetWindowController")
         let config = ConfigManager.shared.loadConfig()
         fanCurveWindowController = FanCurvePresetWindowController(
@@ -3563,6 +3532,7 @@ class MenuBarManager: NSObject {
     }
     
     @objc func showSpeedSetting() {
+        if let window = speedSettingWindowController?.window, window.isVisible { presentWindowFront(window); return }
         let config = ConfigManager.shared.loadConfig()
         let currentRPM = min(config.manualRPM, FanManager.shared.currentMaxRPM)
         let controlMode = ManualRPMControlMode(storedValue: config.manualRPMControlMode)
@@ -3578,6 +3548,7 @@ class MenuBarManager: NSObject {
     }
 
     @objc func showDisplaySettings() {
+        if let window = displaySettingsWindowController?.window, window.isVisible { presentWindowFront(window); return }
         displaySettingsWindowController = DisplaySettingsWindowController()
         displaySettingsWindowController?.onSettingsChanged = { [weak self] in
             self?.statusItem?.button?.font = nil
@@ -3599,6 +3570,7 @@ class MenuBarManager: NSObject {
     }
 
     @objc func showSafetyFloorSetting() {
+        if let window = safetyFloorWindowController?.window, window.isVisible { presentWindowFront(window); return }
         let config = ConfigManager.shared.loadConfig()
         let currentRPM = min(max(config.safetyFloorRPM ?? FanManager.shared.defaultSafetyRPM, 2000), FanManager.shared.currentMaxRPM)
         safetyFloorWindowController = SafetyFloorWindowController(initialRPM: currentRPM, maxRPM: FanManager.shared.currentMaxRPM)
@@ -3668,7 +3640,7 @@ class MenuBarManager: NSObject {
         updateDynamicMenuItems()
     }
 
-    private func maybeShowStartupGuidance() {
+    func maybeShowStartupGuidance() {
         let defaults = UserDefaults.standard
 
         // 首次启动语言选择
@@ -3702,13 +3674,7 @@ class MenuBarManager: NSObject {
         let readings = FanManager.shared.availableTemperatureReadings()
         if readings.count > 1 && !defaults.bool(forKey: temperatureSourceHintKey) {
             defaults.set(true, forKey: temperatureSourceHintKey)
-            let alert = NSAlert()
-            alert.messageText = appL10n("温度源已自动选择", "Temperature Source Set to Auto")
-            alert.informativeText = appL10n("默认会使用当前最热的温度传感器来驱动风扇曲线，也可以在温度源菜单中选择 CPU 或 GPU 传感器的平均温度，或固定某个传感器。这里显示的是这台机器真实可读到的温度传感器，不一定与 CPU/GPU 核心数量一一对应。", "By default, the hottest available sensor drives the fan curve. You can also choose a CPU or GPU sensor average, or pin one sensor from the temperature-source menu. Sensor count may not match CPU/GPU core count.")
-            alert.alertStyle = .informational
-            alert.addButton(withTitle: appL10n("知道了", "OK"))
-            logger.info("Displayed first-run temperature source guidance")
-            alert.runModal()
+            InteractionNotice.shared.show(appL10n("温度源与控制模式可随时在菜单中调整。", "You can change the temperature source and control mode in the menu."), symbol: "info.circle")
         }
     }
 
@@ -3721,6 +3687,7 @@ class MenuBarManager: NSObject {
     }
 
     @objc func showFeedback() {
+        menu?.cancelTracking()
         // 先关闭菜单，避免遮挡弹窗
         self.menu?.cancelTracking()
 
@@ -3838,16 +3805,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var launchDate = Date()
     private var consecutiveMissingTelemetryCount = 0
     private var lastRecordedControlStatus: String?
+    private let startupWindow = StartupProgressWindowController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
         launchDate = Date()
         NSApp.setActivationPolicy(.accessory)
+        startupWindow.present()
+        // Let the launch UI enter the run loop before the existing hardware probes.
+        DispatchQueue.main.async { [weak self] in
+            self?.finishLaunching()
+        }
+    }
+
+    private func finishLaunching() {
         AppLog.shared.bootstrapSession()
         AppLog.shared.info("application did finish launching")
         updateControlStatus(mode: "normal", detail: appL10n("启动完成", "Startup complete"), force: true)
 
         FanManager.shared.refreshHardwareProfile()
+        startupWindow.setStage(.preferences)
         let config = ConfigManager.shared.syncHardwareProfile(maxRPM: FanManager.shared.currentMaxRPM)
         MenuBarManager.shared.setFanCurve(config.curve)
         MenuBarManager.shared.setIsAutoMode(config.mode == "auto")
@@ -3858,6 +3835,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             MenuBarManager.shared.ensureAutoStartEnabled()
         }
 
+        startupWindow.setStage(.controls)
         MenuBarManager.shared.setupMenuBar()
         
         // 解锁风扇
@@ -3881,9 +3859,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hbTimer.setEventHandler { PrivacyStatsService.shared.tick() }
         hbTimer.resume()
         statsHeartbeatTimer = hbTimer
+        startupWindow.dismiss()
+        AppLog.shared.info("startup ready: menu bar and control loop initialized")
+        UpdateService.shared.presentInstalledUpdateIfNeeded()
+        MenuBarManager.shared.maybeShowStartupGuidance()
     }
     
     func applicationWillTerminate(_ notification: Notification) {
+        startupWindow.dismiss()
         AppLog.shared.info("application will terminate")
         statsHeartbeatTimer?.cancel()
         PrivacyStatsService.shared.shutdown()
@@ -4114,7 +4097,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let alert = NSAlert()
         alert.messageText = title
-        alert.informativeText = message
+        alert.informativeText = message + appL10n("\n\n如果问题持续，请到「关于/帮助 → 诊断与支持」导出诊断包。", "\n\nIf this persists, export diagnostics from About / Help → Diagnostics & Support.")
         alert.alertStyle = .warning
         alert.addButton(withTitle: appL10n("知道了", "OK"))
         alert.runModal()
@@ -4156,10 +4139,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 class DisplaySettingsWindowController: NSWindowController {
     var onSettingsChanged: (() -> Void)?
 
+    private let previewField = NSTextField(labelWithString: "")
     private var fullRadio: NSButton!
     private var compactRadio: NSButton!
     private var miniRadio: NSButton!
     private var miniOptionsStack: NSStackView!
+    private var modeControl: NSSegmentedControl!
+    private var topStylePopup: NSPopUpButton!
+    private var bottomStylePopup: NSPopUpButton!
 
     private var topSourceCheckboxes: [String: NSButton] = [:]
     private var topStyleRadios: [String: NSButton] = [:]
@@ -4246,7 +4233,7 @@ class DisplaySettingsWindowController: NSWindowController {
 
     init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 380, height: 180),
+            contentRect: NSRect(x: 0, y: 0, width: 540, height: 390),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -4263,113 +4250,114 @@ class DisplaySettingsWindowController: NSWindowController {
 
     private func setupUI() {
         guard let contentView = window?.contentView else { return }
+        let root = NSStackView()
+        root.orientation = .vertical; root.alignment = .leading; root.spacing = 18
+        root.translatesAutoresizingMaskIntoConstraints = false; contentView.addSubview(root)
 
-        // ── 显示模式 ──────────────────────────
-        let displayModeLabel = makeSectionLabel(appL10n("显示模式", "Display Mode"))
-        contentView.addSubview(displayModeLabel)
+        modeControl = NSSegmentedControl(labels: [appL10n("完整", "Full"), appL10n("简洁", "Compact"), appL10n("迷你", "Mini")], trackingMode: .selectOne, target: self, action: #selector(modeSelectionChanged))
+        modeControl.segmentStyle = .rounded
+        modeControl.setAccessibilityLabel(appL10n("菜单栏显示模式", "Menu bar display mode"))
+        modeControl.controlSize = .small; modeControl.font = .systemFont(ofSize: 12)
+        for index in 0..<3 { modeControl.setWidth(70, forSegment: index) }
+        let modeRow = NSStackView(views: [NativeInterface.label(appL10n("显示模式", "Display mode"), size: 12, color: .secondaryLabelColor), NSView(), modeControl])
+        root.addArrangedSubview(modeRow)
+        modeRow.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
+        // The existing state controls preserve the update and preference semantics.
+        fullRadio = makeRadioButton(""); compactRadio = makeRadioButton(""); miniRadio = makeRadioButton("")
 
-        fullRadio    = makeRadioButton(appL10n("完整：65℃ | 2400 RPM [Auto]", "Full: 65℃ | 2400 RPM [Auto]"))
-        compactRadio = makeRadioButton(appL10n("简洁：53｜981｜A", "Compact: 53｜981｜A"))
-        miniRadio    = makeRadioButton(appL10n("迷你：两行显示", "Mini: Two Lines"))
-        for radio in [fullRadio!, compactRadio!, miniRadio!] {
-            contentView.addSubview(radio)
-            radio.target = self
-            radio.action = #selector(displayModeChanged)
-        }
+        let preview = NSStackView(); preview.orientation = .vertical; preview.spacing = 10; preview.alignment = .centerX
+        preview.addArrangedSubview(NativeInterface.label(appL10n("菜单栏预览", "Menu bar preview"), size: 11, weight: .medium, color: .secondaryLabelColor))
+        previewField.font = .monospacedDigitSystemFont(ofSize: 18, weight: .medium)
+        previewField.alignment = .center; previewField.maximumNumberOfLines = 2
+        previewField.identifier = NSUserInterfaceItemIdentifier("display-preview")
+        preview.addArrangedSubview(previewField)
+        previewField.heightAnchor.constraint(equalToConstant: 50).isActive = true
+        root.addArrangedSubview(preview)
+        preview.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
 
-        // ── 迷你选项容器（缩进，视觉上从属于「迷你」）────────
-        miniOptionsStack = NSStackView()
-        miniOptionsStack.orientation = .vertical
-        miniOptionsStack.alignment = .leading
-        miniOptionsStack.spacing = 6
-        miniOptionsStack.translatesAutoresizingMaskIntoConstraints = false
-        miniOptionsStack.isHidden = true
-        contentView.addSubview(miniOptionsStack)
+        miniOptionsStack = NSStackView(); miniOptionsStack.orientation = .vertical
+        miniOptionsStack.alignment = .leading; miniOptionsStack.spacing = 14
+        miniOptionsStack.addArrangedSubview(makeLineRow(top: true))
+        let separator = NSBox(); separator.boxType = .separator
+        miniOptionsStack.addArrangedSubview(separator)
+        separator.widthAnchor.constraint(equalTo: miniOptionsStack.widthAnchor).isActive = true
+        miniOptionsStack.addArrangedSubview(makeLineRow(top: false))
+        root.addArrangedSubview(miniOptionsStack)
+        miniOptionsStack.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
 
-        // 上行内容（次级标签）
-        miniOptionsStack.addArrangedSubview(makeSubsectionLabel(appL10n("上层内容（可多选）", "Top Content (Multi-select)")))
-        let topSourceGroup = makeRadioGroupStack()
-        miniOptionsStack.addArrangedSubview(topSourceGroup)
-        for item in Self.allSources {
-            let checkbox = makeCheckboxButton(appL10n(item.zh, item.en))
-            checkbox.target = self
-            checkbox.action = #selector(topSourceChanged)
-            topSourceGroup.addArrangedSubview(checkbox)
-            topSourceCheckboxes[item.key.rawValue] = checkbox
-        }
-        miniOptionsStack.addArrangedSubview(makeSubsectionLabel(appL10n("上层样式（示例）", "Top Style (Examples)")))
-        let topStyleGroup = makeRadioGroupStack()
-        miniOptionsStack.addArrangedSubview(topStyleGroup)
-        for item in Self.allStyles {
-            let radio = makeRadioButton(appL10n(item.zh, item.en))
-            radio.target = self
-            radio.action = #selector(topStyleChanged)
-            topStyleGroup.addArrangedSubview(radio)
-            topStyleRadios[item.key.rawValue] = radio
-        }
-
-        // 交换按钮 + 分隔线
-        let swapRow = NSStackView()
-        swapRow.orientation = .horizontal
-        swapRow.alignment = .centerY
-        swapRow.spacing = 8
-        swapRow.translatesAutoresizingMaskIntoConstraints = false
-
-        let leftSep = NSBox(); leftSep.boxType = .separator; leftSep.translatesAutoresizingMaskIntoConstraints = false
-        let rightSep = NSBox(); rightSep.boxType = .separator; rightSep.translatesAutoresizingMaskIntoConstraints = false
-        let swapButton = NSButton(title: appL10n("交换上下行", "Swap Lines"), target: self, action: #selector(swapLines))
-        swapButton.bezelStyle = .rounded
-        swapButton.font = .systemFont(ofSize: 12)
-        swapButton.translatesAutoresizingMaskIntoConstraints = false
-
-        swapRow.addArrangedSubview(leftSep)
-        swapRow.addArrangedSubview(swapButton)
-        swapRow.addArrangedSubview(rightSep)
-        leftSep.widthAnchor.constraint(greaterThanOrEqualToConstant: 40).isActive = true
-        rightSep.widthAnchor.constraint(equalTo: leftSep.widthAnchor).isActive = true
-        miniOptionsStack.addArrangedSubview(swapRow)
-        leftSep.heightAnchor.constraint(equalToConstant: 1).isActive = true
-        rightSep.heightAnchor.constraint(equalToConstant: 1).isActive = true
-
-        // 下行内容（次级标签）
-        miniOptionsStack.addArrangedSubview(makeSubsectionLabel(appL10n("下层内容（可多选）", "Bottom Content (Multi-select)")))
-        let bottomSourceGroup = makeRadioGroupStack()
-        miniOptionsStack.addArrangedSubview(bottomSourceGroup)
-        for item in Self.allSources {
-            let checkbox = makeCheckboxButton(appL10n(item.zh, item.en))
-            checkbox.target = self
-            checkbox.action = #selector(bottomSourceChanged)
-            bottomSourceGroup.addArrangedSubview(checkbox)
-            bottomSourceCheckboxes[item.key.rawValue] = checkbox
-        }
-        miniOptionsStack.addArrangedSubview(makeSubsectionLabel(appL10n("下层样式（示例）", "Bottom Style (Examples)")))
-        let bottomStyleGroup = makeRadioGroupStack()
-        miniOptionsStack.addArrangedSubview(bottomStyleGroup)
-        for item in Self.allStyles {
-            let radio = makeRadioButton(appL10n(item.zh, item.en))
-            radio.target = self
-            radio.action = #selector(bottomStyleChanged)
-            bottomStyleGroup.addArrangedSubview(radio)
-            bottomStyleRadios[item.key.rawValue] = radio
-        }
-
-        // ── 布局 ─────────────────────────────
+        let footer = NSStackView(); footer.spacing = 8
+        let hint = NativeInterface.label(appL10n("示例数值 · 设置即时生效", "Sample values · Changes apply immediately"), size: 11, color: .secondaryLabelColor)
+        footer.addArrangedSubview(hint); footer.addArrangedSubview(NSView())
+        let swap = NativeInterface.button(appL10n("交换上下行", "Swap lines"), target: self, action: #selector(swapLines), small: true)
+        swap.toolTip = appL10n("交换两行的内容和样式", "Swap the content and style of both lines")
+        footer.addArrangedSubview(swap); root.addArrangedSubview(footer)
+        footer.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
         NSLayoutConstraint.activate([
-            displayModeLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
-            displayModeLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
-
-            fullRadio.topAnchor.constraint(equalTo: displayModeLabel.bottomAnchor, constant: 8),
-            fullRadio.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
-            compactRadio.topAnchor.constraint(equalTo: fullRadio.bottomAnchor, constant: 4),
-            compactRadio.leadingAnchor.constraint(equalTo: fullRadio.leadingAnchor),
-            miniRadio.topAnchor.constraint(equalTo: compactRadio.bottomAnchor, constant: 4),
-            miniRadio.leadingAnchor.constraint(equalTo: fullRadio.leadingAnchor),
-
-            miniOptionsStack.topAnchor.constraint(equalTo: miniRadio.bottomAnchor, constant: 12),
-            miniOptionsStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 40),
-            miniOptionsStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
-            miniOptionsStack.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -20),
+            root.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
+            root.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
+            root.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 24),
+            root.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -20)
         ])
+    }
+
+    private func makeLineRow(top: Bool) -> NSStackView {
+        let column = NSStackView(); column.orientation = .vertical; column.alignment = .leading; column.spacing = 8
+        let header = NSStackView(); header.spacing = 12
+        header.addArrangedSubview(NativeInterface.label(top ? appL10n("上行", "Top line") : appL10n("下行", "Bottom line"), weight: .medium))
+        header.addArrangedSubview(NSView())
+        let popup = NSPopUpButton(); popup.controlSize = .small; popup.font = .systemFont(ofSize: 12)
+        popup.addItems(withTitles: [appL10n("仅数值", "Numbers only"), appL10n("数值和单位", "Numbers and units"), appL10n("数值和模式", "Numbers and mode"), appL10n("数值、单位和模式", "Numbers, units and mode")])
+        popup.target = self; popup.action = top ? #selector(topPopupChanged) : #selector(bottomPopupChanged)
+        popup.setAccessibilityLabel(top ? appL10n("上行样式", "Top line style") : appL10n("下行样式", "Bottom line style"))
+        header.addArrangedSubview(popup); column.addArrangedSubview(header)
+        if top { topStylePopup = popup } else { bottomStylePopup = popup }
+        let sources = NSStackView(); sources.spacing = 20
+        for item in Self.allSources {
+            let title = item.key == .temperature ? appL10n("温度", "Temperature") : item.key == .rpm ? appL10n("转速", "RPM") : appL10n("功率", "Power")
+            let button = makeCheckboxButton(title); button.controlSize = .small; button.font = .systemFont(ofSize: 12)
+            button.target = self; button.action = top ? #selector(topSourceChanged) : #selector(bottomSourceChanged)
+            sources.addArrangedSubview(button)
+            if top { topSourceCheckboxes[item.key.rawValue] = button } else { bottomSourceCheckboxes[item.key.rawValue] = button }
+        }
+        sources.addArrangedSubview(NSView()); column.addArrangedSubview(sources)
+        for item in Self.allStyles {
+            let state = makeRadioButton("")
+            if top { topStyleRadios[item.key.rawValue] = state } else { bottomStyleRadios[item.key.rawValue] = state }
+        }
+        column.widthAnchor.constraint(equalToConstant: 492).isActive = true
+        header.widthAnchor.constraint(equalTo: column.widthAnchor).isActive = true
+        sources.widthAnchor.constraint(equalTo: column.widthAnchor).isActive = true
+        return column
+    }
+
+    @objc private func modeSelectionChanged(_ sender: NSSegmentedControl) {
+        fullRadio.state = sender.selectedSegment == 0 ? .on : .off
+        compactRadio.state = sender.selectedSegment == 1 ? .on : .off
+        miniRadio.state = sender.selectedSegment == 2 ? .on : .off
+        displayModeChanged(miniRadio)
+    }
+    @objc private func topPopupChanged(_ sender: NSPopUpButton) {
+        guard Self.allStyles.indices.contains(sender.indexOfSelectedItem), let state = topStyleRadios[Self.allStyles[sender.indexOfSelectedItem].key.rawValue] else { return }
+        topStyleChanged(state)
+    }
+    @objc private func bottomPopupChanged(_ sender: NSPopUpButton) {
+        guard Self.allStyles.indices.contains(sender.indexOfSelectedItem), let state = bottomStyleRadios[Self.allStyles[sender.indexOfSelectedItem].key.rawValue] else { return }
+        bottomStyleChanged(state)
+    }
+
+    private func refreshPreview() {
+        func line(_ sources: [MiniLineSource], _ style: MiniLineStyle) -> String {
+            let texts = sources.map { source -> (String, String) in
+                switch source { case .temperature: return ("65", "65℃"); case .rpm: return ("2400", "2400 RPM"); case .power: return ("12.3", "12.3W") }
+            }
+            let result = MiniDisplayFormatter.line(values: texts.map { $0.0 }, units: texts.map { $0.1 }, style: style.rawValue, mode: "A")
+            return result.primary + result.accent
+        }
+        switch currentDisplayMode {
+        case "compact": previewField.stringValue = "65｜2400｜A"
+        case "mini": previewField.stringValue = line(currentMiniTopLine.sources, currentMiniTopLine.style) + "\n" + line(currentMiniBottomLine.sources, currentMiniBottomLine.style)
+        default: previewField.stringValue = "65℃ | 2400 RPM [Auto]"
+        }
     }
 
     // MARK: - Helpers
@@ -4417,12 +4405,14 @@ class DisplaySettingsWindowController: NSWindowController {
             checkbox.state = topSources.contains(key) ? .on : .off
         }
         topStyleRadios[currentMiniTopLine.style.rawValue]?.state = .on
+        topStylePopup.selectItem(at: Self.allStyles.firstIndex(where: { $0.key == currentMiniTopLine.style }) ?? 3)
 
         let bottomSources = Set(currentMiniBottomLine.sources.map(\.rawValue))
         for (key, checkbox) in bottomSourceCheckboxes {
             checkbox.state = bottomSources.contains(key) ? .on : .off
         }
         bottomStyleRadios[currentMiniBottomLine.style.rawValue]?.state = .on
+        bottomStylePopup.selectItem(at: Self.allStyles.firstIndex(where: { $0.key == currentMiniBottomLine.style }) ?? 1)
     }
 
     private func loadCurrentSettings() {
@@ -4434,6 +4424,7 @@ class DisplaySettingsWindowController: NSWindowController {
 
         syncMiniLineControls()
         updateMiniOptionsVisibility()
+        refreshPreview()
     }
 
     // MARK: - Actions
@@ -4447,6 +4438,7 @@ class DisplaySettingsWindowController: NSWindowController {
             currentDisplayMode = "mini"
         }
         updateMiniOptionsVisibility()
+        refreshPreview()
         onSettingsChanged?()
     }
 
@@ -4464,6 +4456,7 @@ class DisplaySettingsWindowController: NSWindowController {
         }
         currentMiniTopLine = (sources, currentMiniTopLine.style)
         syncMiniLineControls()
+        refreshPreview()
         onSettingsChanged?()
     }
 
@@ -4471,6 +4464,7 @@ class DisplaySettingsWindowController: NSWindowController {
         guard let key = topStyleRadios.first(where: { $0.value === sender })?.key,
               let style = MiniLineStyle(rawValue: key) else { return }
         currentMiniTopLine = (currentMiniTopLine.sources, style)
+        refreshPreview()
         onSettingsChanged?()
     }
 
@@ -4488,6 +4482,7 @@ class DisplaySettingsWindowController: NSWindowController {
         }
         currentMiniBottomLine = (sources, currentMiniBottomLine.style)
         syncMiniLineControls()
+        refreshPreview()
         onSettingsChanged?()
     }
 
@@ -4495,6 +4490,7 @@ class DisplaySettingsWindowController: NSWindowController {
         guard let key = bottomStyleRadios.first(where: { $0.value === sender })?.key,
               let style = MiniLineStyle(rawValue: key) else { return }
         currentMiniBottomLine = (currentMiniBottomLine.sources, style)
+        refreshPreview()
         onSettingsChanged?()
     }
 
@@ -4504,19 +4500,27 @@ class DisplaySettingsWindowController: NSWindowController {
         currentMiniTopLine    = bottom
         currentMiniBottomLine = top
         syncMiniLineControls()
+        refreshPreview()
         onSettingsChanged?()
     }
 
     private func updateMiniOptionsVisibility() {
+        modeControl.selectedSegment = fullRadio.state == .on ? 0 : compactRadio.state == .on ? 1 : 2
         let showMini = miniRadio.state == .on
         miniOptionsStack.isHidden = !showMini
-        let height: CGFloat = showMini ? 640 : 180
-        window?.setContentSize(NSSize(width: 380, height: height))
+        refreshPreview()
+        guard let window else { return }
+        var frame = window.frame
+        let height: CGFloat = showMini ? 400 : 235
+        frame.origin.y += frame.height - height
+        frame.size.height = height
+        window.setFrame(frame, display: true, animate: !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+
     }
 }
 
 @MainActor
-class PowerConsumptionWindowController: NSWindowController {
+class PowerConsumptionWindowController: NSWindowController, NSWindowDelegate {
     private let rows: [(key: String, zh: String, en: String)] = [
         ("cpu", "CPU", "CPU"),
         ("gpu", "GPU", "GPU"),
@@ -4525,6 +4529,7 @@ class PowerConsumptionWindowController: NSWindowController {
         ("pci", "PCI", "PCI"),
         ("total", "总计（DC In）", "Total (DC In)"),
     ]
+    private let samplingStatus = NSTextField(wrappingLabelWithString: "")
     private var valueLabels: [String: NSTextField] = [:]
     private var updateTimer: DispatchSourceTimer?
 
@@ -4539,6 +4544,7 @@ class PowerConsumptionWindowController: NSWindowController {
         window.center()
 
         super.init(window: window)
+        window.delegate = self
         applyWindowMaterialStyle(window)
         setupUI()
     }
@@ -4559,13 +4565,16 @@ class PowerConsumptionWindowController: NSWindowController {
     func refreshSnapshot() {
         let snapshot = PowerTelemetryReader.shared.snapshot
         if !snapshot.isSupported {
-            valueLabels["cpu"]?.stringValue = appL10n("当前机型暂不支持", "Not supported on this Mac")
-            for key in ["gpu", "ane", "ram", "pci", "total"] {
+            samplingStatus.stringValue = appL10n("当前机型暂不支持功率读取。", "Power readings are not supported on this Mac.")
+            for key in ["cpu", "gpu", "ane", "ram", "pci", "total"] {
                 valueLabels[key]?.stringValue = "--"
             }
             return
         }
 
+        samplingStatus.stringValue = snapshot.hasAnyReading
+            ? appL10n("上次读取：\(Int(Date().timeIntervalSince(snapshot.lastUpdatedAt ?? Date())))秒前", "Last reading: \(Int(Date().timeIntervalSince(snapshot.lastUpdatedAt ?? Date())))s ago")
+            : appL10n("正在读取首个样本…", "Reading the first sample…")
         updateValueLabel(for: "cpu", value: snapshot.cpuWatts, hasReading: snapshot.hasAnyReading)
         updateValueLabel(for: "gpu", value: snapshot.gpuWatts, hasReading: snapshot.hasAnyReading)
         updateValueLabel(for: "ane", value: snapshot.aneWatts, hasReading: snapshot.hasAnyReading)
@@ -4576,57 +4585,31 @@ class PowerConsumptionWindowController: NSWindowController {
 
     private func setupUI() {
         guard let contentView = window?.contentView else { return }
-
-        let stack = NSStackView()
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 12
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(stack)
-
-        let descriptionLabel = NSTextField(labelWithString: appL10n(
-            "基于 Apple Silicon Energy Model 的实时估算，仅供参考。",
-            "Live estimate based on Apple Silicon Energy Model. For reference only."
-        ))
-        descriptionLabel.textColor = .secondaryLabelColor
-        descriptionLabel.maximumNumberOfLines = 0
-        descriptionLabel.lineBreakMode = .byWordWrapping
-        stack.addArrangedSubview(descriptionLabel)
-
-        let grid = NSGridView()
-        grid.rowSpacing = 8
-        grid.columnSpacing = 16
-        grid.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(grid)
-
-        for row in rows {
-            let titleLabel = NSTextField(labelWithString: appL10n(row.zh, row.en))
-            titleLabel.font = .systemFont(ofSize: 13, weight: row.key == "total" ? .semibold : .regular)
-            let valueLabel = NSTextField(labelWithString: "--")
-            valueLabel.font = .monospacedDigitSystemFont(ofSize: 13, weight: row.key == "total" ? .semibold : .regular)
-            valueLabel.alignment = .right
-            valueLabel.stringValue = "--"
-            valueLabels[row.key] = valueLabel
-            grid.addRow(with: [titleLabel, valueLabel])
+        let root = NSStackView(); root.orientation = .vertical; root.alignment = .leading; root.spacing = 16
+        root.translatesAutoresizingMaskIntoConstraints = false; contentView.addSubview(root)
+        root.addArrangedSubview(NativeInterface.label(appL10n("总计（DC In）", "Total (DC In)"), size: 12, weight: .medium, color: .secondaryLabelColor))
+        let total = NativeInterface.label("--", size: 30, weight: .medium)
+        root.addArrangedSubview(total); valueLabels["total"] = total
+        let separator = NSBox(); separator.boxType = .separator; root.addArrangedSubview(separator)
+        separator.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
+        let grid = NSGridView(); grid.rowSpacing = 10; grid.columnSpacing = 24; root.addArrangedSubview(grid)
+        grid.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
+        for row in rows where row.key != "total" {
+            let title = NativeInterface.label(appL10n(row.zh, row.en), size: 12)
+            let value = NativeInterface.label("--", size: 12)
+            value.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular); value.alignment = .right
+            valueLabels[row.key] = value; grid.addRow(with: [title, value])
         }
-
-        let noteLabel = NSTextField(labelWithString: appL10n(
-            "首次打开后的前一次采样可能显示为空，等待 1-2 秒即可。",
-            "The first sample may be empty right after opening. Please wait 1-2 seconds."
-        ))
-        noteLabel.textColor = .secondaryLabelColor
-        noteLabel.maximumNumberOfLines = 0
-        noteLabel.lineBreakMode = .byWordWrapping
-        stack.addArrangedSubview(noteLabel)
-
+        samplingStatus.font = .systemFont(ofSize: 11); samplingStatus.textColor = .secondaryLabelColor
+        root.addArrangedSubview(samplingStatus)
+        let footnote = NativeInterface.label(appL10n("基于 Apple Silicon Energy Model 的估算值。", "Estimate from Apple Silicon Energy Model."), size: 10, color: .secondaryLabelColor, wrapping: true)
+        root.addArrangedSubview(footnote); footnote.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
-            stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            stack.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -20),
-            grid.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            root.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 22), root.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24), root.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24), root.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -22)
         ])
     }
+
+    func windowWillClose(_ notification: Notification) { updateTimer?.cancel(); updateTimer = nil }
 
     private func startTimerIfNeeded() {
         guard updateTimer == nil else { return }
@@ -4641,13 +4624,15 @@ class PowerConsumptionWindowController: NSWindowController {
 
     private func updateValueLabel(for key: String, value: Double, hasReading: Bool) {
         guard let label = valueLabels[key] else { return }
-        label.stringValue = hasReading ? String(format: "%.2f W", value) : "--"
+        if key == "total" && hasReading { label.attributedStringValue = NativeInterface.measurement(String(format: "%.2f", value), unit: "W") }
+        else { label.stringValue = hasReading ? String(format: "%.2f W", value) : "--" }
     }
 }
 
 // 转速设置窗口控制器
 @MainActor
 class SpeedSettingWindowController: NSWindowController {
+    private var completionButton: NSButton?
     private var currentRPM: Int = 0
     private let maxRPM: Int
     private var controlMode: ManualRPMControlMode
@@ -4666,7 +4651,7 @@ class SpeedSettingWindowController: NSWindowController {
         self.currentRPM = initialRPM
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 250),
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 280),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -4688,113 +4673,37 @@ class SpeedSettingWindowController: NSWindowController {
     
     private func setupUI() {
         guard let contentView = window?.contentView else { return }
-        
-        let titleLabel = NSTextField(labelWithString: appL10n("手动模式目标转速:", "Manual Mode Target RPM:"))
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(titleLabel)
-
-        let modeLabel = NSTextField(labelWithString: appL10n("调节方式", "Adjustment Mode"))
-        modeLabel.textColor = .secondaryLabelColor
-        modeLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(modeLabel)
-
-        let controlModeSegmentedControl = NSSegmentedControl(labels: [appL10n("连续", "Continuous"), appL10n("档位", "Stepped")], trackingMode: .selectOne, target: self, action: #selector(controlModeChanged))
-        controlModeSegmentedControl.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(controlModeSegmentedControl)
-        
-        let rpmSlider = NSSlider()
-        rpmSlider.minValue = 0
-        rpmSlider.maxValue = Double(maxRPM)
-        rpmSlider.target = self
-        rpmSlider.action = #selector(sliderChanged)
-        rpmSlider.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(rpmSlider)
-        
-        let rpmLabel = NSTextField(labelWithString: "\(currentRPM) RPM")
-        rpmLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(rpmLabel)
-
-        let rpmExplanationLabel = NSTextField(labelWithString: appL10n(
-            "实际转速接近目标值即可，不一定完全相等。",
-            "Actual RPM only needs to stay near the target; it may not match exactly."
-        ))
-        rpmExplanationLabel.textColor = .secondaryLabelColor
-        rpmExplanationLabel.font = .systemFont(ofSize: 12)
-        rpmExplanationLabel.alignment = .center
-        rpmExplanationLabel.lineBreakMode = .byWordWrapping
-        rpmExplanationLabel.maximumNumberOfLines = 2
-        rpmExplanationLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(rpmExplanationLabel)
-
-        let rpmHelpButton = NSButton(title: "?", target: self, action: #selector(showRPMHelp))
-        rpmHelpButton.bezelStyle = .helpButton
-        rpmHelpButton.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(rpmHelpButton)
-
-        let stepHintLabel = NSTextField(labelWithString: "")
-        stepHintLabel.textColor = .secondaryLabelColor
-        stepHintLabel.alignment = .center
-        stepHintLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(stepHintLabel)
-
-        let applyStatusLabel = NSTextField(labelWithString: appL10n("✓ 已应用", "✓ Applied"))
-        applyStatusLabel.textColor = .systemGreen
-        applyStatusLabel.font = .systemFont(ofSize: 12, weight: .medium)
-        applyStatusLabel.alignment = .center
-        applyStatusLabel.alphaValue = 0
-        applyStatusLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(applyStatusLabel)
-        
-        let applyButton = NSButton(title: appL10n("应用", "Apply"), target: self, action: #selector(applySpeed))
-        applyButton.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(applyButton)
-        
-        let cancelButton = NSButton(title: appL10n("取消", "Cancel"), target: self, action: #selector(cancel))
-        cancelButton.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(cancelButton)
-        
+        let root = NSStackView(); root.orientation = .vertical; root.alignment = .centerX; root.spacing = 14
+        root.translatesAutoresizingMaskIntoConstraints = false; contentView.addSubview(root)
+        let title = NativeInterface.label(appL10n("目标转速", "Target speed"), size: 15, weight: .medium)
+        root.addArrangedSubview(title); title.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
+        let value = NSTextField(labelWithString: ""); value.attributedStringValue = NativeInterface.rpm(currentRPM)
+        root.addArrangedSubview(value); rpmLabel = value
+        let explanation = NativeInterface.label(appL10n("实际转速接近目标值即可，不一定完全相等。", "Actual RPM may stay near the target without matching it exactly."), size: 12, color: .secondaryLabelColor, wrapping: true)
+        explanation.alignment = .center
+        let help = NSButton(title: "?", target: self, action: #selector(showRPMHelp)); help.bezelStyle = .helpButton
+        let hintRow = NSStackView(views: [explanation, help]); hintRow.spacing = 6; root.addArrangedSubview(hintRow)
+        hintRow.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
+        let slider = NSSlider(value: Double(currentRPM), minValue: 0, maxValue: Double(maxRPM), target: self, action: #selector(sliderChanged))
+        root.addArrangedSubview(slider); slider.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true; rpmSlider = slider
+        let range = NSStackView(views: [NativeInterface.label("0 RPM", size: 10, color: .secondaryLabelColor), NSView(), NativeInterface.label("\(maxRPM) RPM", size: 10, color: .secondaryLabelColor)])
+        root.addArrangedSubview(range); range.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
+        root.setCustomSpacing(3, after: slider)
+        let control = NSSegmentedControl(labels: [appL10n("连续", "Continuous"), appL10n("档位", "Stepped")], trackingMode: .selectOne, target: self, action: #selector(controlModeChanged))
+        control.controlSize = .small; control.font = .systemFont(ofSize: 12)
+        let modeRow = NSStackView(views: [NativeInterface.label(appL10n("调节方式", "Adjustment"), size: 12, color: .secondaryLabelColor), NSView(), control])
+        root.addArrangedSubview(modeRow); modeRow.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true; controlModeSegmentedControl = control
+        let step = NativeInterface.label("", size: 11, color: .secondaryLabelColor); root.addArrangedSubview(step); stepHintLabel = step
+        let status = NativeInterface.label(appL10n("✓ 已应用", "✓ Applied"), size: 11, color: .systemGreen, wrapping: true)
+        status.alphaValue = 0; applyStatusLabel = status
+        let cancelButton = NativeInterface.button(appL10n("取消", "Cancel"), target: self, action: #selector(cancel)); cancelButton.keyEquivalent = "\u{1b}"
+        completionButton = cancelButton
+        let apply = NativeInterface.button(appL10n("应用", "Apply"), target: self, action: #selector(applySpeed)); apply.keyEquivalent = "\r"
+        let footer = NSStackView(views: [status, NSView(), cancelButton, apply]); footer.spacing = 8
+        root.addArrangedSubview(footer); footer.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
         NSLayoutConstraint.activate([
-            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-
-            modeLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12),
-            modeLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-
-            controlModeSegmentedControl.centerYAnchor.constraint(equalTo: modeLabel.centerYAnchor),
-            controlModeSegmentedControl.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-
-            rpmSlider.topAnchor.constraint(equalTo: modeLabel.bottomAnchor, constant: 14),
-            rpmSlider.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            rpmSlider.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            
-            rpmLabel.topAnchor.constraint(equalTo: rpmSlider.bottomAnchor, constant: 10),
-            rpmLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-
-            rpmExplanationLabel.topAnchor.constraint(equalTo: rpmLabel.bottomAnchor, constant: 6),
-            rpmExplanationLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            rpmExplanationLabel.widthAnchor.constraint(lessThanOrEqualTo: contentView.widthAnchor, constant: -70),
-
-            rpmHelpButton.centerYAnchor.constraint(equalTo: rpmExplanationLabel.centerYAnchor),
-            rpmHelpButton.leadingAnchor.constraint(equalTo: rpmExplanationLabel.trailingAnchor, constant: 6),
-
-            stepHintLabel.topAnchor.constraint(equalTo: rpmExplanationLabel.bottomAnchor, constant: 6),
-            stepHintLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-
-            applyStatusLabel.topAnchor.constraint(equalTo: stepHintLabel.bottomAnchor, constant: 6),
-            applyStatusLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            
-            applyButton.topAnchor.constraint(equalTo: applyStatusLabel.bottomAnchor, constant: 12),
-            applyButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor, constant: -50),
-            
-            cancelButton.topAnchor.constraint(equalTo: applyStatusLabel.bottomAnchor, constant: 12),
-            cancelButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor, constant: 50)
+            root.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 22), root.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24), root.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24), root.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -22)
         ])
-
-        self.rpmSlider = rpmSlider
-        self.rpmLabel = rpmLabel
-        self.controlModeSegmentedControl = controlModeSegmentedControl
-        self.stepHintLabel = stepHintLabel
-        self.applyStatusLabel = applyStatusLabel
     }
 
     private func boundedRPM(_ rpm: Int) -> Int {
@@ -4836,25 +4745,28 @@ class SpeedSettingWindowController: NSWindowController {
         let isStepped = (controlMode == .stepped)
         stepHintLabel?.stringValue = isStepped ? appL10n("步进：\(stepRPM) RPM", "Step: \(stepRPM) RPM") : ""
         stepHintLabel?.isHidden = !isStepped
+        window?.setContentSize(NSSize(width: 400, height: isStepped ? 310 : 280))
     }
 
     private func updateSliderDisplay() {
         let effectiveRPM = (controlMode == .stepped) ? snappedRPM(for: currentRPM) : boundedRPM(currentRPM)
         currentRPM = effectiveRPM
         rpmSlider?.doubleValue = Double(effectiveRPM)
-        rpmLabel?.stringValue = "\(effectiveRPM) RPM"
+        rpmLabel?.attributedStringValue = NativeInterface.rpm(effectiveRPM)
         updateModeUI()
     }
 
     @objc func sliderChanged() {
+        completionButton?.title = appL10n("取消", "Cancel")
         guard let slider = rpmSlider else { return }
         let rpm = effectiveRPM(for: slider.doubleValue)
         currentRPM = rpm
         slider.doubleValue = Double(rpm)
-        rpmLabel?.stringValue = "\(rpm) RPM"
+        rpmLabel?.attributedStringValue = NativeInterface.rpm(rpm)
     }
 
     @objc private func controlModeChanged() {
+        completionButton?.title = appL10n("取消", "Cancel")
         controlMode = (controlModeSegmentedControl?.selectedSegment == 1) ? .stepped : .continuous
         updateSliderDisplay()
     }
@@ -4889,7 +4801,13 @@ class SpeedSettingWindowController: NSWindowController {
         newConfig.manualRPM = currentRPM
         newConfig.manualRPMControlMode = controlMode.rawValue
         newConfig.manualRPMStep = stepRPM
-        ConfigManager.shared.saveConfig(newConfig)
+        guard ConfigManager.shared.saveConfig(newConfig) else {
+            applyStatusResetWorkItem?.cancel()
+            applyStatusLabel?.stringValue = appL10n("设置未保存，请重试。", "Settings were not saved. Please try again.")
+            applyStatusLabel?.textColor = .systemRed
+            applyStatusLabel?.alphaValue = 1
+            return
+        }
         
         MenuBarManager.shared.setFanCurve(newConfig.curve)
         showApplyFeedback()
@@ -4903,13 +4821,17 @@ class SpeedSettingWindowController: NSWindowController {
         applyStatusResetWorkItem?.cancel()
         guard let label = applyStatusLabel else { return }
 
+        completionButton?.title = appL10n("完成", "Done")
+        label.stringValue = appL10n("✓ 已应用", "✓ Applied")
+        label.textColor = .systemGreen
         label.alphaValue = 1.0
 
         let workItem = DispatchWorkItem { [weak label] in
             guard let label else { return }
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.25
-                label.animator().alphaValue = 0
+                if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion { label.alphaValue = 0 }
+                else { label.animator().alphaValue = 0 }
             }
         }
         applyStatusResetWorkItem = workItem
@@ -4919,6 +4841,8 @@ class SpeedSettingWindowController: NSWindowController {
 
 @MainActor
 class FeedbackWindowController: NSWindowController {
+    private var submittedSuccessfully = false
+    private var closeAfterSuccess: DispatchWorkItem?
     private var contentTextView: NSTextView?
     private var emailField: NSTextField?
     private var sendButton: NSButton?
@@ -4942,6 +4866,19 @@ class FeedbackWindowController: NSWindowController {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    override func showWindow(_ sender: Any?) {
+        if submittedSuccessfully {
+            closeAfterSuccess?.cancel()
+            closeAfterSuccess = nil
+            contentTextView?.string = ""
+            sendButton?.isEnabled = true
+            sendButton?.title = appL10n("发送", "Send")
+            statusLabel?.alphaValue = 0
+            submittedSuccessfully = false
+        }
+        super.showWindow(sender)
     }
 
     private func setupUI() {
@@ -4989,15 +4926,22 @@ class FeedbackWindowController: NSWindowController {
         let sendButton = NSButton(title: appL10n("发送", "Send"), target: self, action: #selector(sendFeedback))
         sendButton.bezelStyle = .rounded
         sendButton.keyEquivalent = "\r"
+        sendButton.keyEquivalentModifierMask = [.command]
+        sendButton.toolTip = appL10n("发送 · ⌘↩", "Send · ⌘↩")
         sendButton.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(sendButton)
         self.sendButton = sendButton
 
+        let cancelButton = NativeInterface.button(appL10n("关闭", "Close"), target: self, action: #selector(closeFeedbackWindow))
+        cancelButton.keyEquivalent = "\u{1b}"; cancelButton.translatesAutoresizingMaskIntoConstraints = false; contentView.addSubview(cancelButton)
+        let shortcut = NativeInterface.label("⌘↩", size: 11, color: .secondaryLabelColor)
+        shortcut.translatesAutoresizingMaskIntoConstraints = false; contentView.addSubview(shortcut)
+
         // 状态标签
-        let statusLabel = NSTextField(labelWithString: "")
+        let statusLabel = NSTextField(wrappingLabelWithString: "")
         statusLabel.textColor = .systemGreen
         statusLabel.font = .systemFont(ofSize: 12, weight: .medium)
-        statusLabel.alignment = .center
+        statusLabel.alignment = .left
         statusLabel.alphaValue = 0
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(statusLabel)
@@ -5013,7 +4957,7 @@ class FeedbackWindowController: NSWindowController {
             scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             scrollView.heightAnchor.constraint(equalToConstant: 120),
 
-            emailLabel.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
+            emailLabel.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 12),
             emailLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
 
             emailField.topAnchor.constraint(equalTo: emailLabel.bottomAnchor, constant: 4),
@@ -5021,14 +4965,21 @@ class FeedbackWindowController: NSWindowController {
             emailField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             emailField.heightAnchor.constraint(equalToConstant: 24),
 
-            statusLabel.topAnchor.constraint(equalTo: emailField.bottomAnchor, constant: 10),
-            statusLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            statusLabel.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 6),
+            statusLabel.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            statusLabel.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
 
-            sendButton.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 8),
-            sendButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            sendButton.topAnchor.constraint(equalTo: emailField.bottomAnchor, constant: 16),
+            sendButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            cancelButton.trailingAnchor.constraint(equalTo: sendButton.leadingAnchor, constant: -8),
+            cancelButton.centerYAnchor.constraint(equalTo: sendButton.centerYAnchor),
+            shortcut.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            shortcut.centerYAnchor.constraint(equalTo: sendButton.centerYAnchor),
             sendButton.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -16),
         ])
     }
+
+    @objc private func closeFeedbackWindow() { window?.close() }
 
     @objc private func sendFeedback() {
         let content = contentTextView?.string.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -5038,7 +4989,7 @@ class FeedbackWindowController: NSWindowController {
         }
 
         guard FeedbackService.shared.canSend() else {
-            showStatus(appL10n("服务器压力大，请一小时后再试", "Server busy, please try again in an hour"), isError: true)
+            showStatus(appL10n("每小时最多发送5次，请稍后再试。", "You can send up to 5 messages per hour. Please try again later."), isError: true)
             return
         }
 
@@ -5046,14 +4997,19 @@ class FeedbackWindowController: NSWindowController {
 
         sendButton?.isEnabled = false
         sendButton?.title = appL10n("发送中...", "Sending...")
+        statusLabel?.alphaValue = 0
 
-        Task {
+        Task { [self] in
             let success = await FeedbackService.shared.sendFeedback(content: content, email: email)
             if success {
-                showStatus(appL10n("收到！我会尽快回复你", "Got it! I'll reply soon"), isError: false)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                submittedSuccessfully = true
+                sendButton?.title = appL10n("已送达", "Delivered")
+                showStatus(email.isEmpty ? appL10n("✓ 收到啦，感谢你的反馈！", "✓ Received. Thanks for your feedback!") : appL10n("✓ 收到啦，我会通过邮箱回复你。", "✓ Received. I'll reply by email."), isError: false)
+                let close = DispatchWorkItem { [weak self] in
                     self?.window?.close()
                 }
+                closeAfterSuccess = close
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: close)
             } else {
                 showStatus(appL10n("发送失败，请稍后再试", "Failed, please try later"), isError: true)
                 sendButton?.isEnabled = true
@@ -5132,6 +5088,7 @@ final class FeedbackService: @unchecked Sendable {
 
 @MainActor
 class SafetyFloorWindowController: NSWindowController {
+    private var completionButton: NSButton?
     private var currentRPM: Int = 0
     private let minRPM = 2000
     private let maxRPM: Int
@@ -5145,7 +5102,7 @@ class SafetyFloorWindowController: NSWindowController {
         self.maxRPM = max(maxRPM, minRPM)
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 430, height: 190),
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 270),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -5166,81 +5123,34 @@ class SafetyFloorWindowController: NSWindowController {
 
     private func setupUI() {
         guard let contentView = window?.contentView else { return }
-
-        let titleLabel = NSTextField(labelWithString: appL10n("危险温度（95℃）时的最低兜底转速", "Minimum floor RPM at critical temperature (95°C)"))
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(titleLabel)
-
-        let hintLabel = NSTextField(labelWithString: appL10n("仅作托底，不会压低用户曲线已经给出的更高转速", "Only a safety floor; never caps higher RPM requested by your curve"))
-        hintLabel.textColor = .secondaryLabelColor
-        hintLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(hintLabel)
-
-        let rpmSlider = NSSlider()
-        rpmSlider.minValue = Double(minRPM)
-        rpmSlider.maxValue = Double(maxRPM)
-        rpmSlider.doubleValue = Double(currentRPM)
-        rpmSlider.target = self
-        rpmSlider.action = #selector(sliderChanged)
-        rpmSlider.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(rpmSlider)
-
-        let rpmLabel = NSTextField(labelWithString: "\(currentRPM) RPM")
-        rpmLabel.font = .monospacedDigitSystemFont(ofSize: 15, weight: .medium)
-        rpmLabel.alignment = .center
-        rpmLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(rpmLabel)
-
-        let applyStatusLabel = NSTextField(labelWithString: appL10n("✓ 已应用", "✓ Applied"))
-        applyStatusLabel.textColor = .systemGreen
-        applyStatusLabel.font = .systemFont(ofSize: 12, weight: .medium)
-        applyStatusLabel.alignment = .center
-        applyStatusLabel.alphaValue = 0
-        applyStatusLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(applyStatusLabel)
-
-        let applyButton = NSButton(title: appL10n("应用", "Apply"), target: self, action: #selector(applyValue))
-        applyButton.bezelStyle = .rounded
-        applyButton.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(applyButton)
-
-        let cancelButton = NSButton(title: appL10n("取消", "Cancel"), target: self, action: #selector(cancel))
-        cancelButton.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(cancelButton)
-
+        let root = NSStackView(); root.orientation = .vertical; root.alignment = .centerX; root.spacing = 16
+        root.translatesAutoresizingMaskIntoConstraints = false; contentView.addSubview(root)
+        let title = NativeInterface.label(appL10n("最低安全转速", "Minimum safety speed"), size: 15, weight: .medium)
+        root.addArrangedSubview(title); title.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
+        let value = NSTextField(labelWithString: ""); value.attributedStringValue = NativeInterface.rpm(currentRPM)
+        root.addArrangedSubview(value); rpmLabel = value
+        let hint = NativeInterface.label(appL10n("在临界温度（\(Int(FanManager.shared.criticalTemperatureForDisplay))℃）下托底，保留曲线要求的更高转速。", "A floor at \(Int(FanManager.shared.criticalTemperatureForDisplay))°C. Higher speeds requested by your curve are retained."), size: 12, color: .secondaryLabelColor, wrapping: true)
+        hint.alignment = .center; root.addArrangedSubview(hint); hint.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
+        let slider = NSSlider(value: Double(currentRPM), minValue: Double(minRPM), maxValue: Double(maxRPM), target: self, action: #selector(sliderChanged))
+        root.addArrangedSubview(slider); slider.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true; rpmSlider = slider
+        let range = NSStackView(views: [NativeInterface.label("\(minRPM) RPM", size: 10, color: .secondaryLabelColor), NSView(), NativeInterface.label("\(maxRPM) RPM", size: 10, color: .secondaryLabelColor)])
+        root.addArrangedSubview(range); range.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true; root.setCustomSpacing(3, after: slider)
+        let status = NativeInterface.label(appL10n("✓ 已应用", "✓ Applied"), size: 11, color: .systemGreen, wrapping: true)
+        status.alphaValue = 0; applyStatusLabel = status
+        let cancelButton = NativeInterface.button(appL10n("取消", "Cancel"), target: self, action: #selector(cancel)); cancelButton.keyEquivalent = "\u{1b}"; completionButton = cancelButton
+        let apply = NativeInterface.button(appL10n("应用", "Apply"), target: self, action: #selector(applyValue)); apply.keyEquivalent = "\r"
+        let footer = NSStackView(views: [status, NSView(), cancelButton, apply]); footer.spacing = 8
+        root.addArrangedSubview(footer); footer.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
         NSLayoutConstraint.activate([
-            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 18),
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-
-            hintLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 6),
-            hintLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-
-            rpmSlider.topAnchor.constraint(equalTo: hintLabel.bottomAnchor, constant: 14),
-            rpmSlider.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            rpmSlider.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-
-            rpmLabel.topAnchor.constraint(equalTo: rpmSlider.bottomAnchor, constant: 10),
-            rpmLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-
-            applyStatusLabel.topAnchor.constraint(equalTo: rpmLabel.bottomAnchor, constant: 6),
-            applyStatusLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-
-            applyButton.topAnchor.constraint(equalTo: applyStatusLabel.bottomAnchor, constant: 12),
-            applyButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor, constant: -44),
-
-            cancelButton.centerYAnchor.constraint(equalTo: applyButton.centerYAnchor),
-            cancelButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor, constant: 44)
+            root.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 22), root.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24), root.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24), root.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -22)
         ])
-
-        self.rpmSlider = rpmSlider
-        self.rpmLabel = rpmLabel
-        self.applyStatusLabel = applyStatusLabel
     }
 
     @objc private func sliderChanged() {
+        completionButton?.title = appL10n("取消", "Cancel")
         guard let slider = rpmSlider else { return }
         let rpm = Int(slider.doubleValue.rounded())
-        rpmLabel?.stringValue = "\(rpm) RPM"
+        rpmLabel?.attributedStringValue = NativeInterface.rpm(rpm)
     }
 
     @objc private func applyValue() {
@@ -5250,7 +5160,13 @@ class SafetyFloorWindowController: NSWindowController {
         let config = ConfigManager.shared.loadConfig()
         var newConfig = config
         newConfig.safetyFloorRPM = rpm
-        ConfigManager.shared.saveConfig(newConfig)
+        guard ConfigManager.shared.saveConfig(newConfig) else {
+            applyStatusResetWorkItem?.cancel()
+            applyStatusLabel?.stringValue = appL10n("设置未保存，请重试。", "Settings were not saved. Please try again.")
+            applyStatusLabel?.textColor = .systemRed
+            applyStatusLabel?.alphaValue = 1
+            return
+        }
         showApplyFeedback()
     }
 
@@ -5262,13 +5178,17 @@ class SafetyFloorWindowController: NSWindowController {
         applyStatusResetWorkItem?.cancel()
         guard let label = applyStatusLabel else { return }
 
+        completionButton?.title = appL10n("完成", "Done")
+        label.stringValue = appL10n("✓ 已应用", "✓ Applied")
+        label.textColor = .systemGreen
         label.alphaValue = 1.0
 
         let workItem = DispatchWorkItem { [weak label] in
             guard let label else { return }
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.25
-                label.animator().alphaValue = 0
+                if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion { label.alphaValue = 0 }
+                else { label.animator().alphaValue = 0 }
             }
         }
         applyStatusResetWorkItem = workItem
@@ -5419,6 +5339,7 @@ class HelpWindowController: NSWindowController {
         case diagnostics
         case faq
         case donation
+        case developer
 
         func title() -> String {
             switch self {
@@ -5426,6 +5347,7 @@ class HelpWindowController: NSWindowController {
                 case .diagnostics: return appL10n("诊断与支持", "Diagnostics & Support")
                 case .faq: return appL10n("常见问题", "FAQ")
                 case .donation: return appL10n("支持作者", "Support the Author")
+                case .developer: return appL10n("开发者", "Developer")
             }
         }
     }
@@ -5435,6 +5357,10 @@ class HelpWindowController: NSWindowController {
     private var anonymousStatsCheckbox: NSButton?
     private var currentSection: Section = .overview
     private var sidebarButtons: [Section: NSButton] = [:]
+    private var sidebarStack: NSStackView?
+    private var betaUpdateCheckbox: NSButton?
+    private var updateRouteLabel: NSTextField?
+    private var developerUnlockCounter = DeveloperModeUnlockCounter()
     private var appHeaderView: NSView?
     private var headerSeparatorView: NSView?
     private var sectionContainerView: NSView?
@@ -5444,12 +5370,12 @@ class HelpWindowController: NSWindowController {
     private var qrImageView: AdaptiveQRCodeImageView?
     private var qrCaptionLabel: NSTextField?
     private var adaptiveCards: [AdaptiveCardView] = []
-    private let sidebarWidth: CGFloat = 176
-    private let contentWidth: CGFloat = 600
+    private let sidebarWidth: CGFloat = 164
+    private let contentWidth: CGFloat = 488
 
     init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 500),
+            contentRect: NSRect(x: 0, y: 0, width: 700, height: 500),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -5461,6 +5387,10 @@ class HelpWindowController: NSWindowController {
         applyWindowMaterialStyle(window)
         setupUI()
         select(section: .overview)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(helpWindowWillClose(_:)),
+            name: NSWindow.willCloseNotification, object: window
+        )
         DistributedNotificationCenter.default().addObserver(
             self,
             selector: #selector(systemAppearanceChanged(_:)),
@@ -5474,12 +5404,13 @@ class HelpWindowController: NSWindowController {
     }
 
     deinit {
+        NotificationCenter.default.removeObserver(self)
         DistributedNotificationCenter.default().removeObserver(self)
     }
 
     private func makeSectionTitle(_ text: String) -> NSTextField {
         let label = NSTextField(labelWithString: text)
-        label.font = .systemFont(ofSize: 18, weight: .semibold)
+        label.font = .systemFont(ofSize: 20, weight: .semibold)
         return label
     }
 
@@ -5490,11 +5421,7 @@ class HelpWindowController: NSWindowController {
     }
 
     private func makeBodyLabel(_ text: String) -> NSTextField {
-        let label = NSTextField(labelWithString: text)
-        label.maximumNumberOfLines = 0
-        label.lineBreakMode = .byWordWrapping
-        label.textColor = .secondaryLabelColor
-        return label
+        NativeInterface.label(text, size: 12, color: .secondaryLabelColor, wrapping: true)
     }
 
     private func makeSymbolView(_ name: String, pointSize: CGFloat, weight: NSFont.Weight = .regular) -> NSImageView {
@@ -5514,7 +5441,7 @@ class HelpWindowController: NSWindowController {
         let root = NSView()
         let stack = NSStackView()
         stack.orientation = .vertical
-        stack.spacing = 18
+        stack.spacing = 14
         stack.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(stack)
 
@@ -5536,201 +5463,83 @@ class HelpWindowController: NSWindowController {
     }
 
     private func makeSidebarButton(for section: Section) -> NSButton {
-        let button = NSButton(title: section.title(), target: self, action: #selector(sidebarButtonClicked(_:)))
-        button.bezelStyle = .regularSquare
-        button.isBordered = false
-        button.setButtonType(.momentaryChange)
-        button.font = .systemFont(ofSize: 15, weight: .semibold)
-        button.alignment = .center
-        button.contentTintColor = .labelColor
-        button.wantsLayer = true
-        button.layer?.cornerRadius = 13
+        let title: String
+        switch section {
+            case .diagnostics: title = appL10n("诊断与支持", "Support")
+            case .donation: title = appL10n("支持作者", "Support Author")
+            default: title = section.title()
+        }
+        let symbols = ["info.circle", "wrench.and.screwdriver", "questionmark.circle", "heart", "hammer"]
+        let button = NSButton(title: (section == .diagnostics ? " " : "  ") + title, target: self, action: #selector(sidebarButtonClicked(_:)))
+        button.image = NSImage(systemSymbolName: symbols[section.rawValue], accessibilityDescription: nil)?.withSymbolConfiguration(.init(pointSize: 14, weight: .regular))
+        button.image?.size = NSSize(width: 15, height: 15)
+        button.imageScaling = .scaleProportionallyDown
+        button.imagePosition = .imageLeading
+        button.bezelStyle = .regularSquare; button.isBordered = false
+        button.setButtonType(.momentaryChange); button.font = .systemFont(ofSize: 14)
+        button.alignment = .left; button.contentTintColor = .secondaryLabelColor
+        button.wantsLayer = true; button.layer?.cornerRadius = 6
         button.translatesAutoresizingMaskIntoConstraints = false
-        button.heightAnchor.constraint(equalToConstant: 44).isActive = true
-        button.widthAnchor.constraint(equalToConstant: 132).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        button.widthAnchor.constraint(equalToConstant: sidebarWidth - 24).isActive = true
         button.identifier = NSUserInterfaceItemIdentifier("sidebar-\(section.rawValue)")
+        button.setAccessibilityLabel(section.title())
         return button
     }
 
     private func updateSidebarSelection() {
         for (section, button) in sidebarButtons {
             let isSelected = section == currentSection
-            button.contentTintColor = isSelected ? .white : .labelColor
+            button.contentTintColor = .labelColor
+            button.font = .systemFont(ofSize: 14, weight: isSelected ? .medium : .regular)
             button.layer?.backgroundColor = isSelected
-                ? NSColor.systemRed.cgColor
+                ? NSColor.controlAccentColor.withAlphaComponent(0.12).cgColor
                 : NSColor.clear.cgColor
         }
     }
 
     private func setupUI() {
         guard let contentView = window?.contentView else { return }
-
-        let splitView = NSSplitView()
-        splitView.isVertical = true
-        splitView.dividerStyle = .thin
-        splitView.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(splitView)
-
-        NSLayoutConstraint.activate([
-            splitView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            splitView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            splitView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            splitView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
-        ])
-
-        let sidebarContainer = NSView()
-        sidebarContainer.translatesAutoresizingMaskIntoConstraints = false
-        sidebarContainer.widthAnchor.constraint(equalToConstant: sidebarWidth).isActive = true
-        splitView.addArrangedSubview(sidebarContainer)
-
-        let sidebarBackground = NSVisualEffectView()
-        sidebarBackground.material = .sidebar
-        sidebarBackground.blendingMode = .withinWindow
-        sidebarBackground.state = .active
-        sidebarBackground.translatesAutoresizingMaskIntoConstraints = false
-        sidebarContainer.addSubview(sidebarBackground)
-        NSLayoutConstraint.activate([
-            sidebarBackground.topAnchor.constraint(equalTo: sidebarContainer.topAnchor),
-            sidebarBackground.leadingAnchor.constraint(equalTo: sidebarContainer.leadingAnchor),
-            sidebarBackground.trailingAnchor.constraint(equalTo: sidebarContainer.trailingAnchor),
-            sidebarBackground.bottomAnchor.constraint(equalTo: sidebarContainer.bottomAnchor)
-        ])
-
-        let sidebarStack = NSStackView()
-        sidebarStack.orientation = .vertical
-        sidebarStack.alignment = .centerX
-        sidebarStack.spacing = 12
-        sidebarStack.translatesAutoresizingMaskIntoConstraints = false
-        sidebarContainer.addSubview(sidebarStack)
-        NSLayoutConstraint.activate([
-            sidebarStack.centerXAnchor.constraint(equalTo: sidebarContainer.centerXAnchor),
-            sidebarStack.centerYAnchor.constraint(equalTo: sidebarContainer.centerYAnchor),
-            sidebarStack.leadingAnchor.constraint(greaterThanOrEqualTo: sidebarContainer.leadingAnchor, constant: 12),
-            sidebarStack.trailingAnchor.constraint(lessThanOrEqualTo: sidebarContainer.trailingAnchor, constant: -12)
-        ])
-
-        var buttons: [Section: NSButton] = [:]
-        for section in Section.allCases {
-            let button = makeSidebarButton(for: section)
-            sidebarStack.addArrangedSubview(button)
-            buttons[section] = button
+        let sidebar = NSVisualEffectView()
+        sidebar.material = .sidebar; sidebar.blendingMode = .withinWindow; sidebar.state = .active
+        sidebar.translatesAutoresizingMaskIntoConstraints = false; contentView.addSubview(sidebar)
+        let navigation = NSStackView(); navigation.orientation = .vertical; navigation.alignment = .leading; navigation.spacing = 4
+        navigation.translatesAutoresizingMaskIntoConstraints = false; sidebar.addSubview(navigation)
+        let caption = NativeInterface.label("iFanControl", size: 12, weight: .medium, color: .secondaryLabelColor)
+        navigation.addArrangedSubview(caption)
+        navigation.setCustomSpacing(12, after: caption)
+        for section in Section.allCases where section != .developer || UpdatePreferences.shared.developerModeEnabled {
+            let button = makeSidebarButton(for: section); navigation.addArrangedSubview(button); sidebarButtons[section] = button
         }
-        let rightContainer = NSView()
-        rightContainer.translatesAutoresizingMaskIntoConstraints = false
-        splitView.addArrangedSubview(rightContainer)
+        sidebarStack = navigation
+        let divider = NSBox(); divider.boxType = .separator; divider.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(divider)
 
-        let rightRoot = NSStackView()
-        rightRoot.orientation = .vertical
-        rightRoot.spacing = 12
-        rightRoot.translatesAutoresizingMaskIntoConstraints = false
-        rightContainer.addSubview(rightRoot)
+        let content = NSStackView(); content.orientation = .vertical; content.alignment = .leading; content.spacing = 16
+        content.translatesAutoresizingMaskIntoConstraints = false; contentView.addSubview(content)
+        let title = makeSectionTitle(""); content.addArrangedSubview(title); sectionTitleLabel = title
+        let scroll = NSScrollView(); scroll.drawsBackground = false; scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true; scroll.scrollerStyle = .overlay
+        content.addArrangedSubview(scroll)
+        scroll.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        let sections = NSStackView(); sections.orientation = .vertical; sections.alignment = .centerX
+        sections.translatesAutoresizingMaskIntoConstraints = false; scroll.documentView = sections
+        sections.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor).isActive = true
+        sections.heightAnchor.constraint(greaterThanOrEqualTo: scroll.contentView.heightAnchor).isActive = true
+        sectionContainerView = sections
         NSLayoutConstraint.activate([
-            rightRoot.topAnchor.constraint(equalTo: rightContainer.topAnchor, constant: 14),
-            rightRoot.leadingAnchor.constraint(equalTo: rightContainer.leadingAnchor, constant: 18),
-            rightRoot.trailingAnchor.constraint(equalTo: rightContainer.trailingAnchor, constant: -18),
-            rightRoot.bottomAnchor.constraint(equalTo: rightContainer.bottomAnchor, constant: -14)
+            sidebar.leadingAnchor.constraint(equalTo: contentView.leadingAnchor), sidebar.topAnchor.constraint(equalTo: contentView.topAnchor), sidebar.bottomAnchor.constraint(equalTo: contentView.bottomAnchor), sidebar.widthAnchor.constraint(equalToConstant: sidebarWidth),
+            navigation.topAnchor.constraint(equalTo: sidebar.topAnchor, constant: 24), navigation.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor, constant: 12),
+            divider.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor), divider.topAnchor.constraint(equalTo: sidebar.topAnchor), divider.bottomAnchor.constraint(equalTo: sidebar.bottomAnchor), divider.widthAnchor.constraint(equalToConstant: 1),
+            content.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor, constant: 24), content.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24), content.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 24), content.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20)
         ])
-
-        let appHeader = NSStackView()
-        appHeader.orientation = .horizontal
-        appHeader.alignment = .centerY
-        appHeader.spacing = 10
-
-        let iconView = NSImageView()
-        iconView.image = NSApp.applicationIconImage
-        iconView.imageScaling = .scaleProportionallyUpOrDown
-        iconView.wantsLayer = true
-        iconView.layer?.cornerRadius = 10
-        iconView.layer?.masksToBounds = true
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-        iconView.widthAnchor.constraint(equalToConstant: 44).isActive = true
-        iconView.heightAnchor.constraint(equalToConstant: 44).isActive = true
-        appHeader.addArrangedSubview(iconView)
-
-        let appTitleStack = NSStackView()
-        appTitleStack.orientation = .vertical
-        appTitleStack.spacing = 2
-        let appTitle = NSTextField(labelWithString: "iFanControl")
-        appTitle.font = .systemFont(ofSize: 20, weight: .semibold)
-        let versionLabel = NSTextField(labelWithString: appL10n("版本 \(UpdateService.shared.currentVersionDisplay)", "Version \(UpdateService.shared.currentVersionDisplay)"))
-        versionLabel.textColor = .secondaryLabelColor
-        versionLabel.font = .systemFont(ofSize: 12)
-        appTitleStack.addArrangedSubview(appTitle)
-        appTitleStack.addArrangedSubview(versionLabel)
-        appHeader.addArrangedSubview(appTitleStack)
-        appHeader.addArrangedSubview(NSView())
-        rightRoot.addArrangedSubview(appHeader)
-
-        let separator = NSBox()
-        separator.boxType = .separator
-        rightRoot.addArrangedSubview(separator)
-
-        let sectionTitleLabel = makeSectionTitle("")
-        sectionTitleLabel.alignment = .center
-        rightRoot.addArrangedSubview(sectionTitleLabel)
-
-        let sectionScroll = NSScrollView()
-        sectionScroll.drawsBackground = false
-        sectionScroll.hasVerticalScroller = true
-        sectionScroll.autohidesScrollers = true
-        sectionScroll.scrollerStyle = .overlay
-        sectionScroll.translatesAutoresizingMaskIntoConstraints = false
-        rightRoot.addArrangedSubview(sectionScroll)
-        sectionScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 320).isActive = true
-
-        let sectionCanvas = NSView()
-        sectionCanvas.translatesAutoresizingMaskIntoConstraints = false
-        sectionScroll.documentView = sectionCanvas
-
-        let sectionContent = NSView()
-        sectionContent.translatesAutoresizingMaskIntoConstraints = false
-        sectionCanvas.addSubview(sectionContent)
-        NSLayoutConstraint.activate([
-            sectionCanvas.leadingAnchor.constraint(equalTo: sectionScroll.contentView.leadingAnchor),
-            sectionCanvas.trailingAnchor.constraint(equalTo: sectionScroll.contentView.trailingAnchor),
-            sectionCanvas.topAnchor.constraint(equalTo: sectionScroll.contentView.topAnchor),
-            sectionCanvas.bottomAnchor.constraint(equalTo: sectionScroll.contentView.bottomAnchor),
-            sectionCanvas.widthAnchor.constraint(equalTo: sectionScroll.contentView.widthAnchor),
-
-            sectionContent.topAnchor.constraint(equalTo: sectionCanvas.topAnchor),
-            sectionContent.centerXAnchor.constraint(equalTo: sectionCanvas.centerXAnchor),
-            sectionContent.widthAnchor.constraint(equalToConstant: contentWidth),
-            sectionContent.widthAnchor.constraint(lessThanOrEqualTo: sectionCanvas.widthAnchor),
-            sectionContent.bottomAnchor.constraint(equalTo: sectionCanvas.bottomAnchor)
-        ])
-
-        self.versionLabel = versionLabel
-        self.sidebarButtons = buttons
-        self.appHeaderView = appHeader
-        self.headerSeparatorView = separator
-        self.sectionContainerView = sectionContent
-        self.sectionTitleLabel = sectionTitleLabel
-
-        buildSectionViews()
-        refreshDonationPreview()
-        updateSidebarSelection()
+        buildSectionViews(); refreshDonationPreview(); updateSidebarSelection()
     }
 
     private func buildSectionViews() {
-        guard let container = sectionContainerView else { return }
-        sectionViews = [
-            .overview: makeOverviewSection(),
-            .diagnostics: makeDiagnosticsSection(),
-            .faq: makeFAQSection(),
-            .donation: makeDonationSection()
-        ]
-
-        for view in sectionViews.values {
-            view.translatesAutoresizingMaskIntoConstraints = false
-            container.addSubview(view)
-            NSLayoutConstraint.activate([
-                view.topAnchor.constraint(equalTo: container.topAnchor),
-                view.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-                view.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-                view.bottomAnchor.constraint(equalTo: container.bottomAnchor)
-            ])
-            view.isHidden = true
-        }
+        sectionViews = [.overview: makeOverviewSection(), .diagnostics: makeDiagnosticsSection(), .faq: makeFAQSection(), .donation: makeDonationSection()]
+        for view in sectionViews.values { view.widthAnchor.constraint(equalToConstant: contentWidth).isActive = true }
+        addDeveloperSectionIfNeeded()
     }
 
     private func makeOverviewSection() -> NSView {
@@ -5740,46 +5549,53 @@ class HelpWindowController: NSWindowController {
         iconView.image = NSApp.applicationIconImage
         iconView.imageScaling = .scaleProportionallyUpOrDown
         iconView.wantsLayer = true
-        iconView.layer?.cornerRadius = 20
+        iconView.layer?.cornerRadius = 14
         iconView.layer?.masksToBounds = true
         iconView.translatesAutoresizingMaskIntoConstraints = false
-        iconView.widthAnchor.constraint(equalToConstant: 108).isActive = true
-        iconView.heightAnchor.constraint(equalToConstant: 108).isActive = true
+        iconView.widthAnchor.constraint(equalToConstant: 72).isActive = true
+        iconView.heightAnchor.constraint(equalToConstant: 72).isActive = true
+        iconView.identifier = NSUserInterfaceItemIdentifier("developer-unlock-icon")
+        let unlockClick = NSClickGestureRecognizer(target: self, action: #selector(overviewIconClicked(_:)))
+        iconView.addGestureRecognizer(unlockClick)
         stack.addArrangedSubview(iconView)
 
         let appName = NSTextField(labelWithString: "iFanControl")
-        appName.font = .systemFont(ofSize: 36, weight: .bold)
+        appName.font = .systemFont(ofSize: 26, weight: .semibold)
         appName.alignment = .center
         stack.addArrangedSubview(appName)
 
         let version = NSTextField(labelWithString: appL10n("版本 \(UpdateService.shared.currentVersionDisplay)", "Version \(UpdateService.shared.currentVersionDisplay)"))
-        version.font = .systemFont(ofSize: 18, weight: .medium)
+        version.font = .systemFont(ofSize: 12)
         version.textColor = .secondaryLabelColor
         version.alignment = .center
         stack.addArrangedSubview(version)
 
         let intro = makeBodyLabel(
             appL10n(
-                "iFanControl 是一款面向 Apple Silicon 设备的轻量风扇控制工具，支持自动曲线与手动转速。",
-                "iFanControl is a lightweight fan control utility for Apple Silicon devices, supporting auto curves and manual RPM."
+                "面向 Apple Silicon 的温度监测与风扇控制工具。",
+                "Temperature monitoring and fan control for Apple Silicon."
             )
         )
-        intro.font = .systemFont(ofSize: 14)
+        intro.font = .systemFont(ofSize: 13)
         intro.alignment = .center
-        intro.preferredMaxLayoutWidth = 420
+        intro.preferredMaxLayoutWidth = 360
+        intro.widthAnchor.constraint(equalToConstant: 360).isActive = true
         stack.addArrangedSubview(intro)
 
         let buttonRow = NSStackView()
         buttonRow.orientation = .horizontal
         buttonRow.spacing = 10
-        let restartButton = NSButton(title: appL10n("重新启动", "Restart"), target: self, action: #selector(restartApp))
-        restartButton.bezelStyle = .rounded
         let updateButton = NSButton(title: appL10n("检查更新", "Check Updates"), target: self, action: #selector(checkUpdates))
         updateButton.bezelStyle = .rounded
         let githubButton = NSButton(title: "GitHub", target: self, action: #selector(openGitHub))
         githubButton.bezelStyle = .rounded
-        buttonRow.addArrangedSubview(restartButton)
+        let websiteButton = NSButton(title: appL10n("访问官网", "Visit Website"), target: self, action: #selector(openWebsite))
+        websiteButton.bezelStyle = .rounded
+        websiteButton.identifier = NSUserInterfaceItemIdentifier("visit-website")
+        websiteButton.toolTip = "https://ifancontrol.puremilkchun.top"
+        // Restart is available with the diagnostic quick checks.
         buttonRow.addArrangedSubview(updateButton)
+        buttonRow.addArrangedSubview(websiteButton)
         buttonRow.addArrangedSubview(githubButton)
         stack.addArrangedSubview(buttonRow)
 
@@ -5790,7 +5606,9 @@ class HelpWindowController: NSWindowController {
         )
         autoCheck.state = UpdateService.shared.automaticChecksEnabled ? .on : .off
         automaticUpdateCheckbox = autoCheck
-        stack.addArrangedSubview(autoCheck)
+        autoCheck.controlSize = .small; autoCheck.font = .systemFont(ofSize: 12)
+        let preferences = NSStackView(); preferences.orientation = .vertical; preferences.alignment = .leading; preferences.spacing = 10
+        preferences.addArrangedSubview(autoCheck)
 
         let statsCheck = NSButton(
             checkboxWithTitle: appL10n("匿名统计用户量", "Anonymous user-count stats"),
@@ -5801,7 +5619,7 @@ class HelpWindowController: NSWindowController {
         anonymousStatsCheckbox = statsCheck
 
         let statsHelpButton = NSButton(title: "?", target: self, action: #selector(showAnonymousStatsHelp))
-        statsHelpButton.bezelStyle = .rounded
+        statsHelpButton.bezelStyle = .helpButton
         statsHelpButton.font = .systemFont(ofSize: 11, weight: .semibold)
         statsHelpButton.setContentHuggingPriority(.required, for: .horizontal)
 
@@ -5812,112 +5630,150 @@ class HelpWindowController: NSWindowController {
         statsRow.addArrangedSubview(statsCheck)
         statsRow.addArrangedSubview(statsHelpButton)
         statsRow.setHuggingPriority(.required, for: .horizontal)
-        stack.addArrangedSubview(statsRow)
+        statsCheck.controlSize = .small; statsCheck.font = .systemFont(ofSize: 12)
+        preferences.addArrangedSubview(statsRow)
 
         let statsHint = makeBodyLabel(
             appL10n(
-                "仅用于匿名统计有多少人在使用 iFanControl，帮助开发者判断这个软件是不是还活着。不会上传姓名、邮箱、序列号或设备名称。",
-                "Only used to anonymously count how many people are using iFanControl, so the developer knows the app is still alive. It does not upload your name, email, serial number, or device name."
+                "匿名统计使用人数，不上传姓名、邮箱、序列号或设备名称。",
+                "Counts usage anonymously. No name, email, serial number or device name is uploaded."
             )
         )
         statsHint.font = .systemFont(ofSize: 11)
-        statsHint.alignment = .center
-        statsHint.preferredMaxLayoutWidth = 430
-        stack.addArrangedSubview(statsHint)
+        statsHint.alignment = .left
+        statsHint.preferredMaxLayoutWidth = 360
+        statsHint.widthAnchor.constraint(equalToConstant: 360).isActive = true
+        preferences.addArrangedSubview(statsHint)
+        stack.addArrangedSubview(preferences)
 
         return view
     }
 
-    private func makeDiagnosticsSection() -> NSView {
+    private func addDeveloperSectionIfNeeded() {
+        guard UpdatePreferences.shared.developerModeEnabled,
+              sectionViews[.developer] == nil, sectionContainerView != nil else { return }
+        if sidebarButtons[.developer] == nil {
+            let button = makeSidebarButton(for: .developer)
+            sidebarButtons[.developer] = button
+            sidebarStack?.addArrangedSubview(button)
+        }
+
         let (view, stack) = makeSectionRoot(horizontalCentered: true, verticalCentered: true)
-
-        let supportCard = makeCardView()
-        supportCard.translatesAutoresizingMaskIntoConstraints = false
-        supportCard.widthAnchor.constraint(equalToConstant: 410).isActive = true
-        supportCard.heightAnchor.constraint(equalToConstant: 410).isActive = true
-        stack.addArrangedSubview(supportCard)
-
-        let supportStack = NSStackView()
-        supportStack.orientation = .vertical
-        supportStack.alignment = .centerX
-        supportStack.spacing = 18
-        supportStack.translatesAutoresizingMaskIntoConstraints = false
-        supportCard.addSubview(supportStack)
-        NSLayoutConstraint.activate([
-            supportStack.centerXAnchor.constraint(equalTo: supportCard.centerXAnchor),
-            supportStack.centerYAnchor.constraint(equalTo: supportCard.centerYAnchor),
-            supportStack.leadingAnchor.constraint(greaterThanOrEqualTo: supportCard.leadingAnchor, constant: 28),
-            supportStack.trailingAnchor.constraint(lessThanOrEqualTo: supportCard.trailingAnchor, constant: -28),
-            supportStack.topAnchor.constraint(greaterThanOrEqualTo: supportCard.topAnchor, constant: 28),
-            supportStack.bottomAnchor.constraint(lessThanOrEqualTo: supportCard.bottomAnchor, constant: -28)
-        ])
-
-        let supportTitle = NSTextField(labelWithString: appL10n("先导出诊断包，再发邮件给我们。", "Export diagnostics first, then email us."))
-        supportTitle.font = .systemFont(ofSize: 18, weight: .semibold)
-        supportTitle.alignment = .center
-        supportTitle.maximumNumberOfLines = 0
-        supportTitle.lineBreakMode = .byWordWrapping
-        supportTitle.preferredMaxLayoutWidth = 300
-        supportStack.addArrangedSubview(supportTitle)
-
-        let supportHint = makeBodyLabel(
-            appL10n(
-                "我们会结合日志更快定位问题。若只是小异常，也可以先试试重新启动或检查更新。",
-                "Logs help us diagnose issues faster. For smaller problems, you can also try restarting the app or checking for updates first."
-            )
+        stack.alignment = .centerX
+        let betaCheck = NSButton(
+            checkboxWithTitle: appL10n("接收 Beta 更新", "Receive Beta Updates"),
+            target: self, action: #selector(toggleBetaUpdates(_:))
         )
-        supportHint.font = .systemFont(ofSize: 14)
-        supportHint.preferredMaxLayoutWidth = 300
-        supportHint.alignment = .center
-        supportStack.addArrangedSubview(supportHint)
+        betaCheck.identifier = NSUserInterfaceItemIdentifier("beta-update-checkbox")
+        stack.addArrangedSubview(betaCheck)
+        betaUpdateCheckbox = betaCheck
 
-        let primaryButtons = NSStackView()
-        primaryButtons.orientation = .horizontal
-        primaryButtons.spacing = 10
-        primaryButtons.alignment = .centerY
+        let routeLabel = NSTextField(labelWithString: "")
+        routeLabel.textColor = .secondaryLabelColor
+        stack.addArrangedSubview(routeLabel)
+        updateRouteLabel = routeLabel
 
-        let exportButton = NSButton(title: appL10n("导出诊断包", "Export Diagnostics"), target: self, action: #selector(exportDiagnostics))
-        exportButton.bezelStyle = .rounded
-        let contactButton = NSButton(title: appL10n("联系支持", "Contact Support"), target: self, action: #selector(contactSupport))
-        contactButton.bezelStyle = .rounded
-        let uninstallButton = NSButton(title: appL10n("完整卸载", "Full Uninstall"), target: self, action: #selector(uninstallControlComponents))
-        uninstallButton.bezelStyle = .rounded
-        primaryButtons.addArrangedSubview(exportButton)
-        primaryButtons.addArrangedSubview(contactButton)
-        primaryButtons.addArrangedSubview(uninstallButton)
-        supportStack.addArrangedSubview(primaryButtons)
+        let hint = makeBodyLabel(appL10n(
+            "启用后，自动与手动检查都会使用 Beta 通道。\n切回正式通道只改变后续更新路线，当前安装版本不会改变。",
+            "When enabled, automatic and manual checks use the Beta channel.\nSwitching to Stable changes future updates; your installed version stays the same."
+        ))
+        hint.alignment = .center
+        hint.preferredMaxLayoutWidth = 360
+        hint.widthAnchor.constraint(equalToConstant: 360).isActive = true
+        stack.addArrangedSubview(hint)
 
-        let helperHint = NSTextField(labelWithString: appL10n("也可以先做这两步快速自检：", "You can also try these quick checks first:"))
-        helperHint.font = .systemFont(ofSize: 12, weight: .medium)
-        helperHint.textColor = .tertiaryLabelColor
-        helperHint.alignment = .center
-        supportStack.addArrangedSubview(helperHint)
-
-        let secondaryButtons = NSStackView()
-        secondaryButtons.orientation = .horizontal
-        secondaryButtons.spacing = 10
-        secondaryButtons.alignment = .centerY
-        let restartButton = NSButton(title: appL10n("重新启动", "Restart"), target: self, action: #selector(restartApp))
-        restartButton.bezelStyle = .rounded
         let updateButton = NSButton(title: appL10n("检查更新", "Check Updates"), target: self, action: #selector(checkUpdates))
         updateButton.bezelStyle = .rounded
-        let openLogButton = NSButton(title: appL10n("打开日志目录", "Open Log Folder"), target: self, action: #selector(openLogFolder))
-        openLogButton.bezelStyle = .rounded
-        secondaryButtons.addArrangedSubview(restartButton)
-        secondaryButtons.addArrangedSubview(updateButton)
-        secondaryButtons.addArrangedSubview(openLogButton)
-        supportStack.addArrangedSubview(secondaryButtons)
+        stack.addArrangedSubview(updateButton)
+
+        let exitButton = NSButton(title: appL10n("退出开发者模式", "Exit Developer Mode"), target: self, action: #selector(exitDeveloperMode))
+        exitButton.bezelStyle = .rounded
+        exitButton.identifier = NSUserInterfaceItemIdentifier("exit-developer-mode")
+        stack.addArrangedSubview(exitButton)
+
+        sectionViews[.developer] = view
+        view.widthAnchor.constraint(equalToConstant: contentWidth).isActive = true
+        refreshDeveloperSettings()
+    }
+
+    private func refreshDeveloperSettings() {
+        let preferences = UpdatePreferences.shared
+        betaUpdateCheckbox?.state = preferences.betaEnabled ? .on : .off
+        updateRouteLabel?.stringValue = preferences.betaEnabled
+            ? appL10n("当前更新通道：Beta", "Update Channel: Beta")
+            : appL10n("当前更新通道：正式版", "Update Channel: Stable")
+    }
+
+    @objc private func overviewIconClicked(_ sender: NSClickGestureRecognizer) {
+        guard !UpdatePreferences.shared.developerModeEnabled,
+              developerUnlockCounter.registerClick() else { return }
+        UpdatePreferences.shared.unlockDeveloperMode()
+        addDeveloperSectionIfNeeded()
+        select(section: .developer)
+    }
+
+    @objc private func helpWindowWillClose(_ notification: Notification) {
+        developerUnlockCounter.reset()
+    }
+
+    @objc private func toggleBetaUpdates(_ sender: NSButton) {
+        UpdatePreferences.shared.setBetaEnabled(sender.state == .on)
+        refreshDeveloperSettings()
+    }
+
+    @objc private func exitDeveloperMode() {
+        UpdatePreferences.shared.exitDeveloperMode()
+        developerUnlockCounter.reset()
+        select(section: .overview)
+        sectionViews.removeValue(forKey: .developer)?.removeFromSuperview()
+        if let button = sidebarButtons.removeValue(forKey: .developer) {
+            sidebarStack?.removeArrangedSubview(button)
+            button.removeFromSuperview()
+        }
+        betaUpdateCheckbox = nil
+        updateRouteLabel = nil
+    }
+
+    private func makeDiagnosticsSection() -> NSView {
+        let (view, stack) = makeSectionRoot()
+        stack.alignment = .leading
+        func section(_ title: String, _ detail: String) {
+            let heading = NSTextField(labelWithString: title)
+            heading.font = .systemFont(ofSize: 13, weight: .medium)
+            stack.addArrangedSubview(heading)
+            let body = makeBodyLabel(detail)
+            body.preferredMaxLayoutWidth = contentWidth
+            body.widthAnchor.constraint(equalToConstant: contentWidth).isActive = true
+            stack.addArrangedSubview(body)
+        }
+        func buttons(_ entries: [(String, Selector)]) {
+            let row = NSStackView(); row.spacing = 10
+            for (title, action) in entries {
+                let button = NSButton(title: title, target: self, action: action)
+                button.bezelStyle = .rounded; button.controlSize = .small; button.font = .systemFont(ofSize: 12); row.addArrangedSubview(button)
+            }
+            stack.addArrangedSubview(row)
+        }
+        section(appL10n("先做一次快速自检", "Start with a Quick Check"),
+                appL10n("小异常可以先重启应用，或检查是否有可用更新。", "For a minor issue, try restarting the app or checking for an update."))
+        buttons([(appL10n("重新启动", "Restart"), #selector(restartApp)), (appL10n("检查更新", "Check Updates"), #selector(checkUpdates))])
+        let separator = NSBox(); separator.boxType = .separator
+        separator.widthAnchor.constraint(equalToConstant: contentWidth).isActive = true; stack.addArrangedSubview(separator)
+        section(appL10n("联系支持", "Contact support"),
+                appL10n("诊断包会保存在本机并在访达中显示。你可以检查内容，再自行附到支持邮件中。", "The diagnostic ZIP is saved locally and revealed in Finder. Review it, then attach it to your support email."))
+        buttons([(appL10n("导出诊断包", "Export Diagnostics"), #selector(exportDiagnostics)), (appL10n("联系支持", "Contact Support"), #selector(contactSupport))])
+        buttons([(appL10n("打开日志目录", "Open Log Folder"), #selector(openLogFolder))])
+        let separator2 = NSBox(); separator2.boxType = .separator
+        separator2.widthAnchor.constraint(equalToConstant: contentWidth).isActive = true; stack.addArrangedSubview(separator2)
+        section(appL10n("移除 iFanControl", "Remove iFanControl"),
+                appL10n("完整卸载会移除应用、控制组件和本机设置。开始前会再次确认删除范围。", "A full uninstall removes the app, control components and local settings. You will confirm the scope before removal."))
+        buttons([(appL10n("完整卸载…", "Full Uninstall…"), #selector(uninstallControlComponents))])
         return view
     }
 
     private func makeFAQSection() -> NSView {
         let (view, stack) = makeSectionRoot(horizontalCentered: true)
 
-        let intro = makeBodyLabel(appL10n("整理了最常遇到的几个问题，方便快速定位设置逻辑。", "A short set of answers for the most common questions."))
-        intro.font = .systemFont(ofSize: 14)
-        intro.preferredMaxLayoutWidth = contentWidth
-        intro.alignment = .center
-        stack.addArrangedSubview(intro)
 
         let faqItems: [(String, String)] = [
             (
@@ -5945,25 +5801,29 @@ class HelpWindowController: NSWindowController {
             stack.addArrangedSubview(card)
 
             let qaStack = NSStackView()
+            qaStack.alignment = .leading
             qaStack.orientation = .vertical
             qaStack.spacing = 8
             qaStack.translatesAutoresizingMaskIntoConstraints = false
             card.addSubview(qaStack)
 
             let q = NSTextField(labelWithString: item.0)
-            q.font = .systemFont(ofSize: 16, weight: .semibold)
+            q.font = .systemFont(ofSize: 13, weight: .medium)
+            q.maximumNumberOfLines = 0
+            q.lineBreakMode = .byWordWrapping
+            q.preferredMaxLayoutWidth = contentWidth - 32
             qaStack.addArrangedSubview(q)
 
             let a = makeBodyLabel(item.1)
-            a.font = .systemFont(ofSize: 14)
-            a.preferredMaxLayoutWidth = contentWidth - 48
+            a.font = .systemFont(ofSize: 12)
+            a.preferredMaxLayoutWidth = contentWidth - 32
             qaStack.addArrangedSubview(a)
 
             NSLayoutConstraint.activate([
-                qaStack.topAnchor.constraint(equalTo: card.topAnchor, constant: 18),
-                qaStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 24),
-                qaStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -24),
-                qaStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -18)
+                qaStack.topAnchor.constraint(equalTo: card.topAnchor, constant: 14),
+                qaStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
+                qaStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+                qaStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -14)
             ])
         }
         return view
@@ -5981,7 +5841,7 @@ class HelpWindowController: NSWindowController {
         stack.addArrangedSubview(coffeeIcon)
 
         let introTitle = NSTextField(labelWithString: appL10n("请作者喝杯咖啡", "Buy the author a coffee"))
-        introTitle.font = .systemFont(ofSize: 22, weight: .bold)
+        introTitle.font = .systemFont(ofSize: 18, weight: .semibold)
         introTitle.alignment = .center
         stack.addArrangedSubview(introTitle)
 
@@ -6028,13 +5888,15 @@ class HelpWindowController: NSWindowController {
         qrImage.widthAnchor.constraint(equalToConstant: 168).isActive = true
         qrImage.heightAnchor.constraint(equalToConstant: 168).isActive = true
 
-        let hint = NSTextField(labelWithString: appL10n("感谢支持，帮助 iFanControl 持续改进。", "Thank you for helping iFanControl keep improving."))
+        let hint = NSTextField(wrappingLabelWithString: appL10n("感谢支持，帮助 iFanControl 持续改进。", "Thank you for helping iFanControl keep improving."))
         hint.textColor = .secondaryLabelColor
         hint.font = .systemFont(ofSize: 13)
+        hint.alignment = .center
 
         qrStack.addArrangedSubview(caption)
         qrStack.addArrangedSubview(qrImage)
         qrStack.addArrangedSubview(hint)
+        hint.widthAnchor.constraint(equalTo: qrStack.widthAnchor).isActive = true
 
         self.donationMethodControl = methodControl
         self.qrImageView = qrImage
@@ -6047,6 +5909,7 @@ class HelpWindowController: NSWindowController {
         versionLabel?.stringValue = appL10n("版本 \(UpdateService.shared.currentVersionDisplay)", "Version \(UpdateService.shared.currentVersionDisplay)")
         automaticUpdateCheckbox?.state = UpdateService.shared.automaticChecksEnabled ? .on : .off
         anonymousStatsCheckbox?.state = PrivacyStatsService.shared.anonymousStatsEnabled ? .on : .off
+        refreshDeveloperSettings()
         refreshDonationPreview()
         super.showWindow(sender)
     }
@@ -6058,8 +5921,10 @@ class HelpWindowController: NSWindowController {
         appHeaderView?.isHidden = isOverview
         headerSeparatorView?.isHidden = isOverview
         sectionTitleLabel?.isHidden = isOverview
-        for (key, view) in sectionViews {
-            view.isHidden = (key != section)
+        if let container = sectionContainerView as? NSStackView {
+            for child in container.arrangedSubviews { container.removeArrangedSubview(child); child.removeFromSuperview() }
+            if let page = sectionViews[section] { page.isHidden = false; container.addArrangedSubview(page) }
+            container.layoutSubtreeIfNeeded()
         }
         updateSidebarSelection()
     }
@@ -6106,6 +5971,11 @@ class HelpWindowController: NSWindowController {
 
     @objc private func openGitHub() {
         NSWorkspace.shared.open(UpdateService.shared.releasesURL)
+    }
+
+    @objc private func openWebsite() {
+        guard let url = URL(string: "https://ifancontrol.puremilkchun.top") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     @objc private func restartApp() {
