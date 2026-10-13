@@ -43,7 +43,7 @@ GitHub Actions对main/codex分支推送及长期分支PR运行Release构建、�
 
 3. 按现有Beta隔离流程发布，仅修改Beta feed和独立含build的PKG。保留正式/旧feed、包、官网下载、官网版本与后端。Git推送和CI不会自动执行部署。正式版发布由维护者另行决定。
 4. 公网重下载并核对包SHA256、feed身份/build/no-store及原资产保留。将包URL/哈希、源码输入哈希、部署身份与验证摘要记录到 `docs/releases/<version>-beta.<build>.json`，并提交记录。标签提交中的源文件应与实际构建输入一致；使用 `verify_release_source.py` 检查。
-5. 创建不可重写的注释标签，例如 `v2.9.10-beta.71`，推送到GitHub。不覆盖已经发布的标签或包；修复发布需要新build、新提交和新标签。Beta标签不创建正式GitHub Release，不推进main或稳定线路。
+5. 创建不可重写的注释标签，例如 `v2.9.10-beta.71`，推送到GitHub。仓库规则保护v*版本标签，禁止更新和删除（管理员也无绕过名单）；不覆盖已经发布的标签或包；修复发布需要新build、新提交和新标签。Beta标签不创建正式GitHub Release，不推进main或稳定线路。
 
 ```sh
 python3 scripts/verify_release_source.py docs/releases/2.9.10-beta.70.json --ref v2.9.10-beta.70

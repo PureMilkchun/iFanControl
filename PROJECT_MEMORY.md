@@ -38,7 +38,7 @@ Release、原生控制器、真实updater回归通过；新增实际AppDelegate�
 
 ### Git机制（2026-10-13）
 
-Beta70基线在 `codex/3.0-beta`，对应注释标签 `v2.9.10-beta.70`；main继续保留正式build52。长期分支要求PR、build检查，禁止强推/删除；单维护者不强制第二人批准。规则见CONTRIBUTING.md，发布输入/包/部署证据见docs/releases/2.9.10-beta.70.json。
+Beta70基线在 `codex/3.0-beta`，对应注释标签 `v2.9.10-beta.70`；main继续保留正式build52。长期分支要求PR、build检查，禁止强推/删除；单维护者不强制第二人批准。v*版本标签通过仓库ruleset禁止更新/删除。规则见CONTRIBUTING.md，发布输入/包/部署证据见docs/releases/2.9.10-beta.70.json。
 
 Info.plist提交来源为packaging/app/Info.plist，root icon.png和kentsmc作为固定输入；scripts/build_app.py生成build/iFanControl.app并记录提交/是否有改动/哈希。生成App、签名、PKG、Cloudflare状态停止追踪但磁盘文件不删除；历史Git不改写。实验源码/HTML/旧公告仍在本机exclude，反馈邮件全局ignore；原生证据图纳入docs/development/assets。
 

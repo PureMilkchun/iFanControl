@@ -54,6 +54,14 @@
     }
 }
 @MainActor extension FeedbackWindowController {
+    private func waitForSendOutcome() async throws {
+        let deadline = Date().addingTimeInterval(3)
+        while !submittedSuccessfully && sendButton?.isEnabled == false && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        precondition(submittedSuccessfully || sendButton?.isEnabled == true, "Feedback operation did not finish within the test deadline")
+    }
+
     static func runUIRegression() async throws {
         let c=FeedbackWindowController()
         c.sendFeedback();precondition(c.statusLabel?.stringValue == appL10n("请输入内容","Please enter something"))
@@ -63,19 +71,19 @@
         UserDefaults.standard.removeObject(forKey:"ifancontrol.feedback.send_timestamps")
         c.contentTextView?.string="fail retained draft";c.emailField?.stringValue="qa@example.invalid"
         c.sendFeedback();precondition(c.sendButton?.isEnabled==false && c.statusLabel?.alphaValue==0)
-        try await Task.sleep(for:.milliseconds(100))
+        try await c.waitForSendOutcome()
         precondition(c.sendButton?.isEnabled==true && c.contentTextView?.string=="fail retained draft")
         c.window?.close();c.showWindow(nil)
         precondition(c.contentTextView?.string=="fail retained draft" && c.emailField?.stringValue=="qa@example.invalid")
         c.contentTextView?.string="success";c.emailField?.stringValue=""
-        c.sendFeedback();try await Task.sleep(for:.milliseconds(100))
+        c.sendFeedback();try await c.waitForSendOutcome()
         precondition(c.submittedSuccessfully && !(c.statusLabel?.stringValue.contains("reply") ?? false) && !(c.statusLabel?.stringValue.contains("邮箱") ?? false))
         c.window?.close();c.showWindow(nil)
         precondition(c.sendButton?.isEnabled==true && c.contentTextView?.string=="" && c.closeAfterSuccess==nil)
         c.contentTextView?.string="new draft"
         try await Task.sleep(for:.milliseconds(2150))
         precondition(c.window?.isVisible==true && c.contentTextView?.string=="new draft","Prior success close must not close a reopened editor")
-        c.emailField?.stringValue="qa@example.invalid";c.sendFeedback();try await Task.sleep(for:.milliseconds(100))
+        c.emailField?.stringValue="qa@example.invalid";c.sendFeedback();try await c.waitForSendOutcome()
         precondition(c.statusLabel?.stringValue.contains(appL10n("邮箱","email"))==true)
         c.closeAfterSuccess?.cancel();c.window?.close()
         print("PASS: empty/limited/sending/failure draft persistence, optional-email success wording, resend and prior-close cancellation")
