@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+## 当前正式发布（2026-10-15）
+
+维护者已审核并授权发布3.0.0/build71（对外3.0）。沿用已发布Beta70程序，仅更新版本/build/正式身份和签名，风扇控制策略、工具与有效程序区段保持。正式与Beta feed均指向stable71，Beta使用不可变71包，官网下载与/download均71；旧ZIP/manifest仍永久52。Production `56371256-511d-4101-9f6d-0a8d25713eab`，源码标签v3.0.0，记录见docs/releases/3.0.0-build71*.json。下一build大于71。下文Beta62～70发布段落是历史，不代表当前正式线路仍52。
+
 ## 项目概述
 
 iFanControl 是一个面向 Apple Silicon Mac 的原生菜单栏风扇控制工具，支持自动/手动模式、5 点风扇曲线 + 3 预设切换、温度源选择、应用内更新、中英文切换、匿名活跃统计。

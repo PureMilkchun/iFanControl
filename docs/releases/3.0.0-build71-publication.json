@@ -1,0 +1,83 @@
+{
+  "deployment": "56371256-511d-4101-9f6d-0a8d25713eab",
+  "url": "https://56371256.ifan-59w.pages.dev",
+  "previous_deployment": "6066e693-f572-417a-b5b9-cd784c371078",
+  "published_at": "2026-10-15T03:15:56.99869Z",
+  "stable_build": 71,
+  "beta_feed_build": 71,
+  "beta_feed_channel": "stable",
+  "legacy_build": 52,
+  "download_route_build": 71,
+  "prior_assets_preserved": 58,
+  "prior_asset_changes": [
+    "/iFanControl-macOS.pkg",
+    "/timeline.json",
+    "/update-manifest-beta.json",
+    "/update-manifest-pkg.json"
+  ],
+  "production_backend_change": "only download target build52 -> build71",
+  "runtime_bindings_preserved": true,
+  "checked_downloads": [
+    {
+      "name": "update-manifest-pkg.json",
+      "sha256": "e371d973bae17a8b1976b08cb0172b9aa6044f05a564ebca0785e2d096fe0e88"
+    },
+    {
+      "name": "update-manifest-beta.json",
+      "sha256": "803f38dabc2501ab2ee71c2cd037928d856053cc5f0d08cbb1759f7e1db31376"
+    },
+    {
+      "name": "update-manifest.json",
+      "sha256": "d1a3613794cfc4a96abe7ee9a7c7e6928d11ab8aa4c8dd4d8b7183e5b907a639"
+    },
+    {
+      "name": "iFanControl-macOS.pkg",
+      "sha256": "1e43404105f5927c89ba26e893505ec00639626d86d6833952f6e97ae0138f6c"
+    },
+    {
+      "name": "iFanControl-3.0.0-71.pkg",
+      "sha256": "1e43404105f5927c89ba26e893505ec00639626d86d6833952f6e97ae0138f6c"
+    },
+    {
+      "name": "iFanControl-legacy-2.9.9.zip",
+      "sha256": "b80296cbd80e7878e476e9dce0a1aaf03acea1decadf6d628d3743680771610d"
+    },
+    {
+      "name": "iFanControl-macOS.zip",
+      "sha256": "b80296cbd80e7878e476e9dce0a1aaf03acea1decadf6d628d3743680771610d"
+    },
+    {
+      "name": "timeline.json",
+      "sha256": "bd1459b8ee76b15d274ca1ab38d44f3d93d32f55a3c5ddba1912c96ccba0a1a4"
+    },
+    {
+      "name": "index.html",
+      "sha256": "f544ad548307e1d8c380cb0d3e4e2a45cd8b347b4d3be4b80ac783faef71936b"
+    }
+  ],
+  "github_release": "https://github.com/PureMilkchun/iFanControl/releases/tag/v3.0.0",
+  "application_recompiled": false,
+  "actual_installation_performed": false,
+  "github_published_at": "2026-10-15T03:15:17Z",
+  "release_source_tag": "v3.0.0",
+  "release_source_commit": "411ed81",
+  "package_sha256": "1e43404105f5927c89ba26e893505ec00639626d86d6833952f6e97ae0138f6c",
+  "rollback_deployment": "6066e693-f572-417a-b5b9-cd784c371078",
+  "website": {
+    "url": "https://ifancontrol.puremilkchun.top/",
+    "versions": [
+      "3.0.0"
+    ],
+    "timelineContains71": true,
+    "desktop_and_mobile_screenshots_inspected": true,
+    "viewports": [
+      1440,
+      390
+    ],
+    "evidence_hashes": {
+      "website-desktop.png": "887038d7f99be68dd55a4fe554ad8a83e1113403490a3924da5871542003ba38",
+      "website-mobile.png": "56e285897384bfa46c013eab26d937779397124f0a2475e3d68ba819c2e7fecc",
+      "website-timeline.png": "f7e0d4d3c493e1b0c455a06928ceb635b266ce95ac81e8af36f089c4e13d06a1"
+    }
+  }
+}

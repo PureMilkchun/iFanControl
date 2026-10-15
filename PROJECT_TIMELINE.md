@@ -3,6 +3,16 @@
 关联固定记忆：`/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_MEMORY.md`
 读取建议：先读固定记忆，再读本文件，用本文件补足最近发生的变化。
 
+## 2026-10-15
+
+### 2026-10-15 — 正式发布3.0.0 / build71
+
+- 维护者决定先稳定Mac mini M4基本盘，保持风扇控制策略；审核完整九项更新说明后明确授权正式推送。版本为3.0.0/build71，以Beta70为功能基线，没有混入Stats研究或睡眠恢复改动。
+- 从已发布且哈希验证的Beta70 PKG提取App，更新源码Info.plist中的版本/build/正式身份并重新ad-hoc签名，36个文件内有效程序区段逐项一致，工具及20项源码输入核对通过（仅Info.plist变化）；未重编译应用。沿用原生PKG构建器完成展开、脚本、sudoers、内容与签名验证，未执行安装或控温。
+- 正式PKG SHA256 `1e43404105f5927c89ba26e893505ec00639626d86d6833952f6e97ae0138f6c`；GitHub正式Release v3.0.0、PKG附件与源码标签已发布，main已快进。完整中英文说明保存在docs/releases，应用内使用覆盖九项改进的精简摘要。
+- Production `56371256-511d-4101-9f6d-0a8d25713eab`：正式/Beta native feed均stable71，官网下载及两个域名/download均71，新增不可变71包。旧manifest、旧双ZIP仍为2.9.9/build52且哈希不变；其余58个旧资产和运行绑定保留，后端只改下载目标编号，未整体发布本地无关网站/schema/后台改动。
+- 公网三feed JSON/no-store、两个71 PKG、两个旧ZIP、GitHub附件、时间线及首页已逐字节/hash核验。已实际查看官网1440宽桌面、390宽手机版及发布时间线，版本3.0.0/build71正确。原Production `6066e693-f572-417a-b5b9-cd784c371078`保留为部署回退点；完整证据见packaging/pkg/output/stable-71与docs/releases/3.0.0-build71-publication.json。真实2.9.9→3.0安装和运行由维护者/用户执行。
+
 ## 2026-10-13
 
 ### 2026-10-13 — MacBook 睡眠/合盖后风扇失效的重点调查

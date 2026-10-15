@@ -3,7 +3,7 @@
 关联时间戳记忆：`/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/PROJECT_TIMELINE.md`
 读取建议：先读本文件，再读时间戳记忆，避免遗漏最新变更。
 
-更新时间：2026-10-13
+更新时间：2026-10-15
 
 ## 1. 项目当前基线
 
@@ -20,7 +20,11 @@ iFanControl 是一个面向 Apple Silicon 带风扇机型的风扇控制工具�
 - 开机自启动（SMAppService 原生登录项 API，系统设置中可直接管理）
 - 信息栏展示设置（完整/简洁/迷你三种模式，弹窗设置，存 `ifancontrol.ui.display_mode`，切换即时生效）
 
-当前正式版本：`2.9.9` / build 52
+当前正式版本：`3.0.0` / build71（对外名称3.0，2026-10-15发布）。
+
+正式发布：维护者审核完整更新说明后授权推送。以已发布Beta70程序为基线，仅将Info.plist改为3.0.0/build71并移除Beta身份，重新签名打包；36个有效程序区段与Beta70一致，未重编译应用、修改风扇策略或工具。PKG SHA256 `1e43404105f5927c89ba26e893505ec00639626d86d6833952f6e97ae0138f6c`，源码标签`v3.0.0`/提交`411ed81`。Production `56371256-511d-4101-9f6d-0a8d25713eab`；正式与Beta feed均为stable71，Beta使用不可变包，两个域名/download均71。旧manifest及双ZIP仍52，公网逐字节/hash核验通过；58个旧资产及后端绑定保留，后端仅修改下载目标编号。来源与发布记录见`docs/releases/3.0.0-build71*.json`；实际安装/硬件控制未由代理执行。下一build必须大于71。
+
+以下62～70段落保留为历史，正式/旧线路状态以本段为准。
 
 开发者种子版本：`2.9.10` / build 62（由 52 递增 10），用户手动本地安装。独立 Beta 线路已部署；正式渠道仍为 `2.9.9` / build52，未正式发布 build62。
 
@@ -38,7 +42,7 @@ Release、原生控制器、真实updater回归通过；新增实际AppDelegate�
 
 ### Git机制（2026-10-13）
 
-Beta70基线在 `codex/3.0-beta`，对应注释标签 `v2.9.10-beta.70`；main继续保留正式build52。长期分支只禁止强推/删除；没有构建/PR门槛。用户明确缩小范围为Git历史、追踪、回退，已停用自动构建，不再重跑CI；原在途任务在取消请求前已结束，目前无运行任务。v*版本标签通过仓库ruleset禁止更新/删除。规则见CONTRIBUTING.md，发布输入/包/部署证据见docs/releases/2.9.10-beta.70.json。
+Beta70基线在 `codex/3.0-beta`，对应注释标签 `v2.9.10-beta.70`；main已在3.0正式发布时快进至71，Beta70标签保持原样。长期分支只禁止强推/删除；没有构建/PR门槛。用户明确缩小范围为Git历史、追踪、回退，已停用自动构建，不再重跑CI；原在途任务在取消请求前已结束，目前无运行任务。v*版本标签通过仓库ruleset禁止更新/删除。规则见CONTRIBUTING.md，发布输入/包/部署证据见docs/releases/2.9.10-beta.70.json。
 
 Info.plist提交来源为packaging/app/Info.plist，root icon.png和kentsmc作为固定输入；scripts/build_app.py生成build/iFanControl.app并记录提交/是否有改动/哈希。生成App、签名、PKG、Cloudflare状态停止追踪但磁盘文件不删除；历史Git不改写。实验源码/HTML/旧公告仍在本机exclude，反馈邮件全局ignore；原生证据图纳入docs/development/assets。
 
@@ -46,7 +50,7 @@ Info.plist提交来源为packaging/app/Info.plist，root icon.png和kentsmc作�
 
 ### 设备适配研究（2026-10-13）
 
-独立分支 `codex/stats-compatibility` 固定 Stats `88d5359ad3466efaa16985646a0bb15c6599109f`，保存 193 条 SMC/11 条 HID 温度声明、平台与平均资格、源文件哈希及 MIT 许可。离线目录审计确认现有 97 个静态 key 覆盖上游 M1～M5 专属 key；20 个 key 的定义随平台变化，未知 Tf 不能仅凭前缀证明属于 CPU。现有 kentsmc 哈希 `56b9b4f7239b4b043b8b69c92ed23f184eaf55a6b7d67c419d899da3a7254605`，对应源码版本尚未确定，公开候选缺 `--unlock-fans`，不能直接替换。研究与 23 个待实现/待执行的合成验收场景见 `docs/development/3.0-device-compatibility.md`；没有改变产品/控制/版本/线上线路，没有构建或实际硬件验证。首个补丁建议传感器元数据及平均资格，恢复与后端分开推进；不是已完成适配。
+独立分支 `codex/stats-compatibility` 固定 Stats `88d5359ad3466efaa16985646a0bb15c6599109f`，保存 193 条 SMC/11 条 HID 温度声明、平台与平均资格、源文件哈希及 MIT 许可。离线目录审计确认现有 97 个静态 key 覆盖上游 M1～M5 专属 key；20 个 key 的定义随平台变化，未知 Tf 不能仅凭前缀证明属于 CPU。现有 kentsmc 哈希 `56b9b4f7239b4b043b8b69c92ed23f184eaf55a6b7d67c419d899da3a7254605`，对应源码版本尚未确定，公开候选缺 `--unlock-fans`，不能直接替换。研究与 23 个待实现/待执行的合成验收场景见 `docs/development/3.0-device-compatibility.md`；没有改变产品/控制/版本/线上线路，没有构建或实际硬件验证。原先建议首个补丁为传感器元数据及平均资格，恢复与后端分开推进；不是已完成适配。
 
 维护者随后明确 MacBook 反馈为“启动正常，睡眠或合盖后失效”。优先级调整为风扇生命周期恢复：当前没有 sleep/wake 订阅，lastSetRPM 小差值去重不检查当前控制权，可能在系统接管后挡住相同目标的恢复；这是条件路径证据，尚未实机确定反馈根因。只读 nm/反汇编进一步确认现有工具包含 `modeKey` 小写 md/大写 Md 选择、直接模式写入、Ftst 回退和重试，不能误判为这些功能缺失。保留 lastSetRPM 从实际 RPM 初始化和平滑用途，单独设计控制确认/唤醒恢复；系统恢复目前提示早于命令确认也需单独验收。详见 `docs/development/3.0-fan-wake-recovery.md`；仍没有改产品代码或构建/硬件执行。
 

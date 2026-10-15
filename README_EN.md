@@ -12,6 +12,8 @@
 
 ## Overview
 
+Current stable release: **3.0.0 / build71**. See the [full release notes](https://github.com/PureMilkchun/iFanControl/releases/tag/v3.0.0). Promoted from Beta70 with interface, startup and update improvements; the existing fan control strategy is preserved.
+
 iFanControl is a native macOS menu bar app for Apple Silicon Macs with controllable fans. It provides real-time temperature and RPM monitoring, automatic and manual fan control, a 5-point curve editor, in-app updates, and more robust temperature-sensor detection for supported M-series machines.
 
 This repository now keeps only source code, scripts, and essential resources. Release archives are distributed through GitHub Releases and the official website instead of being committed into the repo.

@@ -22,6 +22,8 @@
 
 ## 项目简介
 
+当前正式版为 **3.0.0 / build71**：[完整更新说明](https://github.com/PureMilkchun/iFanControl/releases/tag/v3.0.0)。以 Beta70 为功能基线，改善界面、启动和更新体验，沿用现有风扇控制策略。
+
 iFanControl 是一个面向 Apple Silicon Mac 的原生菜单栏应用，提供实时温度与转速查看、自动/手动风扇控制、5 点风扇曲线、应用内更新，以及面向带风扇 M 系列设备的更稳健传感器探测。
 
 当前仓库只保留源码、安装脚本和必要资源。历史发布包不再提交到仓库，统一通过 GitHub Releases 和官网分发。
