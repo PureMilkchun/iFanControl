@@ -1,0 +1,160 @@
+{
+  "deployment": "497535a4-3955-4676-aa9a-76c1e5c38447",
+  "url": "https://497535a4.ifan-59w.pages.dev",
+  "previous_deployment": "6f3a60a0-a09b-42d7-99dc-cd5258aa943f",
+  "published_at": "2026-10-15T05:38:55.251409Z",
+  "stable_build": 71,
+  "beta_build": 71,
+  "legacy_build": 52,
+  "minimum_macos": "15.0",
+  "distribution_revision": "macos15-r1",
+  "prior_assets_preserved": 55,
+  "changed_existing_assets": [
+    "/iFanControl-legacy-2.9.9.zip",
+    "/iFanControl-macOS.pkg",
+    "/iFanControl-macOS.zip",
+    "/index.html",
+    "/timeline.json",
+    "/update-manifest-beta.json",
+    "/update-manifest-pkg.json",
+    "/update-manifest.json"
+  ],
+  "added_assets": [
+    "/iFanControl-2.9.9-52-macos15.pkg",
+    "/iFanControl-3.0.0-71-macos15.pkg",
+    "/iFanControl-legacy-2.9.9-macos15.zip"
+  ],
+  "old_immutable71_preserved": true,
+  "runtime_bindings_preserved": true,
+  "guard_checks": [
+    {
+      "request": "mac13",
+      "build": 0
+    },
+    {
+      "request": "mac14",
+      "build": 0
+    },
+    {
+      "request": "mac15",
+      "build": 52
+    },
+    {
+      "request": "mac26",
+      "build": 52
+    },
+    {
+      "request": "unknown",
+      "build": 0
+    }
+  ],
+  "checked_downloads": [
+    {
+      "name": "update-manifest-pkg.json",
+      "sha256": "55872ac409436633a386800f40ce91f9a3b703e7392b622315c996aa7c247c95"
+    },
+    {
+      "name": "update-manifest-beta.json",
+      "sha256": "427b97d8a4e039b4f600a8501d2541930f110efc1c3eac9e1949d7f47efea91c"
+    },
+    {
+      "name": "update-manifest.json",
+      "sha256": "3b0c1fc069d3e619a50f361f5968edc4268b8b340304e8b37b39951187c7fff2"
+    },
+    {
+      "name": "iFanControl-macOS.pkg",
+      "sha256": "aa1b57720cf99b0111b8591f5e07571f1f1c7abc13ebb1c1502c6af78063983c"
+    },
+    {
+      "name": "iFanControl-3.0.0-71-macos15.pkg",
+      "sha256": "aa1b57720cf99b0111b8591f5e07571f1f1c7abc13ebb1c1502c6af78063983c"
+    },
+    {
+      "name": "iFanControl-2.9.9-52-macos15.pkg",
+      "sha256": "9dcdec83d1f1528c87d93d71f61059441c51d0c20928fe27965915ff4016d725"
+    },
+    {
+      "name": "iFanControl-legacy-2.9.9.zip",
+      "sha256": "61dc279c0b50647746a7fc5dad519a5ecaba22dabe9a97a984d3b3fbc45311ff"
+    },
+    {
+      "name": "iFanControl-legacy-2.9.9-macos15.zip",
+      "sha256": "61dc279c0b50647746a7fc5dad519a5ecaba22dabe9a97a984d3b3fbc45311ff"
+    },
+    {
+      "name": "iFanControl-macOS.zip",
+      "sha256": "61dc279c0b50647746a7fc5dad519a5ecaba22dabe9a97a984d3b3fbc45311ff"
+    },
+    {
+      "name": "iFanControl-3.0.0-71.pkg",
+      "sha256": "1e43404105f5927c89ba26e893505ec00639626d86d6833952f6e97ae0138f6c"
+    },
+    {
+      "name": "timeline.json",
+      "sha256": "58884b3e1dd8f957d889a6cbbda85329fa138ea9944f5832b76d0b2d11bd141c"
+    },
+    {
+      "name": "index.html",
+      "sha256": "750cd44551752695faa8d27e81a2f5151255cc293b0827e931918c7c844eb561"
+    }
+  ],
+  "application_recompiled": false,
+  "actual_macos15_execution": false,
+  "actual_installation_performed": false,
+  "source_tag": "v3.0.0-macos15-r1",
+  "package_hashes": {
+    "legacy_sha256": "61dc279c0b50647746a7fc5dad519a5ecaba22dabe9a97a984d3b3fbc45311ff",
+    "pkg52_sha256": "9dcdec83d1f1528c87d93d71f61059441c51d0c20928fe27965915ff4016d725",
+    "pkg71_sha256": "aa1b57720cf99b0111b8591f5e07571f1f1c7abc13ebb1c1502c6af78063983c"
+  },
+  "github_assets": [
+    {
+      "release": "v2.9.9",
+      "asset": "iFanControl-2.9.9.pkg",
+      "sha256": "9dcdec83d1f1528c87d93d71f61059441c51d0c20928fe27965915ff4016d725",
+      "github_asset_id": "RA_kwDORqPe7c4mUIx6"
+    },
+    {
+      "release": "v2.9.9",
+      "asset": "iFanControl-macOS-2.9.9.zip",
+      "sha256": "61dc279c0b50647746a7fc5dad519a5ecaba22dabe9a97a984d3b3fbc45311ff",
+      "github_asset_id": "RA_kwDORqPe7c4mUIx9"
+    },
+    {
+      "release": "v3.0.0",
+      "asset": "iFanControl-3.0.0.pkg",
+      "sha256": "aa1b57720cf99b0111b8591f5e07571f1f1c7abc13ebb1c1502c6af78063983c",
+      "github_asset_id": "RA_kwDORqPe7c4mUJxh"
+    }
+  ],
+  "github_notes_verified": true,
+  "website": {
+    "url": "https://ifancontrol.puremilkchun.top",
+    "actual_render_inspected": true,
+    "languages": [
+      "zh",
+      "en"
+    ],
+    "widths": [
+      1440,
+      390
+    ],
+    "fallback_url": "https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.8"
+  },
+  "installer_welcome": {
+    "actual_rtfd_render_inspected": true,
+    "appearances": [
+      "light",
+      "dark"
+    ],
+    "fallback_link_verified": true
+  },
+  "source_commit": "e3a069b6621d6a5979d6c6254ce7582b228fabbe",
+  "visual_evidence_sha256": {
+    "live-zh-mobile.png": "6e44e2b875b829bfa8dd434775bb43aed26dea0703c91b4778981f7ea8b59e10",
+    "live-en-mobile.png": "5b2c9a64cc363df11375c454fd433dc11ae3cf0935da55ad1aa7ba562f1e2e4c",
+    "welcome-light.png": "ea31e03b94059e6e74d27f72927f3faa719687f0e39f7e5d4730fed12951bac6",
+    "welcome-dark.png": "ae47277aa23a40d081dfc2fc70634fdcffbb0ba5c08d7216be00cc02ca5f21d0"
+  },
+  "github_validation": "Uploaded state and GitHub server-provided SHA256 match local artifacts. Direct GitHub binary downloads were interrupted by network EOF and are not counted as successful downloads; all Cloudflare binary downloads were byte-verified."
+}

@@ -2,6 +2,8 @@
 
 ## 最新授权：macOS15兼容性修订
 
+已上线Production `497535a4-3955-4676-aa9a-76c1e5c38447`；源码`e3a069b`/v3.0.0-macos15-r1。官网/清单/ZIP/PKG/download及GitHub两个Release均已替换并核对；55个旧资产（含旧不可变71）及后端绑定保留。发布证据见docs/releases/macos15-repack-2026-10-15-publication.json。后续部署以此完整快照为基线，不能部署旧26门槛的包、guard或清单。
+
 维护者明确要求降低准入、替换2.9.9/3.0、增加GitHub2.9.8回退提示；本次覆盖历史旧ZIP冻结限制一次。App/PKG最低15.0，52/71版本/build保持，控制程序区段、kentsmc与PKG脚本不变，无App重编译。legacy-channel.json已固定修订后ZIP，未来不得再次无授权替换。guard允许原生Darwin≥24，13/14/未知仍暂停。旧不可变71和原版本标签保留，新标签v3.0.0-macos15-r1。修订记录docs/releases/macos15-repack-2026-10-15.json；没有15实机验证。后文26门槛/只发Beta等历史限制以本次人类明确授权为准。
 
 ## 旧系统升级事故保护（2026-10-15，当前部署）

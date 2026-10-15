@@ -22,6 +22,8 @@ iFanControl 是一个面向 Apple Silicon 带风扇机型的风扇控制工具�
 
 当前正式版本：`3.0.0` / build71（对外名称3.0，2026-10-15发布）。
 
+**当前线上部署**：macOS15修订已发布，Production `497535a4-3955-4676-aa9a-76c1e5c38447`，源码`e3a069b`/`v3.0.0-macos15-r1`。官网、旧52与正式/Beta71清单、对应ZIP/PKG、两个域名/download及GitHub两个Release已更新。保留55个原资产（含原不可变71），新增3个兼容修订文件；其余后端与运行绑定保持。公网逐字节/SHA、15/26放行和13/14/未知暂停、中英文官网实际渲染及安装RTFD深浅色已核验。PKG71 SHA `aa1b57720cf99b0111b8591f5e07571f1f1c7abc13ebb1c1502c6af78063983c`，52ZIP SHA `61dc279c0b50647746a7fc5dad519a5ecaba22dabe9a97a984d3b3fbc45311ff`；GitHub服务端摘要一致。发布与回退见docs/releases/macos15-repack-2026-10-15-publication.json；前一6f3a部署是26门槛紧急拦截，回退时须注意它会再次暂停15。
+
 **最新授权与兼容性修订**：维护者随后明确要求直接降低门槛、替换2.9.9和3.0并提示可去GitHub下载2.9.8。本次覆盖旧ZIP永久冻结限制一次：52/71版本和build保持，App/PKG准入改15.0，从已发布程序重新签名打包，无App重编译；所有程序区段、kentsmc及PKG安装脚本不变。旧不可变71包和原版本标签保留，新增macos15文件路径/revision避免旧缓存；当前legacy-channel.json固定新52ZIP哈希。guard放行可识别Darwin≥24，13/14/未知继续暂停。回退提示覆盖安装介绍、ZIP文档、manifest、官网和GitHub；同build已安装用户不会重复提示。修订记录docs/releases/macos15-repack-2026-10-15.json与新标签v3.0.0-macos15-r1；低于15不在此次放开范围，尚无15实机验证。以下应急guard26及禁止发包段落为此前历史，最新授权优先。
 
 **2026-10-15旧系统应急保护（优先于下文历史部署状态）**：用户报告macOS15.2升级2.9.9后无法打开。build51起App最低系统提高到26，而旧更新器不判断系统；此前只验证ZIP→PKG衔接，遗漏系统兼容。当前Production已为`6f3a60a0-a09b-42d7-99dc-cd5258aa943f`：仅旧/update-manifest.json增加guard，可识别CFNetwork/Darwin≥25继续原52，旧系统/未知请求返回build0、无资产，暂停不兼容升级。63个静态资产、正式/Beta71及运行绑定不变。后续部署必须保留guard和路由，不能用原71 worker覆盖。详见docs/development/macos15-upgrade-incident.md与docs/releases/macos15-incident-2026-10-15.json。
