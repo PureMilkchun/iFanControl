@@ -2,13 +2,16 @@
   "latest_version": "2.9.9",
   "latest_build": 52,
   "min_supported_build": 1,
-  "published_at": "2026-10-04T15:41:08Z",
+  "published_at": "2026-10-15T05:33:35.575Z",
   "mandatory": false,
   "rollout_percent": 100,
-  "notes": "优化安装体验。",
+  "notes": "优化安装体验。\n\n兼容性提示：现已开放 macOS 15 或更新版本。若出现兼容性问题，可前往 GitHub 下载 2.9.8：https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.8",
   "assets": {
-    "macos_arm64_zip_url": "https://ifan-59w.pages.dev/iFanControl-legacy-2.9.9.zip?build=52",
-    "sha256": "b80296cbd80e7878e476e9dce0a1aaf03acea1decadf6d628d3743680771610d",
-    "size": 6111690
-  }
+    "macos_arm64_zip_url": "https://ifan-59w.pages.dev/iFanControl-legacy-2.9.9-macos15.zip?build=52&revision=macos15-r1",
+    "sha256": "61dc279c0b50647746a7fc5dad519a5ecaba22dabe9a97a984d3b3fbc45311ff",
+    "size": 6112085
+  },
+  "minimum_macos": "15.0",
+  "distribution_revision": "macos15-r1",
+  "fallback_url": "https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.8"
 }

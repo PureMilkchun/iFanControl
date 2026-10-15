@@ -46,6 +46,11 @@ paragraph(copy["before_install"]!, size: 13, weight: .semibold, spaceAfter: 6)
 paragraph(copy["installation"]!, size: 12, spaceAfter: 18)
 paragraph(copy["requirements"]!, size: 10, spaceAfter: 4, color: .secondaryLabelColor)
 paragraph(copy["compatibility"]!, size: 10, color: .secondaryLabelColor)
+if let rollbackURL = copy["rollback_url"], let url = URL(string: rollbackURL) {
+    let range = (document.string as NSString).range(of: "GitHub 下载 2.9.8", options: .backwards)
+    guard range.location != NSNotFound else { fatalError("Missing compatibility fallback link text") }
+    document.addAttribute(.link, value: url, range: range)
+}
 
 let data = try document.data(from: NSRange(location: 0, length: document.length),
                              documentAttributes: [.documentType: NSAttributedString.DocumentType.rtfd])

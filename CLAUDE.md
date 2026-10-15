@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+## 最新授权：macOS15兼容性修订
+
+维护者明确要求降低准入、替换2.9.9/3.0、增加GitHub2.9.8回退提示；本次覆盖历史旧ZIP冻结限制一次。App/PKG最低15.0，52/71版本/build保持，控制程序区段、kentsmc与PKG脚本不变，无App重编译。legacy-channel.json已固定修订后ZIP，未来不得再次无授权替换。guard允许原生Darwin≥24，13/14/未知仍暂停。旧不可变71和原版本标签保留，新标签v3.0.0-macos15-r1。修订记录docs/releases/macos15-repack-2026-10-15.json；没有15实机验证。后文26门槛/只发Beta等历史限制以本次人类明确授权为准。
+
 ## 旧系统升级事故保护（2026-10-15，当前部署）
 
 当前Production为`6f3a60a0-a09b-42d7-99dc-cd5258aa943f`。旧静态manifest/ZIP仍52，但旧/update-manifest.json的GET/HEAD已增加系统guard：可识别CFNetwork/Darwin≥25才返回52，旧系统/未知UA返回build0/null暂停。正式/Beta71不变。未来部署必须保留functions/update-manifest.json.js及路由，不能复用下面历史71 worker直接覆盖。源码在packaging/pkg/legacy-update-os-guard.mjs，实际worker验证脚本scripts/verify_legacy_os_guard.mjs，事故记录docs/development/macos15-upgrade-incident.md。

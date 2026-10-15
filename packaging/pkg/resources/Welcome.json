@@ -3,6 +3,7 @@
   "tagline": "查看温度，按需调整风扇。",
   "before_install": "安装前，请先退出 iFanControl。",
   "installation": "安装需要管理员密码，现有设置会保留。\n完成后，从「应用程序」打开即可。",
-  "requirements": "带风扇的 M 系列 Mac · macOS 26 或更新版本",
-  "compatibility": "开发者仅有一台 Mac mini M4，已稳定运行数月。\n其他机型理论上可用，实际需试用确认。"
+  "requirements": "带风扇的 M 系列 Mac · macOS 15 或更新版本",
+  "compatibility": "开发者仅在 Mac mini M4 上长期验证，其他机型请试用确认。\n若出现兼容性问题，可前往 GitHub 下载 2.9.8。",
+  "rollback_url": "https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.8"
 }

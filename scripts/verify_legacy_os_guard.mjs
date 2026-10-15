@@ -23,7 +23,6 @@ const env = { ASSETS: { async fetch(request) {
 const ctx = { waitUntil() {}, passThroughOnException() {} };
 let cases = 0;
 const pausedAgents = [
-    "iFanControl/50 CFNetwork/3826 Darwin/24.2.0", // macOS 15.2
     "MacFanControl/44 CFNetwork/1496 Darwin/23.6.0", // macOS 14
     "MacFanControl/35 CFNetwork/1408 Darwin/22.6.0", // macOS 13
     "iFanControl/50 CFNetwork/3826", // unknown kernel
@@ -45,7 +44,7 @@ for (const agent of pausedAgents) {
     assert.equal(assetReads, reads, "paused request must not fall through to unsafe manifest");
     cases++;
 }
-for (const agent of ["iFanControl/50 CFNetwork/3860 Darwin/25.0.0", "MacFanControl/44 CFNetwork/1 Darwin/26.1.0"]) {
+for (const agent of ["iFanControl/50 CFNetwork/3826 Darwin/24.2.0", "iFanControl/50 CFNetwork/3860 Darwin/25.0.0", "MacFanControl/44 CFNetwork/1 Darwin/26.1.0"]) {
     const response = await worker.fetch(new Request("https://example.test/update-manifest.json", {
         headers: { "User-Agent": agent }
     }), env, ctx);
@@ -68,7 +67,9 @@ for (const name of ["update-manifest.json", "download"]) {
     assert.equal(await response.text(), "");
     if (name === "download") {
         assert.equal(response.status, 302);
-        assert.equal(response.headers.get("Location"), "https://example.test/iFanControl-macOS.pkg?build=71");
+        const location = new URL(response.headers.get("Location"));
+        assert.equal(location.pathname, "/iFanControl-macOS.pkg");
+        assert.equal(location.searchParams.get("build"), "71");
     } else assert.equal(response.status, 200);
     cases++;
 }

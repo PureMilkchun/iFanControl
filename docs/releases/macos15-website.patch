@@ -1,0 +1,82 @@
+--- a/index.html
++++ b/index.html
+@@ -142,6 +142,8 @@
+           <p class="panel-copy" data-i18n="compat_tested">开发者只有一台 Mac mini M4，已在这台机器上稳定运行数月，日常使用正常。</p>
+           <p class="panel-copy" data-i18n="compat_other">其他带风扇的 M 系列 Mac 理论上可用，实际是否正常，需要在你的机器上试用确认。</p>
+ 
++          <p class="panel-copy"><span data-i18n="compat_fallback">若出现兼容性问题，可前往</span> <a href="https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.8" style="text-decoration:underline;text-underline-offset:3px" data-i18n="compat_fallback_link">GitHub 下载 2.9.8</a><span data-i18n="compat_fallback_end">。</span></p>
++
+           <div class="cta-group">
+             <a class="cta-button primary" href="./download" data-i18n="cta_download">下载应用</a>
+             <a class="cta-button secondary" href="https://github.com/PureMilkchun/iFanControl" data-i18n="cta_source">查看源码</a>
+@@ -150,13 +152,13 @@
+         </section>
+ 
+         <footer class="panel-footer label-micro">
+-          <span data-i18n="footer_platform">macOS 26+ / Apple Silicon</span>
++          <span data-i18n="footer_platform">macOS 15+ / Apple Silicon</span>
+           <span>
+             <a href="./download" data-i18n="footer_download">下载 PKG</a>
+             /
+             <a href="https://github.com/PureMilkchun/iFanControl">GitHub</a>
+             /
+-            <a href="./iFanControl-legacy-2.9.9.zip" data-i18n="footer_legacy">旧版升级至 2.9.9</a>
++            <a href="./iFanControl-legacy-2.9.9-macos15.zip?revision=macos15-r1" data-i18n="footer_legacy">旧版升级至 2.9.9</a>
+           </span>
+         </footer>
+         <div class="build-tag label-micro" data-latest-build data-calligraph data-calligraph-from="build 00">build --</div>
+@@ -371,6 +373,9 @@
+             compat_title: "Mac mini M4 已验证",
+             compat_tested: "开发者只有一台 Mac mini M4，已在这台机器上稳定运行数月，日常使用正常。",
+             compat_other: "其他带风扇的 M 系列 Mac 理论上可用，实际是否正常，需要在你的机器上试用确认。",
++            compat_fallback: "若出现兼容性问题，可前往",
++            compat_fallback_link: "GitHub 下载 2.9.8",
++            compat_fallback_end: "。",
+             mode_label: "控制模式",
+             mode_value: "自动 / 手动",
+             curve_label: "曲线编辑",
+@@ -414,7 +419,7 @@
+             showcase_info: "信息栏展示配置",
+             showcase_power: "实时电力估算",
+             showcase_safety: "安全兜底转速",
+-            footer_platform: "macOS 26+ / Apple Silicon",
++            footer_platform: "macOS 15+ / Apple Silicon",
+             footer_download: "下载 PKG",
+             footer_legacy: "旧版升级至 2.9.9",
+             voices_label: "用户声音",
+@@ -440,6 +445,9 @@
+             compat_title: "Verified on Mac mini M4",
+             compat_tested: "The developer owns only a Mac mini M4. iFanControl has run stably on it for several months in daily use.",
+             compat_other: "Other fan-equipped M-series Macs may work in theory. Actual compatibility needs to be confirmed by trying it on your Mac.",
++            compat_fallback: "If you encounter compatibility issues, visit",
++            compat_fallback_link: "GitHub to download 2.9.8",
++            compat_fallback_end: ".",
+             mode_label: "Control Modes",
+             mode_value: "Auto / Manual",
+             curve_label: "Curve Editor",
+@@ -483,7 +491,7 @@
+             showcase_info: "Info bar display options",
+             showcase_power: "Live power estimate",
+             showcase_safety: "Safety floor control",
+-            footer_platform: "macOS 26+ / Apple Silicon",
++            footer_platform: "macOS 15+ / Apple Silicon",
+             footer_download: "Download PKG",
+             footer_legacy: "Upgrade older versions to 2.9.9",
+             voices_label: "User Voices",
+--- a/timeline.json
++++ b/timeline.json
+@@ -2,6 +2,14 @@
+   {
+     "date": "2026-10-15",
+     "entries": [
++      {
++        "time": "13:33",
++        "version": "v3.0.0 / build 71 · macOS 15",
++        "desc": {
++          "zh": "2.9.9 与 3.0 已开放 macOS 15 或更新版本的安装与启动准入，风扇控制策略与工具保持不变。若出现兼容性问题，可前往 <a href=\"https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.8\">GitHub 下载 2.9.8</a>。本次为同 build 安装包修订，已安装新版的用户无需重复更新。",
++          "en": "The 2.9.9 and 3.0 packages now allow macOS 15 or newer. Fan control and the tool are unchanged. For compatibility issues, <a href=\"https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.8\">download 2.9.8 from GitHub</a>. This is a same-build package revision; existing installations do not need to update again."
++        }
++      },
+       {
+         "time": "11:15",
+         "version": "v3.0.0 / build 71",

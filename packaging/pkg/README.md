@@ -1,5 +1,7 @@
 # iFanControl PKG 构建
 
+2026-10-15维护者随后明确授权降低准入、替换2.9.9和3.0，覆盖本文件历史冻结包限制一次：版本/build仍52和71，App/PKG准入15.0，控制程序区段、工具和PKG安装脚本保持。新版ZIP/PKG使用macos15独立路径及revision缓存标记，旧不可变71包保留；guard允许Darwin≥24，其余暂停。安装介绍/ZIP文档/更新说明/官网/GitHub提供2.9.8回退链接。修订记录见../../docs/releases/macos15-repack-2026-10-15.json；后续以新版legacy-channel.json为固定哈希，禁止再次无授权替换。旧v3.0.0/v2.9.9-build52标签不移动，新修订标签v3.0.0-macos15-r1。以下26要求及部署信息为本次替换前历史。
+
 2026-10-15应急保护：旧静态清单/双ZIP仍固定52，但线上旧manifest已按系统请求分流，旧系统/未知UA暂停升级。后续部署必须保留当前Production `6f3a60a0-a09b-42d7-99dc-cd5258aa943f`的guard和路由。`verify_channels.py`验证固定文件；线上行为另用`scripts/verify_legacy_os_guard.mjs`与公网UA检查。详见`../../docs/development/macos15-upgrade-incident.md`。当前71仍要求macOS26，旧系统兼容尚未验收。
 
 从 active 工程的 App 与 kentsmc 构建系统安装包，不执行安装。
@@ -13,7 +15,7 @@ bash packaging/pkg/test_updates.sh
 
 也支持用 --source-zip /path/archive.zip --manifest /path/legacy-manifest.json 读取经过校验的旧版 ZIP。
 
-包内包含 App、kentsmc 与所需授权配置，不包含用户 config.json。介绍页嵌入真实 App 图标，结束页保留系统原生打钩；左侧提供打开 App 和系统阻止打开时的操作提示。适用于 Apple Silicon、macOS 26 或更新版本、当前启动磁盘；安装前须退出 App。已有配置、日志和开机自启动设置会保留。
+包内包含 App、kentsmc 与所需授权配置，不包含用户 config.json。介绍页嵌入真实 App 图标与GitHub2.9.8回退链接，结束页保留系统原生打钩；左侧提供打开 App 和系统阻止打开时的操作提示。准入适用于 Apple Silicon、macOS 15 或更新版本、当前启动磁盘；安装前须退出 App。已有配置、日志和开机自启动设置会保留。macOS15尚无实机结果，不将准入声明写成所有设备的兼容性保证。
 
 构建会展开最终安装包并核对文件、脚本、代码签名与校验值。输出中的 build-info.json 记录来源与验证。
 

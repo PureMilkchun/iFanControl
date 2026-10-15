@@ -101,6 +101,8 @@ def main():
         assert info["CFBundleIdentifier"] == "com.ifancontrol.app"
         assert info["CFBundleShortVersionString"] == version
         assert info["CFBundleVersion"] == str(build)
+        minimum_os = info["LSMinimumSystemVersion"]
+        assert minimum_os == "15.0", "App and PKG must share the macOS15 admission requirement"
         run("/usr/bin/codesign", "--verify", "--strict", app)
         run("/usr/bin/codesign", "--verify", tool)
 
@@ -151,7 +153,7 @@ def main():
         run("/usr/sbin/pkgutil", "--flatten", component_expanded, component_package)
 
         requirements = work / "requirements.plist"
-        requirements.write_bytes(plistlib.dumps({"os": ["26.0"], "arch": ["arm64"]}))
+        requirements.write_bytes(plistlib.dumps({"os": [minimum_os], "arch": ["arm64"]}))
         distribution = work / "Distribution.xml"
         run("/usr/bin/productbuild", "--synthesize", "--product", requirements,
             "--package", component_package, distribution)
@@ -215,7 +217,7 @@ def main():
         "app_executable_sha256": sha256(arguments.app / "Contents/MacOS/iFanControl") if arguments.app else None,
         "app_version": version, "app_build": build, "package_version": package_version,
         "package_identifier": IDENTIFIER, "package": str(package), "sha256": checksum,
-        "signed": False, "notarized": False, "minimum_os": "26.0", "architecture": "arm64",
+        "signed": False, "notarized": False, "minimum_os": minimum_os, "architecture": "arm64",
         "verification": ["local App/tool inputs" if arguments.tool else "ZIP matches manifest", "payload hashes match selected App and tool",
                          "existing ad-hoc code signatures valid", "shell syntax valid", "system command paths executable", "sudoers syntax valid"],
         "installation_tested": False,

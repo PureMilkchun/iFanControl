@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the frozen legacy channel and the current native PKG channel before deployment."""
+"""Check the pinned build52 revision and current native PKG channel before deployment."""
 import argparse
 import hashlib
 import json
@@ -31,6 +31,7 @@ def verify(docs, pin):
         assert not any(Path(name).name == "config.json" for name in z.namelist())
         info = plistlib.loads(z.read("iFanControl.app/Contents/Info.plist"))
         assert info["CFBundleShortVersionString"] == "2.9.9" and info["CFBundleVersion"] == "52"
+        assert info["LSMinimumSystemVersion"] == "15.0"
         assert b"update-manifest-pkg.json" in z.read("iFanControl.app/Contents/MacOS/iFanControl")
 
     package = docs / Path(urlparse(latest["assets"]["macos_arm64_pkg_url"]).path).name
@@ -50,7 +51,7 @@ def verify(docs, pin):
         assert hashlib.sha256(beta_package.read_bytes()).hexdigest() == beta["assets"]["pkg_sha256"]
         assert f'?build={beta["latest_build"]}' in beta["assets"]["macos_arm64_pkg_url"]
         print("PASS: Beta feed isolated; package SHA256 and shared build sequence valid")
-    print("PASS: legacy channel frozen at 2.9.9/build52; native PKG channel and both artifact hashes valid")
+    print("PASS: legacy channel pinned at 2.9.9/build52 macOS15 revision; native PKG channel and both artifact hashes valid")
 
 
 if __name__ == "__main__":
