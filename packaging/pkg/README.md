@@ -1,5 +1,7 @@
 # iFanControl PKG 构建
 
+2026-10-15应急保护：旧静态清单/双ZIP仍固定52，但线上旧manifest已按系统请求分流，旧系统/未知UA暂停升级。后续部署必须保留当前Production `6f3a60a0-a09b-42d7-99dc-cd5258aa943f`的guard和路由。`verify_channels.py`验证固定文件；线上行为另用`scripts/verify_legacy_os_guard.mjs`与公网UA检查。详见`../../docs/development/macos15-upgrade-incident.md`。当前71仍要求macOS26，旧系统兼容尚未验收。
+
 从 active 工程的 App 与 kentsmc 构建系统安装包，不执行安装。
 
 ```sh

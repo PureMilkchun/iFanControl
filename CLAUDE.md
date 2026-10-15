@@ -1,5 +1,11 @@
 # CLAUDE.md
 
+## 旧系统升级事故保护（2026-10-15，当前部署）
+
+当前Production为`6f3a60a0-a09b-42d7-99dc-cd5258aa943f`。旧静态manifest/ZIP仍52，但旧/update-manifest.json的GET/HEAD已增加系统guard：可识别CFNetwork/Darwin≥25才返回52，旧系统/未知UA返回build0/null暂停。正式/Beta71不变。未来部署必须保留functions/update-manifest.json.js及路由，不能复用下面历史71 worker直接覆盖。源码在packaging/pkg/legacy-update-os-guard.mjs，实际worker验证脚本scripts/verify_legacy_os_guard.mjs，事故记录docs/development/macos15-upgrade-incident.md。
+
+维护者优先希望兼容旧系统。App Mach-O最低13不等于完整产品兼容：kentsmc声明26，公开build50与71使用同一工具，未实机验证15。禁止仅降低plist/PKG或修补二进制版本声明就发布兼容承诺；先确认工具执行、遥测、控制和系统接管，保持M4策略。
+
 ## 当前正式发布（2026-10-15）
 
 维护者已审核并授权发布3.0.0/build71（对外3.0）。沿用已发布Beta70程序，仅更新版本/build/正式身份和签名，风扇控制策略、工具与有效程序区段保持。正式与Beta feed均指向stable71，Beta使用不可变71包，官网下载与/download均71；旧ZIP/manifest仍永久52。Production `56371256-511d-4101-9f6d-0a8d25713eab`，源码标签v3.0.0，记录见docs/releases/3.0.0-build71*.json。下一build大于71。下文Beta62～70发布段落是历史，不代表当前正式线路仍52。

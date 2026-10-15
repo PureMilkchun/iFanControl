@@ -22,6 +22,10 @@ iFanControl 是一个面向 Apple Silicon 带风扇机型的风扇控制工具�
 
 当前正式版本：`3.0.0` / build71（对外名称3.0，2026-10-15发布）。
 
+**2026-10-15旧系统应急保护（优先于下文历史部署状态）**：用户报告macOS15.2升级2.9.9后无法打开。build51起App最低系统提高到26，而旧更新器不判断系统；此前只验证ZIP→PKG衔接，遗漏系统兼容。当前Production已为`6f3a60a0-a09b-42d7-99dc-cd5258aa943f`：仅旧/update-manifest.json增加guard，可识别CFNetwork/Darwin≥25继续原52，旧系统/未知请求返回build0、无资产，暂停不兼容升级。63个静态资产、正式/Beta71及运行绑定不变。后续部署必须保留guard和路由，不能用原71 worker覆盖。详见docs/development/macos15-upgrade-incident.md与docs/releases/macos15-incident-2026-10-15.json。
+
+维护者选择优先争取兼容旧系统，困难时保留旧线维护。主程序Mach-O最低13，但kentsmc声明26；官方build50与71工具哈希相同，不能只降App/PKG门槛或凭旧版名称认定工具兼容。尚无macOS15实际运行结果、工具对应源码或兼容候选包；已准备只读检测包供旧系统验证，代理未执行硬件命令。下一步需确认用户降级版本及真实读写结果，M4正式控制策略保持。
+
 正式发布：维护者审核完整更新说明后授权推送。以已发布Beta70程序为基线，仅将Info.plist改为3.0.0/build71并移除Beta身份，重新签名打包；36个有效程序区段与Beta70一致，未重编译应用、修改风扇策略或工具。PKG SHA256 `1e43404105f5927c89ba26e893505ec00639626d86d6833952f6e97ae0138f6c`，源码标签`v3.0.0`/提交`411ed81`。Production `56371256-511d-4101-9f6d-0a8d25713eab`；正式与Beta feed均为stable71，Beta使用不可变包，两个域名/download均71。旧manifest及双ZIP仍52，公网逐字节/hash核验通过；58个旧资产及后端绑定保留，后端仅修改下载目标编号。来源与发布记录见`docs/releases/3.0.0-build71*.json`；实际安装/硬件控制未由代理执行。下一build必须大于71。
 
 以下62～70段落保留为历史，正式/旧线路状态以本段为准。

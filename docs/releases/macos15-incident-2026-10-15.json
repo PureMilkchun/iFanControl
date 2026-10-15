@@ -1,0 +1,36 @@
+{
+  "deployment": "6f3a60a0-a09b-42d7-99dc-cd5258aa943f",
+  "previous": "56371256-511d-4101-9f6d-0a8d25713eab",
+  "all_static_assets_unchanged": 63,
+  "stable_build": 71,
+  "beta_build": 71,
+  "checks": [
+    {
+      "request": "mac15",
+      "latest_build": 0
+    },
+    {
+      "request": "unknown",
+      "latest_build": 0
+    },
+    {
+      "request": "mac26",
+      "latest_build": 52
+    }
+  ],
+  "runtime_bindings_preserved": true,
+  "zip_archives_unchanged": true,
+  "guard_source_sha256": "b32cd964321c695d8eb52bc77c21bb26fd495e20b815f807dbabb6f43e1a4a46",
+  "reported_system": "macOS15.2",
+  "published_at": "2026-10-15",
+  "old_archive_sha256": "39fe6298e1cd8ec754ef9d64b7a82cefbf1737971234ecf540203e7c703ea532",
+  "old_app_minimum_os": "13.0",
+  "bridge_app_minimum_os": "26.0",
+  "current_app_binary_minimum_os": "13.0",
+  "tool_sha256": "56b9b4f7239b4b043b8b69c92ed23f184eaf55a6b7d67c419d899da3a7254605",
+  "tool_binary_minimum_os": "26.0",
+  "offline_actual_worker_cases": 16,
+  "actual_macos15_execution": false,
+  "compatibility_candidate_published": false,
+  "source_recording": "Guard deployed before this source checkpoint; source hash identifies exact handler."
+}
