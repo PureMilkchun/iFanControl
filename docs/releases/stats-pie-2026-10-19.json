@@ -109,5 +109,20 @@
     "Existing unchanged Functions source rebundled; previous compiled worker source unavailable through API."
   ],
   "rollback": "Cloudflare Pages rollback to previous_deployment.",
-  "source_note": "Stats resides in dirty parent repository. This app-repo commit records only the isolated production delta, regression and evidence; unrelated parent changes are excluded."
+  "source_note": "Stats resides in dirty parent repository. This app-repo commit records only the isolated production delta, regression and evidence; unrelated parent changes are excluded.",
+  "production_verification": {
+    "deployment_id": "f52375df-bdb0-4d3c-98b9-f6c4893a175f",
+    "url": "https://ifan-stats.pages.dev",
+    "only_changed_asset": "/app.js",
+    "other_assets_unchanged": 10,
+    "runtime_config_preserved": true,
+    "http_checks": {
+      "/app.js": 200,
+      "/api/auth/session": 401,
+      "/api/dashboard/summary": 401,
+      "/reedensync": 302
+    },
+    "live_script_sha256": "8624121d7565d09ae185a6482e8e1e545f205e44b791e970619c90c74976741a",
+    "authenticated_live_test": false
+  }
 }
