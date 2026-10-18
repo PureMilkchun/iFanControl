@@ -1,0 +1,23 @@
+--- a/ifan-stats/app.js
++++ b/ifan-stats/app.js
+@@ -335,6 +335,9 @@
+     const frac = rows[i].count / total;
+     const slice = frac * Math.PI * 2;
+     if (slice < 0.02) { angle += slice; continue; }
++    // Keep both margins within this slice; reversed arc endpoints wrap around
++    // almost a full circle and would cover previously drawn small percentages.
++    const sliceGap = Math.min(gap, slice / 4);
+ 
+     const mid = angle + slice / 2;
+     const isHovered = (i === hoverIdx);
+@@ -342,8 +345,8 @@
+     const sy = isHovered ? Math.sin(mid) * pullOut : 0;
+ 
+     ctx.beginPath();
+-    ctx.arc(cx + sx, cy + sy, outerR, angle + gap, angle + slice - gap);
+-    ctx.arc(cx + sx, cy + sy, innerR, angle + slice - gap, angle + gap, true);
++    ctx.arc(cx + sx, cy + sy, outerR, angle + sliceGap, angle + slice - sliceGap);
++    ctx.arc(cx + sx, cy + sy, innerR, angle + slice - sliceGap, angle + sliceGap, true);
+     ctx.closePath();
+     ctx.fillStyle = palette[i % palette.length];
+     if (!isHovered && hoverIdx != null) ctx.globalAlpha = 0.45;

@@ -1,0 +1,113 @@
+{
+  "project": "ifan-stats",
+  "production_url": "https://ifan-stats.pages.dev",
+  "previous_deployment": "5e8435ab-dd71-466d-874d-2f6d471c8ea5",
+  "changed_assets": [
+    "/app.js"
+  ],
+  "cause": "Fixed angular margins exceeded small sector sweep, causing Canvas arc to wrap nearly 2pi and overwrite earlier sectors.",
+  "fix": "Cap each margin at one quarter of its sector sweep; preserve original small-sector skip threshold.",
+  "before_sha256": "3962304a87639d02cabd12bb9b6edf223cb273c91210fb310306a68cff562bbb",
+  "after_sha256": "8624121d7565d09ae185a6482e8e1e545f205e44b791e970619c90c74976741a",
+  "browser_verification": {
+    "expectBug": false,
+    "cases": [
+      {
+        "theme": "light",
+        "name": "reported",
+        "total": 192,
+        "mismatches": 0
+      },
+      {
+        "theme": "light",
+        "name": "near-skip-boundary",
+        "total": 314,
+        "mismatches": 0
+      },
+      {
+        "theme": "light",
+        "name": "below-gap-width",
+        "total": 126,
+        "mismatches": 0
+      },
+      {
+        "theme": "light",
+        "name": "above-gap-width",
+        "total": 125,
+        "mismatches": 0
+      },
+      {
+        "theme": "light",
+        "name": "single-version",
+        "total": 192,
+        "mismatches": 0
+      },
+      {
+        "theme": "light",
+        "name": "zero-and-tiny",
+        "total": 1001,
+        "mismatches": 0
+      },
+      {
+        "theme": "light",
+        "name": "empty",
+        "total": 0,
+        "mismatches": 0
+      },
+      {
+        "theme": "dark",
+        "name": "reported",
+        "total": 192,
+        "mismatches": 0
+      },
+      {
+        "theme": "dark",
+        "name": "near-skip-boundary",
+        "total": 314,
+        "mismatches": 0
+      },
+      {
+        "theme": "dark",
+        "name": "below-gap-width",
+        "total": 126,
+        "mismatches": 0
+      },
+      {
+        "theme": "dark",
+        "name": "above-gap-width",
+        "total": 125,
+        "mismatches": 0
+      },
+      {
+        "theme": "dark",
+        "name": "single-version",
+        "total": 192,
+        "mismatches": 0
+      },
+      {
+        "theme": "dark",
+        "name": "zero-and-tiny",
+        "total": 1001,
+        "mismatches": 0
+      },
+      {
+        "theme": "dark",
+        "name": "empty",
+        "total": 0,
+        "mismatches": 0
+      }
+    ],
+    "synthetic": true
+  },
+  "additional_checks": [
+    "reedensync-admin.mjs PASS",
+    "activity-rollups.mjs PASS",
+    "Actual screenshots reviewed: light/dark, desktop/mobile, hover"
+  ],
+  "limits": [
+    "No authenticated live dashboard screenshot: saved local credentials rejected with HTTP401. No password reset.",
+    "Existing unchanged Functions source rebundled; previous compiled worker source unavailable through API."
+  ],
+  "rollback": "Cloudflare Pages rollback to previous_deployment.",
+  "source_note": "Stats resides in dirty parent repository. This app-repo commit records only the isolated production delta, regression and evidence; unrelated parent changes are excluded."
+}
