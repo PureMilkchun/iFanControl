@@ -3,9 +3,12 @@
   "preview_url": "http://127.0.0.1:8765/",
   "base_production": "497535a4-3955-4676-aa9a-76c1e5c38447",
   "scope": [
-    "Remove website donation CTA, payment modal, handlers and translations",
-    "Remove unused donation CSS; rename compatibility heading class without visual changes",
-    "Two equal CTA columns; 12px gap; minimum44px height and48px on small screens; narrow-screen label spacing"
+    "Keep removal of all author-support UI and handlers",
+    "Consolidate duplicated mode/curve/monitoring descriptions into three capability rows",
+    "Replace prominent free badge with one quiet sentence near actions",
+    "Prioritize product explanation and download/source buttons",
+    "Keep M4 testing scope and other-device caveat visible; disclose context and two older-version links on demand",
+    "Preserve existing page identity, hero, voices, timeline, routes, backend and update distribution"
   ],
   "source_changes": [
     "../docs/index.html",
@@ -13,8 +16,8 @@
   ],
   "reproduce_css_patch": "Copy docs/styles.20260610a.css to docs/styles.20261022a.css, then apply the CSS patch. The HTML patch updates the stylesheet reference.",
   "source_sha256": {
-    "../docs/index.html": "e3682edd9c4af6dc3a26d0513df9fe233fa37a2b23cce5f259a1da98b913abc3",
-    "../docs/styles.20261022a.css": "3efdca2129eb8f4823cad0614a155ec471b5a080f1c71afb07c4fa84d695712d"
+    "../docs/index.html": "e451e625042bfc71a5858dbbcbf59550306866ce546dd842975c933f84549a41",
+    "../docs/styles.20261022a.css": "e5f323430c08f50776319a99ccecf7ec922526b6ae85281bdb2ef2033c0afeac"
   },
   "verification": [
     {
@@ -22,14 +25,14 @@
       "buttons": [
         {
           "x": 1038,
-          "y": 958.921875,
+          "y": 516.453125,
           "w": 177,
           "h": 48,
           "overflow": false
         },
         {
           "x": 1227,
-          "y": 958.921875,
+          "y": 516.453125,
           "w": 177,
           "h": 48,
           "overflow": false
@@ -45,14 +48,14 @@
       "buttons": [
         {
           "x": 1038,
-          "y": 965.8125,
+          "y": 515.453125,
           "w": 177,
           "h": 45,
           "overflow": false
         },
         {
           "x": 1227,
-          "y": 965.8125,
+          "y": 515.453125,
           "w": 177,
           "h": 45,
           "overflow": false
@@ -68,14 +71,14 @@
       "buttons": [
         {
           "x": 930.8125,
-          "y": 991.25,
+          "y": 569.609375,
           "w": 157.59375,
           "h": 45,
           "overflow": false
         },
         {
           "x": 1100.40625,
-          "y": 991.25,
+          "y": 569.609375,
           "w": 157.59375,
           "h": 45,
           "overflow": false
@@ -91,14 +94,14 @@
       "buttons": [
         {
           "x": 24,
-          "y": 1584.578125,
+          "y": 1014.84375,
           "w": 165,
           "h": 48,
           "overflow": false
         },
         {
           "x": 201,
-          "y": 1584.578125,
+          "y": 1014.84375,
           "w": 165,
           "h": 48,
           "overflow": false
@@ -114,14 +117,14 @@
       "buttons": [
         {
           "x": 24,
-          "y": 1615.078125,
+          "y": 1074,
           "w": 165,
           "h": 48,
           "overflow": false
         },
         {
           "x": 201,
-          "y": 1615.078125,
+          "y": 1074,
           "w": 165,
           "h": 48,
           "overflow": false
@@ -137,14 +140,14 @@
       "buttons": [
         {
           "x": 24,
-          "y": 1613.15625,
+          "y": 1060.015625,
           "w": 130,
           "h": 48,
           "overflow": false
         },
         {
           "x": 166,
-          "y": 1613.15625,
+          "y": 1060.015625,
           "w": 130,
           "h": 48,
           "overflow": false
@@ -172,5 +175,15 @@
     "Update feeds and packages",
     "Backend/data/authentication",
     "Production deployment"
-  ]
+  ],
+  "revision": 2,
+  "review_feedback": "Sidebar instructions looked cluttered and lacked hierarchy.",
+  "in_app_verification": {
+    "updated_existing_preview_tab": true,
+    "disclosure_click_and_Return_verified": true,
+    "fallback_and_bridge_hrefs_verified": true,
+    "final_state": "Collapsed disclosure; new introduction and download area in view",
+    "screenshot": "packaging/pkg/output/website-no-support-20261022/in-app-review.png"
+  },
+  "design_principle": "Say each capability once. Establish product/actions/compatibility hierarchy through typography and grouping. Keep important compatibility caveats visible; move optional details behind a labelled disclosure."
 }

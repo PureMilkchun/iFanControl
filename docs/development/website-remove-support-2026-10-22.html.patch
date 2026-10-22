@@ -9,28 +9,127 @@
    </head>
    <body>
      <section class="landing-screen">
-@@ -77,7 +77,7 @@
+@@ -75,92 +75,38 @@
+           </div>
+         </section>
  
-         <section class="telemetry-primary">
-           <div class="label-micro muted" data-i18n="compat_label">适配说明</div>
+-        <section class="telemetry-primary">
+-          <div class="label-micro muted" data-i18n="compat_label">适配说明</div>
 -          <div class="support-title" data-i18n="compat_title">Mac mini M4 已验证</div>
-+          <div class="compat-title" data-i18n="compat_title">Mac mini M4 已验证</div>
+-
+-          <div class="telemetry-meta">
+-            <div class="meta-group">
+-              <div class="meta-head">
+-                <span class="meta-icon" aria-hidden="true">◎</span>
+-                <div class="label-micro muted" data-i18n="mode_label">控制模式</div>
+-              </div>
+-              <div class="meta-value" data-i18n="mode_value">自动 / 手动</div>
+-            </div>
+-            <div class="meta-group">
+-              <div class="meta-head">
+-                <span class="meta-icon" aria-hidden="true">◌</span>
+-                <div class="label-micro muted" data-i18n="curve_label">曲线编辑</div>
+-              </div>
+-              <div class="meta-value" data-i18n="curve_value">5 点风扇曲线</div>
+-            </div>
+-          </div>
++        <section class="product-overview" aria-labelledby="overview-title">
++          <h2 id="overview-title" data-i18n="overview_title">风扇控制，尽在菜单栏。</h2>
++          <p data-i18n="overview_body">实时查看温度与转速，按自己的习惯调节。</p>
+         </section>
  
-           <div class="telemetry-meta">
-             <div class="meta-group">
-@@ -147,7 +147,6 @@
+-        <section class="info-section">
+-          <p class="panel-copy" data-i18n="panel_copy">实时温度、转速、曲线控制，全部收进菜单栏。</p>
+-
+-          <div class="free-badge">
+-            <span class="free-icon" aria-hidden="true">◈</span>
+-            <div class="free-copy">
+-              <span class="label-micro" data-i18n="free_title">Free Forever</span>
+-              <strong data-i18n="free_desc">完全免费，无订阅，无内购。</strong>
+-            </div>
+-          </div>
+-
+-          <div class="feature-list">
+-            <div class="feature-item">
+-              <span class="feature-label">
+-                <span class="feature-icon" aria-hidden="true">◐</span>
+-                <span data-i18n="f1_label">原生菜单栏</span>
+-              </span>
+-              <strong class="feature-value" data-i18n="f1_value">实时查看温度与转速</strong>
+-            </div>
+-            <div class="feature-item">
+-              <span class="feature-label">
+-                <span class="feature-icon" aria-hidden="true">⟲</span>
+-                <span data-i18n="f2_label">自动 / 手动</span>
+-              </span>
+-              <strong class="feature-value" data-i18n="f2_value">按场景切换</strong>
+-            </div>
+-            <div class="feature-item">
+-              <span class="feature-label">
+-                <span class="feature-icon" aria-hidden="true">⌁</span>
+-                <span data-i18n="f3_label">5 点曲线</span>
+-              </span>
+-              <strong class="feature-value" data-i18n="f3_value">自定义温度 / RPM</strong>
+-            </div>
+-            <div class="feature-item">
+-              <span class="feature-label">
+-                <span class="feature-icon" aria-hidden="true">≈</span>
+-                <span data-i18n="f4_label">平滑过渡算法</span>
+-              </span>
+-              <strong class="feature-value" data-i18n="f4_value">渐进调速，避免硬切不适</strong>
+-            </div>
+-          </div>
+-
+-          <p class="panel-copy" data-i18n="compat_tested">开发者只有一台 Mac mini M4，已在这台机器上稳定运行数月，日常使用正常。</p>
+-          <p class="panel-copy" data-i18n="compat_other">其他带风扇的 M 系列 Mac 理论上可用，实际是否正常，需要在你的机器上试用确认。</p>
+-
+-          <p class="panel-copy"><span data-i18n="compat_fallback">若出现兼容性问题，可前往</span> <a href="https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.8" style="text-decoration:underline;text-underline-offset:3px" data-i18n="compat_fallback_link">GitHub 下载 2.9.8</a><span data-i18n="compat_fallback_end">。</span></p>
+-
++        <ul class="capability-list" aria-labelledby="overview-title">
++          <li><strong data-i18n="cap_monitor">实时监测</strong><span data-i18n="cap_monitor_detail">温度与转速，一目了然</span></li>
++          <li><strong data-i18n="cap_control">自动 / 手动</strong><span data-i18n="cap_control_detail">按需切换控制模式</span></li>
++          <li><strong data-i18n="cap_curve">5 点风扇曲线</strong><span data-i18n="cap_curve_detail">自定义转速，平滑过渡</span></li>
++        </ul>
++
++        <section class="download-section">
++          <p class="free-note" data-i18n="free_note">完全免费，无订阅，无内购。</p>
            <div class="cta-group">
              <a class="cta-button primary" href="./download" data-i18n="cta_download">下载应用</a>
              <a class="cta-button secondary" href="https://github.com/PureMilkchun/iFanControl" data-i18n="cta_source">查看源码</a>
 -            <button class="cta-button secondary compact" type="button" data-support-open data-i18n="support_button">支持作者</button>
            </div>
++          <p class="platform-note">macOS 15+ <span aria-hidden="true">·</span> Apple Silicon</p>
          </section>
  
-@@ -298,51 +297,6 @@
-         </div>
+-        <footer class="panel-footer label-micro">
+-          <span data-i18n="footer_platform">macOS 15+ / Apple Silicon</span>
+-          <span>
+-            <a href="./download" data-i18n="footer_download">下载 PKG</a>
+-            /
+-            <a href="https://github.com/PureMilkchun/iFanControl">GitHub</a>
+-            /
+-            <a href="./iFanControl-legacy-2.9.9-macos15.zip?revision=macos15-r1" data-i18n="footer_legacy">旧版升级至 2.9.9</a>
+-          </span>
+-        </footer>
++        <section class="compatibility-note" aria-labelledby="compatibility-heading">
++          <h3 id="compatibility-heading" data-i18n="compat_status">Mac mini M4 长期实测</h3>
++          <p data-i18n="compat_caveat">其他带风扇的 M 系列 Mac，需试用确认兼容性。</p>
++          <details class="compatibility-details">
++            <summary data-i18n="compat_details">兼容性与旧版下载</summary>
++            <div class="compatibility-content">
++              <p data-i18n="compat_context">开发者目前仅有一台 Mac mini M4，已在日常使用中稳定运行数月。</p>
++              <a href="https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.8" data-i18n="compat_fallback_download">兼容性问题：下载 2.9.8</a>
++              <a href="./iFanControl-legacy-2.9.9-macos15.zip?revision=macos15-r1" data-i18n="compat_bridge_download">旧版升级：先安装 2.9.9</a>
++            </div>
++          </details>
++        </section>
+         <div class="build-tag label-micro" data-latest-build data-calligraph data-calligraph-from="build 00">build --</div>
+       </aside>
+     </section>
+@@ -299,51 +245,6 @@
        </div>
      </section>
--
+ 
 -    <div class="support-modal" data-support-modal hidden>
 -      <button class="support-backdrop" type="button" aria-label="Close" data-support-close></button>
 -      <section class="support-card" role="dialog" aria-modal="true" aria-labelledby="support-title">
@@ -75,39 +174,136 @@
 -        </div>
 -      </section>
 -    </div>
- 
+-
      <script>
        (function () {
-@@ -391,12 +345,6 @@
-             f3_value: "自定义温度 / RPM",
-             f4_label: "平滑过渡算法",
-             f4_value: "渐进调速，避免硬切不适",
+         var STORAGE_KEY = "ifc_lang";
+@@ -369,34 +270,21 @@
+             hero_tagline: "简洁的风扇控制工具。",
+             panel_home: "官方网站",
+             panel_open_source: "开源项目",
+-            compat_label: "适配说明",
+-            compat_title: "Mac mini M4 已验证",
+-            compat_tested: "开发者只有一台 Mac mini M4，已在这台机器上稳定运行数月，日常使用正常。",
+-            compat_other: "其他带风扇的 M 系列 Mac 理论上可用，实际是否正常，需要在你的机器上试用确认。",
+-            compat_fallback: "若出现兼容性问题，可前往",
+-            compat_fallback_link: "GitHub 下载 2.9.8",
+-            compat_fallback_end: "。",
+-            mode_label: "控制模式",
+-            mode_value: "自动 / 手动",
+-            curve_label: "曲线编辑",
+-            curve_value: "5 点风扇曲线",
+-            panel_copy: "实时温度、转速、曲线控制，全部收进菜单栏。",
+-            free_title: "Free Forever",
+-            free_desc: "完全免费，无订阅，无内购。",
+-            f1_label: "原生菜单栏",
+-            f1_value: "实时查看温度与转速",
+-            f2_label: "自动 / 手动",
+-            f2_value: "按场景切换",
+-            f3_label: "5 点曲线",
+-            f3_value: "自定义温度 / RPM",
+-            f4_label: "平滑过渡算法",
+-            f4_value: "渐进调速，避免硬切不适",
 -            support_button: "支持作者",
 -            support_title: "支持作者",
 -            support_wechat: "微信",
 -            support_alipay: "支付宝",
 -            support_name_wechat: "微信：PureMilk_chun（**淳）",
 -            support_name_alipay: "支付宝：**淳",
++            overview_title: "风扇控制，尽在菜单栏。",
++            overview_body: "实时查看温度与转速，按自己的习惯调节。",
++            cap_monitor: "实时监测",
++            cap_monitor_detail: "温度与转速，一目了然",
++            cap_control: "自动 / 手动",
++            cap_control_detail: "按需切换控制模式",
++            cap_curve: "5 点风扇曲线",
++            cap_curve_detail: "自定义转速，平滑过渡",
++            free_note: "完全免费，无订阅，无内购。",
++            compat_status: "Mac mini M4 长期实测",
++            compat_caveat: "其他带风扇的 M 系列 Mac，需试用确认兼容性。",
++            compat_details: "兼容性与旧版下载",
++            compat_context: "开发者目前仅有一台 Mac mini M4，已在日常使用中稳定运行数月。",
++            compat_fallback_download: "兼容性问题：下载 2.9.8",
++            compat_bridge_download: "旧版升级：先安装 2.9.9",
              cta_download: "下载应用",
              cta_source: "查看源码",
              active_label: "真实使用",
-@@ -463,12 +411,6 @@
-             f3_value: "Custom temp / RPM",
-             f4_label: "Smooth Transition",
-             f4_value: "Gradual RPM, no hard jumps",
+@@ -419,9 +307,6 @@
+             showcase_info: "信息栏展示配置",
+             showcase_power: "实时电力估算",
+             showcase_safety: "安全兜底转速",
+-            footer_platform: "macOS 15+ / Apple Silicon",
+-            footer_download: "下载 PKG",
+-            footer_legacy: "旧版升级至 2.9.9",
+             voices_label: "用户声音",
+             voices_title: "高效采纳用户建议",
+             voices_subtitle: "快速的用户反馈入口就设计在菜单里，我们倾听每一位真实用户的声音。",
+@@ -441,34 +326,21 @@
+             hero_tagline: "A restrained fan control utility.",
+             panel_home: "Official Homepage",
+             panel_open_source: "Open Source",
+-            compat_label: "Compatibility",
+-            compat_title: "Verified on Mac mini M4",
+-            compat_tested: "The developer owns only a Mac mini M4. iFanControl has run stably on it for several months in daily use.",
+-            compat_other: "Other fan-equipped M-series Macs may work in theory. Actual compatibility needs to be confirmed by trying it on your Mac.",
+-            compat_fallback: "If you encounter compatibility issues, visit",
+-            compat_fallback_link: "GitHub to download 2.9.8",
+-            compat_fallback_end: ".",
+-            mode_label: "Control Modes",
+-            mode_value: "Auto / Manual",
+-            curve_label: "Curve Editor",
+-            curve_value: "5-Point Curve",
+-            panel_copy: "Temp, RPM, and curve control in your menu bar.",
+-            free_title: "Free Forever",
+-            free_desc: "100% free. No subscription. No IAP.",
+-            f1_label: "Menu Bar",
+-            f1_value: "Live temp & RPM",
+-            f2_label: "Auto / Manual",
+-            f2_value: "Switch by scenario",
+-            f3_label: "5-Point Curve",
+-            f3_value: "Custom temp / RPM",
+-            f4_label: "Smooth Transition",
+-            f4_value: "Gradual RPM, no hard jumps",
 -            support_button: "Support",
 -            support_title: "Support",
 -            support_wechat: "WeChat",
 -            support_alipay: "Alipay",
 -            support_name_wechat: "WeChat: PureMilk_chun (**淳)",
 -            support_name_alipay: "Alipay: **淳",
++            overview_title: "Fan control, in your menu bar.",
++            overview_body: "See live temperature and RPM. Adjust to suit your Mac.",
++            cap_monitor: "Live monitoring",
++            cap_monitor_detail: "Temperature and RPM at a glance",
++            cap_control: "Auto / Manual",
++            cap_control_detail: "Switch control modes as needed",
++            cap_curve: "5-point curve",
++            cap_curve_detail: "Custom RPM, smooth transitions",
++            free_note: "Free. No subscriptions or in-app purchases.",
++            compat_status: "Tested daily on Mac mini M4",
++            compat_caveat: "Other fan-equipped M-series Macs require compatibility testing on your device.",
++            compat_details: "Compatibility & older versions",
++            compat_context: "The developer owns only a Mac mini M4, used reliably for several months in daily work.",
++            compat_fallback_download: "Compatibility issues: download 2.9.8",
++            compat_bridge_download: "Older releases: first install 2.9.9",
              cta_download: "Download App",
              cta_source: "View Source",
              active_label: "Real Use",
-@@ -549,74 +491,6 @@
+@@ -491,9 +363,6 @@
+             showcase_info: "Info bar display options",
+             showcase_power: "Live power estimate",
+             showcase_safety: "Safety floor control",
+-            footer_platform: "macOS 15+ / Apple Silicon",
+-            footer_download: "Download PKG",
+-            footer_legacy: "Upgrade older versions to 2.9.9",
+             voices_label: "User Voices",
+             voices_title: "Listening to Every Voice",
+             voices_subtitle: "Feedback is one click away in the menu. We listen to every real user.",
+@@ -547,74 +416,6 @@
+           if (lang !== "zh" && lang !== "en") return;
+           localStorage.setItem(STORAGE_KEY, lang);
            applyLang(lang);
-         });
- 
+-        });
+-
 -        var supportModal = document.querySelector("[data-support-modal]");
 -        var supportOpen = document.querySelector("[data-support-open]");
 -        var supportClose = document.querySelectorAll("[data-support-close]");
@@ -174,8 +370,6 @@
 -
 -        document.addEventListener("keydown", function (event) {
 -          if (event.key === "Escape") closeSupport();
--        });
--
+         });
+ 
          function applyManifest(meta) {
-           if (!meta) return;
-           var versionNodes = document.querySelectorAll("[data-latest-version]");
