@@ -1,0 +1,176 @@
+{
+  "status": "local preview awaiting maintainer review; not deployed",
+  "preview_url": "http://127.0.0.1:8765/",
+  "base_production": "497535a4-3955-4676-aa9a-76c1e5c38447",
+  "scope": [
+    "Remove website donation CTA, payment modal, handlers and translations",
+    "Remove unused donation CSS; rename compatibility heading class without visual changes",
+    "Two equal CTA columns; 12px gap; minimum44px height and48px on small screens; narrow-screen label spacing"
+  ],
+  "source_changes": [
+    "../docs/index.html",
+    "../docs/styles.20261022a.css (new; original versioned CSS retained)"
+  ],
+  "reproduce_css_patch": "Copy docs/styles.20260610a.css to docs/styles.20261022a.css, then apply the CSS patch. The HTML patch updates the stylesheet reference.",
+  "source_sha256": {
+    "../docs/index.html": "e3682edd9c4af6dc3a26d0513df9fe233fa37a2b23cce5f259a1da98b913abc3",
+    "../docs/styles.20261022a.css": "3efdca2129eb8f4823cad0614a155ec471b5a080f1c71afb07c4fa84d695712d"
+  },
+  "verification": [
+    {
+      "name": "desktop-zh",
+      "buttons": [
+        {
+          "x": 1038,
+          "y": 958.921875,
+          "w": 177,
+          "h": 48,
+          "overflow": false
+        },
+        {
+          "x": 1227,
+          "y": 958.921875,
+          "w": 177,
+          "h": 48,
+          "overflow": false
+        }
+      ],
+      "overflow": false,
+      "ready": true,
+      "language": "zh-CN",
+      "pageErrors": []
+    },
+    {
+      "name": "desktop-en",
+      "buttons": [
+        {
+          "x": 1038,
+          "y": 965.8125,
+          "w": 177,
+          "h": 45,
+          "overflow": false
+        },
+        {
+          "x": 1227,
+          "y": 965.8125,
+          "w": 177,
+          "h": 45,
+          "overflow": false
+        }
+      ],
+      "overflow": false,
+      "ready": true,
+      "language": "en",
+      "pageErrors": []
+    },
+    {
+      "name": "laptop-en",
+      "buttons": [
+        {
+          "x": 930.8125,
+          "y": 991.25,
+          "w": 157.59375,
+          "h": 45,
+          "overflow": false
+        },
+        {
+          "x": 1100.40625,
+          "y": 991.25,
+          "w": 157.59375,
+          "h": 45,
+          "overflow": false
+        }
+      ],
+      "overflow": false,
+      "ready": true,
+      "language": "en",
+      "pageErrors": []
+    },
+    {
+      "name": "mobile-zh",
+      "buttons": [
+        {
+          "x": 24,
+          "y": 1584.578125,
+          "w": 165,
+          "h": 48,
+          "overflow": false
+        },
+        {
+          "x": 201,
+          "y": 1584.578125,
+          "w": 165,
+          "h": 48,
+          "overflow": false
+        }
+      ],
+      "overflow": false,
+      "ready": true,
+      "language": "zh-CN",
+      "pageErrors": []
+    },
+    {
+      "name": "mobile-en",
+      "buttons": [
+        {
+          "x": 24,
+          "y": 1615.078125,
+          "w": 165,
+          "h": 48,
+          "overflow": false
+        },
+        {
+          "x": 201,
+          "y": 1615.078125,
+          "w": 165,
+          "h": 48,
+          "overflow": false
+        }
+      ],
+      "overflow": false,
+      "ready": true,
+      "language": "en",
+      "pageErrors": []
+    },
+    {
+      "name": "narrow-en",
+      "buttons": [
+        {
+          "x": 24,
+          "y": 1613.15625,
+          "w": 130,
+          "h": 48,
+          "overflow": false
+        },
+        {
+          "x": 166,
+          "y": 1613.15625,
+          "w": 130,
+          "h": 48,
+          "overflow": false
+        }
+      ],
+      "overflow": false,
+      "ready": true,
+      "language": "en",
+      "pageErrors": []
+    }
+  ],
+  "visual_review": [
+    "desktop-overview",
+    "desktop-zh-panel",
+    "laptop-en-panel",
+    "mobile-zh-panel",
+    "narrow-en-panel"
+  ],
+  "preview_data": "Public website assets verified against production snapshot; public stats fetched read-only once; version/timeline/public stats are snapshot data. No live backend runs locally.",
+  "history_note": "Website is in dirty parent repo. App repo records only these isolated patches and evidence, not unrelated parent changes.",
+  "preserved": [
+    "Native app support page",
+    "User feedback and voices",
+    "Download/source/legacy links",
+    "Update feeds and packages",
+    "Backend/data/authentication",
+    "Production deployment"
+  ]
+}
