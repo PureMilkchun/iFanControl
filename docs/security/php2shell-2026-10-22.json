@@ -1,0 +1,230 @@
+{
+  "review_date": "2026-10-22",
+  "timezone": "Asia/Shanghai",
+  "checker_repository": "https://github.com/openai/php2shell-checker",
+  "checker_commit": "40a4746ec4925d4d7510b99f9e134277918b1ac3",
+  "upstream_self_tests": {
+    "passed": 39,
+    "failed": 0
+  },
+  "url_checks": [
+    {
+      "url": "https://ifancontrol.puremilkchun.top/",
+      "process_exit": 3,
+      "result": {
+        "patch_status": "unknown",
+        "php_version": null,
+        "reason": "PHP version not found",
+        "exit_code": 3
+      }
+    },
+    {
+      "url": "https://ifan-59w.pages.dev/",
+      "process_exit": 3,
+      "result": {
+        "patch_status": "unknown",
+        "php_version": null,
+        "reason": "PHP version not found",
+        "exit_code": 3
+      }
+    },
+    {
+      "url": "https://stats.puremilkchun.top/",
+      "process_exit": 3,
+      "result": {
+        "patch_status": "unknown",
+        "php_version": null,
+        "reason": "PHP version not found",
+        "exit_code": 3
+      }
+    },
+    {
+      "url": "https://ifan-stats.pages.dev/",
+      "process_exit": 3,
+      "result": {
+        "patch_status": "unknown",
+        "php_version": null,
+        "reason": "PHP version not found",
+        "exit_code": 3
+      }
+    }
+  ],
+  "deployment_checks": [
+    {
+      "project": "ifan",
+      "deployment_id": "497535a4-3955-4676-aa9a-76c1e5c38447",
+      "created_on": "2026-10-15T05:38:55.251409Z",
+      "domains": [
+        "ifan-59w.pages.dev",
+        "ifancontrol.puremilkchun.top"
+      ],
+      "uses_functions": true,
+      "compatibility_date": "2026-03-20",
+      "asset_count": 66,
+      "php_or_wasm_assets": [],
+      "d1_bindings": [
+        "IFAN_DB"
+      ],
+      "service_binding_names": []
+    },
+    {
+      "project": "ifan-stats",
+      "deployment_id": "f52375df-bdb0-4d3c-98b9-f6c4893a175f",
+      "created_on": "2026-10-18T17:14:07.772298Z",
+      "domains": [
+        "ifan-stats.pages.dev",
+        "stats.puremilkchun.top"
+      ],
+      "uses_functions": true,
+      "compatibility_date": "2026-04-24",
+      "asset_count": 11,
+      "php_or_wasm_assets": [],
+      "d1_bindings": [
+        "IFAN_DB",
+        "REEDENSYNC_DB"
+      ],
+      "service_binding_names": []
+    }
+  ],
+  "headers": [
+    {
+      "url": "https://ifancontrol.puremilkchun.top/",
+      "curl_exit": 0,
+      "status_lines": [
+        "HTTP/1.1 200 Connection established",
+        "HTTP/2 200 "
+      ],
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "server": "cloudflare"
+      }
+    },
+    {
+      "url": "https://ifan-59w.pages.dev/",
+      "curl_exit": 0,
+      "status_lines": [
+        "HTTP/1.1 200 Connection established",
+        "HTTP/2 200 "
+      ],
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "server": "cloudflare"
+      }
+    },
+    {
+      "url": "https://stats.puremilkchun.top/",
+      "curl_exit": 0,
+      "status_lines": [
+        "HTTP/1.1 200 Connection established",
+        "HTTP/2 200 "
+      ],
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "server": "cloudflare"
+      }
+    },
+    {
+      "url": "https://ifan-stats.pages.dev/",
+      "curl_exit": 0,
+      "status_lines": [
+        "HTTP/1.1 200 Connection established",
+        "HTTP/2 200 "
+      ],
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "server": "cloudflare"
+      }
+    }
+  ],
+  "source_inventory": {
+    "php_files": [],
+    "wasm_files": [],
+    "function_file_count": 20,
+    "function_files_with_fetch_calls": [],
+    "function_sources": [
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/docs/functions/download.js",
+        "sha256": "0935f196358992a3f1425b8cd3b318d5c5ae8e464259ffe135e23e32210bcc7c"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/docs/functions/update-manifest.json.js",
+        "sha256": "a47ac63dd93cb72dc938851497b9f70e41b491dc25849b7f67e3c8a0b4703abc"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/docs/functions/api/feedback.js",
+        "sha256": "89d3e5d3a6d2403f30ae3bbadb394aa042959d923184c03a2db7d6388f5ee451"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/docs/functions/api/heartbeat.js",
+        "sha256": "c9f3733c58fdcbbffb3842098040653926f84c3c669bc771997a9afde9f5d4d4"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/docs/functions/api/public-stats.js",
+        "sha256": "fceba42634379ca2af698261e2b1860ae0d4bab77b70ded48ffd4e09ce84375d"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/docs/functions/api/stats.js",
+        "sha256": "e2ce34b8f777951f55a7a3aac6f63f6124bb3733d41bc7060bebb794db9a7a09"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/docs/functions/api/rikkahub/feedback.js",
+        "sha256": "910f79ad24e9b3bd7c52c8db5a61bcbe81c081d4cec1e0d8dc2961cc644a4281"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/docs/functions/api/rikkahub/heartbeat.js",
+        "sha256": "24962a1fd2a323f8a323ee28fdd8ddebed4c16eb9ee1231e13d39e21e3525528"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/ifan-stats/functions/_middleware.js",
+        "sha256": "d9272ef4c9e4edf371abce809975d1e1a6daa54f2cf7f41934fc0eb1ff46dfd8"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/ifan-stats/functions/api/auth/session.js",
+        "sha256": "4965199200db1231a5e23a0a5dc46e100432d2de1f00f73703395fcdc9e9a2ad"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/ifan-stats/functions/api/auth/logout.js",
+        "sha256": "c55fe4b107457fb083c186e2d677c2d7a7ccb626e797ef57c2d78f75e7b6dd56"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/ifan-stats/functions/api/auth/login.js",
+        "sha256": "faeaf4a67d324ef667c63dad490df97fa505284287b78ad7e6ad44191b917a63"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/ifan-stats/functions/api/_lib/security.js",
+        "sha256": "5a96c4397dff081d902048e3ae98f5efd77ffc8a289637b213c46d1303bc877e"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/ifan-stats/functions/api/_lib/auth.js",
+        "sha256": "bb4f5c9b0c68b0880fc4af627d896c489f74d68d8a5970c2e3cc6d9160bf5e38"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/ifan-stats/functions/api/_lib/http.js",
+        "sha256": "fcde8c5514040a40d08bef761db518340212fe8bd45a89f4d41bab95c7fd1403"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/ifan-stats/functions/api/dashboard/user.js",
+        "sha256": "23c0e8e64208d57db4c1605aac40afc436710796ea4545fd5de7f4d1dfbb7ab1"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/ifan-stats/functions/api/dashboard/users.js",
+        "sha256": "9db2634c60b703a4f6c7585aa7146dde916aebf88191cdf359a8d67f44a19cef"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/ifan-stats/functions/api/dashboard/reedensync.js",
+        "sha256": "db5c03fe75b3f05bd8f0ca5273656e257bcd6230f0479c88003d26da53a01662"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/ifan-stats/functions/api/dashboard/summary.js",
+        "sha256": "fbba619403cc751b983f88dcfbcae0f688891ae5d21bd2015e5bfef55c179940"
+      },
+      {
+        "path": "/Users/puremilk/Documents/mac fancontrol/ifan-stats/functions/api/dashboard/rikkahub-feedback.js",
+        "sha256": "46fe89eba182b746e3ed47b1b7dbea6e8ae28cd9eb3369208a92a08841b8840d"
+      }
+    ]
+  },
+  "conclusion": "Not applicable to the two reviewed deployments: no serving PHP runtime identified. Header scanner alone is UNKNOWN, not a patched verdict.",
+  "changes": "No application code, deployment configuration, secrets, credentials or production deployment changed. Existing provider OAuth session refreshed only to read deployment metadata.",
+  "limits": "Scoped PHP2Shell exposure review; not a general penetration test, compromise investigation, or review of unrelated domains/products."
+}
