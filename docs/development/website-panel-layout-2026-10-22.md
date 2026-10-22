@@ -40,7 +40,7 @@ Not verified：完整 VoiceOver、全站 WCAG 审计、浏览器菜单 200% 缩�
 
 ## Verdict
 
-Approve：仅限以上已检查的本地右侧范围，未发现仍待处理的 HIGH 项；六个领域均已按说明检查，未验证项如上。视觉方案等待维护者审核，**未部署**。
+Approve：仅限以上已检查的本地右侧范围，未发现仍待处理的 HIGH 项；六个领域均已按说明检查，未验证项如上。维护者已审核并明确授权部署；当前 Production 为 `953fce42-1c0d-45fa-83d8-69077bc0c514`，发布记录见 `docs/releases/website-panel-layout-2026-10-22-publication.json`。线上字节、更新线路和下载跳转已通过核验；新线上截图尝试超时，未声称已取得。
 
 ## Reproduction and history
 

@@ -1,5 +1,5 @@
 {
-  "status": "local preview; not deployed; awaiting maintainer visual review",
+  "status": "published after maintainer approval",
   "recorded_at": "2026-10-22T17:39:40+08:00",
   "baseline_production": "80d80198-7883-4de8-924f-f1e36783a79f",
   "preview_url": "http://127.0.0.1:8765/",
@@ -134,5 +134,8 @@
     "native app builds",
     "production deployment"
   ],
-  "history_note": "Parent website repo contains unrelated local changes; only isolated patches and review records are committed in the active app repo."
+  "history_note": "Parent website repo contains unrelated local changes; only isolated patches and review records are committed in the active app repo.",
+  "production_deployment": "953fce42-1c0d-45fa-83d8-69077bc0c514",
+  "production_url": "https://ifancontrol.puremilkchun.top",
+  "publication_record": "docs/releases/website-panel-layout-2026-10-22-publication.json"
 }

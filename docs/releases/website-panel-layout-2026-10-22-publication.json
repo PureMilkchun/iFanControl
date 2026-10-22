@@ -1,0 +1,92 @@
+{
+  "deployment_id": "953fce42-1c0d-45fa-83d8-69077bc0c514",
+  "previous_deployment": "80d80198-7883-4de8-924f-f1e36783a79f",
+  "published_at": "2026-10-22T10:10:56.7656Z",
+  "url": "https://ifancontrol.puremilkchun.top",
+  "changed_existing_assets": [
+    "/index.html"
+  ],
+  "added_assets": [
+    "/styles.20261022b.css"
+  ],
+  "other_existing_assets_preserved": 66,
+  "runtime_config_preserved": true,
+  "backend_sha256": "d4216535b5d48ac8766530002faf6c354b57dd673c640c4ed5102c853dc9e2c8",
+  "backend_exact_copy": true,
+  "origins": [
+    {
+      "origin": "https://ifancontrol.puremilkchun.top",
+      "assets": [
+        {
+          "asset": "index.html",
+          "raw_bytes_match": false,
+          "recognized_edge_additions": {
+            "cloudflare_invisible_link": 1,
+            "cloudflare_js_detection": 1
+          },
+          "application_bytes_match_reviewed": true
+        },
+        {
+          "asset": "styles.20261022b.css",
+          "raw_bytes_match": true,
+          "recognized_edge_additions": {},
+          "application_bytes_match_reviewed": true
+        }
+      ]
+    },
+    {
+      "origin": "https://ifan-59w.pages.dev",
+      "assets": [
+        {
+          "asset": "index.html",
+          "raw_bytes_match": true,
+          "recognized_edge_additions": {},
+          "application_bytes_match_reviewed": true
+        },
+        {
+          "asset": "styles.20261022b.css",
+          "raw_bytes_match": true,
+          "recognized_edge_additions": {},
+          "application_bytes_match_reviewed": true
+        }
+      ]
+    }
+  ],
+  "legacy_guard": [
+    {
+      "client": "mac14",
+      "build": 0
+    },
+    {
+      "client": "mac15",
+      "build": 52
+    },
+    {
+      "client": "mac26",
+      "build": 52
+    },
+    {
+      "client": "unknown",
+      "build": 0
+    }
+  ],
+  "stable_build": 71,
+  "beta_build": 71,
+  "download_routes": [
+    {
+      "origin": "https://ifancontrol.puremilkchun.top",
+      "download_redirect_build": 71
+    },
+    {
+      "origin": "https://ifan-59w.pages.dev",
+      "download_redirect_build": 71
+    }
+  ],
+  "html_sha256": "a3133f9eb5ee3cb9990c2875ce0ab183890327daac7147a9087a3019fb308a6b",
+  "css_sha256": "5525fddb025508cd4af27664d55072b496fdf08e2f8633a94f8e23d58a284a44",
+  "source_commit": "1aa2c3899ec49bb5973536332ecc2d10d8810d5b",
+  "review_record": "docs/development/website-panel-layout-2026-10-22.json",
+  "visual_verification": "Exact approved source was rendered and reviewed locally in CUA before publishing. Fresh official production CUA capture timed out (60s); no live screenshot claimed. Both origins verified against exact approved application bytes; only known Cloudflare protection insertions excluded on official domain.",
+  "rollback": "Cloudflare Pages rollback to 80d80198-7883-4de8-924f-f1e36783a79f",
+  "application_or_package_build_performed": false
+}
