@@ -17,7 +17,7 @@
   "reproduce_css_patch": "Copy docs/styles.20260610a.css to docs/styles.20261022a.css, then apply the CSS patch. The HTML patch updates the stylesheet reference.",
   "source_sha256": {
     "../docs/index.html": "e451e625042bfc71a5858dbbcbf59550306866ce546dd842975c933f84549a41",
-    "../docs/styles.20261022a.css": "e5f323430c08f50776319a99ccecf7ec922526b6ae85281bdb2ef2033c0afeac"
+    "../docs/styles.20261022a.css": "a3b0ef00e2d4e3c72f85945672c08903d68bac41b4e69f36840314173bf895a7"
   },
   "verification": [
     {
@@ -176,7 +176,7 @@
     "Backend/data/authentication",
     "Production deployment"
   ],
-  "revision": 2,
+  "revision": 3,
   "review_feedback": "Sidebar instructions looked cluttered and lacked hierarchy.",
   "in_app_verification": {
     "updated_existing_preview_tab": true,
@@ -185,5 +185,45 @@
     "final_state": "Collapsed disclosure; new introduction and download area in view",
     "screenshot": "packaging/pkg/output/website-no-support-20261022/in-app-review.png"
   },
-  "design_principle": "Say each capability once. Establish product/actions/compatibility hierarchy through typography and grouping. Keep important compatibility caveats visible; move optional details behind a labelled disclosure."
+  "design_principle": "Say each capability once. Establish product/actions/compatibility hierarchy through typography and grouping. Keep important compatibility caveats visible; move optional details behind a labelled disclosure.",
+  "revision3_feedback": "Bottom-right space felt empty in the actual wide layout.",
+  "revision3_change": "Overview and download sections share spare desktop height via flex growth with vertically centered content; compatibility moves down to form the bottom group with build. At <=819px growth is disabled, preserving natural compact flow.",
+  "revision3_verification": {
+    "desktop_zh": {
+      "viewport": [
+        1440,
+        1000
+      ],
+      "horizontal_overflow": false,
+      "compatibility_top": 806.0078125,
+      "compatibility_bottom": 929,
+      "build_bottom": 968,
+      "visual_review": "balanced-desktop.png"
+    },
+    "laptop_en": {
+      "viewport": [
+        1280,
+        800
+      ],
+      "horizontal_overflow": false,
+      "cta_overflow": false,
+      "cta_height": 45,
+      "panel_height": 882.5,
+      "note": "Natural vertical page scroll remains available on the shorter English layout; no content overlap.",
+      "visual_review": "balanced-laptop-en.png"
+    },
+    "mobile_zh": {
+      "viewport": [
+        390,
+        844
+      ],
+      "horizontal_overflow": false,
+      "overview_flex_grow": 0,
+      "download_flex_grow": 0,
+      "cta_overflow": false,
+      "cta_height": 48
+    },
+    "browser_viewport_restored": true,
+    "language_restored": "zh"
+  }
 }
