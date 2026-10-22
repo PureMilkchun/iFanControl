@@ -1,5 +1,5 @@
 {
-  "status": "local preview awaiting maintainer review; not deployed",
+  "status": "published after maintainer approval",
   "preview_url": "http://127.0.0.1:8765/",
   "base_production": "497535a4-3955-4676-aa9a-76c1e5c38447",
   "scope": [
@@ -240,5 +240,8 @@
     "compatibility_link_count": 1,
     "remaining_link": "https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.8",
     "screenshot": "packaging/pkg/output/website-no-support-20261022/compatibility-without-bridge.png"
-  }
+  },
+  "production_url": "https://ifancontrol.puremilkchun.top",
+  "production_deployment": "80d80198-7883-4de8-924f-f1e36783a79f",
+  "publication_record": "docs/releases/website-ui-2026-10-22-publication.json"
 }

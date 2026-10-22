@@ -1,0 +1,96 @@
+{
+  "deployment_id": "80d80198-7883-4de8-924f-f1e36783a79f",
+  "previous_deployment": "497535a4-3955-4676-aa9a-76c1e5c38447",
+  "published_at": "2026-10-22T05:21:49.67616Z",
+  "url": "https://ifancontrol.puremilkchun.top",
+  "changed_existing_assets": [
+    "/index.html"
+  ],
+  "added_assets": [
+    "/styles.20261022a.css"
+  ],
+  "other_existing_assets_preserved": 65,
+  "runtime_config_preserved": true,
+  "backend_sha256": "d4216535b5d48ac8766530002faf6c354b57dd673c640c4ed5102c853dc9e2c8",
+  "backend_exact_copy": true,
+  "origins": [
+    {
+      "origin": "https://ifancontrol.puremilkchun.top",
+      "assets": [
+        {
+          "asset": "index.html",
+          "raw_bytes_match": false,
+          "recognized_edge_additions": {
+            "cloudflare_invisible_link": 1,
+            "cloudflare_js_detection": 1
+          },
+          "application_bytes_match_reviewed": true
+        },
+        {
+          "asset": "styles.20261022a.css",
+          "raw_bytes_match": true,
+          "recognized_edge_additions": {},
+          "application_bytes_match_reviewed": true
+        }
+      ]
+    },
+    {
+      "origin": "https://ifan-59w.pages.dev",
+      "assets": [
+        {
+          "asset": "index.html",
+          "raw_bytes_match": true,
+          "recognized_edge_additions": {},
+          "application_bytes_match_reviewed": true
+        },
+        {
+          "asset": "styles.20261022a.css",
+          "raw_bytes_match": true,
+          "recognized_edge_additions": {},
+          "application_bytes_match_reviewed": true
+        }
+      ]
+    }
+  ],
+  "legacy_guard": [
+    {
+      "client": "mac14",
+      "build": 0
+    },
+    {
+      "client": "mac15",
+      "build": 52
+    },
+    {
+      "client": "mac26",
+      "build": 52
+    },
+    {
+      "client": "unknown",
+      "build": 0
+    }
+  ],
+  "stable_build": 71,
+  "beta_build": 71,
+  "download_routes": [
+    {
+      "origin": "https://ifancontrol.puremilkchun.top",
+      "download_redirect_build": 71
+    },
+    {
+      "origin": "https://ifan-59w.pages.dev",
+      "download_redirect_build": 71
+    }
+  ],
+  "html_sha256": "07859920b644c825ed2e1415e338c682a8d355e540680ac91074b2d7ced3a646",
+  "css_sha256": "a3b0ef00e2d4e3c72f85945672c08903d68bac41b4e69f36840314173bf895a7",
+  "reviewed_revision": 4,
+  "source_commit": "1646fd6d1fb86d137f8575779641a3e7def02782",
+  "visual_verification": "Reviewed real-browser local render of these exact HTML/CSS bytes before publishing. Fresh production browser capture was attempted twice but the browser provider timed out; no live-render screenshot claimed.",
+  "edge_transform_references": [
+    "https://developers.cloudflare.com/bots/additional-configurations/ai-labyrinth/",
+    "https://developers.cloudflare.com/cloudflare-challenges/challenge-types/javascript-detections/"
+  ],
+  "rollback": "Cloudflare Pages rollback to 497535a4-3955-4676-aa9a-76c1e5c38447",
+  "application_or_package_build_performed": false
+}

@@ -1,0 +1,21 @@
+--- a/docs/DEPLOY.md
++++ b/docs/DEPLOY.md
+@@ -1,8 +1,16 @@
+ # iFanControl 官网部署规范
+ 
+-## 当前macOS15修订（维护者明确授权替换52/71）
++## 官网界面更新（2026-10-22）
+ 
+-Production `497535a4-3955-4676-aa9a-76c1e5c38447`。版本/build仍52/71，App/PKG准入15.0；按本次授权替换旧ZIP固定哈希，legacy-channel.json已更新。guard门槛改Darwin≥24，13/14/未知继续暂停；保留旧不可变71包，新包路径带macos15及revision避免缓存。安装介绍、更新说明、官网和GitHub均提供2.9.8回退链接。后续不得用旧26 guard/manifest/包覆盖当前修订；本次是明确授权的一次例外，后续旧ZIP仍固定新哈希。源码标签v3.0.0-macos15-r1；发布与核验记录见App工程docs/releases/macos15-repack-2026-10-15*.json。以下26保护信息为历史。
++当前 Production 为 `80d80198-7883-4de8-924f-f1e36783a79f`，以前次 macOS15 修订 `497535a4-3955-4676-aa9a-76c1e5c38447` 为基础，仅更新 `index.html` 并新增 `styles.20261022a.css`。移除官网支持作者入口，精简说明并调整布局；去掉手动安装2.9.9的网页入口，迁移仍由软件内引导。2.9.8兼容性回退链接保留。
++
++其余65个原资产、已发布 Functions bundle、路由、headers与运行配置保持原样；正式/Beta71、旧通道52、macOS15 guard及所有安装包不变。后续必须基于此部署准备，不得以旧首页或本地无关后端改动覆盖。审核源记录为App工程提交 `1646fd6`；发布核验见 `docs/releases/website-ui-2026-10-22-publication.json`。
++
++正式域名会自动附加Cloudflare防护链接/脚本；对页面字节核验时应先验证发布资产哈希，再仅排除已识别的边缘附加内容，不能删除任意脚本或修改防护设置。`/index.html` 正常308到 `/`，首页应检查根路径。
++
++## macOS15修订（2026-10-15，维护者明确授权替换52/71）
++
++当次 Production `497535a4-3955-4676-aa9a-76c1e5c38447`。版本/build仍52/71，App/PKG准入15.0；按本次授权替换旧ZIP固定哈希，legacy-channel.json已更新。guard门槛改Darwin≥24，13/14/未知继续暂停；保留旧不可变71包，新包路径带macos15及revision避免缓存。安装介绍、更新说明、官网和GitHub均提供2.9.8回退链接。后续不得用旧26 guard/manifest/包覆盖当前修订；本次是明确授权的一次例外，后续旧ZIP仍固定新哈希。源码标签v3.0.0-macos15-r1；发布与核验记录见App工程docs/releases/macos15-repack-2026-10-15*.json。以下26保护信息为历史。
+ 
+ ## macOS旧系统应急保护（2026-10-15）
+ 
