@@ -9,7 +9,7 @@
    </head>
    <body>
      <section class="landing-screen">
-@@ -75,92 +75,38 @@
+@@ -75,92 +75,37 @@
            </div>
          </section>
  
@@ -115,18 +115,17 @@
 +          <h3 id="compatibility-heading" data-i18n="compat_status">Mac mini M4 长期实测</h3>
 +          <p data-i18n="compat_caveat">其他带风扇的 M 系列 Mac，需试用确认兼容性。</p>
 +          <details class="compatibility-details">
-+            <summary data-i18n="compat_details">兼容性与旧版下载</summary>
++            <summary data-i18n="compat_details">兼容性说明</summary>
 +            <div class="compatibility-content">
 +              <p data-i18n="compat_context">开发者目前仅有一台 Mac mini M4，已在日常使用中稳定运行数月。</p>
 +              <a href="https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.8" data-i18n="compat_fallback_download">兼容性问题：下载 2.9.8</a>
-+              <a href="./iFanControl-legacy-2.9.9-macos15.zip?revision=macos15-r1" data-i18n="compat_bridge_download">旧版升级：先安装 2.9.9</a>
 +            </div>
 +          </details>
 +        </section>
          <div class="build-tag label-micro" data-latest-build data-calligraph data-calligraph-from="build 00">build --</div>
        </aside>
      </section>
-@@ -299,51 +245,6 @@
+@@ -299,51 +244,6 @@
        </div>
      </section>
  
@@ -178,7 +177,7 @@
      <script>
        (function () {
          var STORAGE_KEY = "ifc_lang";
-@@ -369,34 +270,21 @@
+@@ -369,34 +269,20 @@
              hero_tagline: "简洁的风扇控制工具。",
              panel_home: "官方网站",
              panel_open_source: "开源项目",
@@ -221,14 +220,13 @@
 +            free_note: "完全免费，无订阅，无内购。",
 +            compat_status: "Mac mini M4 长期实测",
 +            compat_caveat: "其他带风扇的 M 系列 Mac，需试用确认兼容性。",
-+            compat_details: "兼容性与旧版下载",
++            compat_details: "兼容性说明",
 +            compat_context: "开发者目前仅有一台 Mac mini M4，已在日常使用中稳定运行数月。",
 +            compat_fallback_download: "兼容性问题：下载 2.9.8",
-+            compat_bridge_download: "旧版升级：先安装 2.9.9",
              cta_download: "下载应用",
              cta_source: "查看源码",
              active_label: "真实使用",
-@@ -419,9 +307,6 @@
+@@ -419,9 +305,6 @@
              showcase_info: "信息栏展示配置",
              showcase_power: "实时电力估算",
              showcase_safety: "安全兜底转速",
@@ -238,7 +236,7 @@
              voices_label: "用户声音",
              voices_title: "高效采纳用户建议",
              voices_subtitle: "快速的用户反馈入口就设计在菜单里，我们倾听每一位真实用户的声音。",
-@@ -441,34 +326,21 @@
+@@ -441,34 +324,20 @@
              hero_tagline: "A restrained fan control utility.",
              panel_home: "Official Homepage",
              panel_open_source: "Open Source",
@@ -281,14 +279,13 @@
 +            free_note: "Free. No subscriptions or in-app purchases.",
 +            compat_status: "Tested daily on Mac mini M4",
 +            compat_caveat: "Other fan-equipped M-series Macs require compatibility testing on your device.",
-+            compat_details: "Compatibility & older versions",
++            compat_details: "Compatibility details",
 +            compat_context: "The developer owns only a Mac mini M4, used reliably for several months in daily work.",
 +            compat_fallback_download: "Compatibility issues: download 2.9.8",
-+            compat_bridge_download: "Older releases: first install 2.9.9",
              cta_download: "Download App",
              cta_source: "View Source",
              active_label: "Real Use",
-@@ -491,9 +363,6 @@
+@@ -491,9 +360,6 @@
              showcase_info: "Info bar display options",
              showcase_power: "Live power estimate",
              showcase_safety: "Safety floor control",
@@ -298,7 +295,7 @@
              voices_label: "User Voices",
              voices_title: "Listening to Every Voice",
              voices_subtitle: "Feedback is one click away in the menu. We listen to every real user.",
-@@ -547,74 +416,6 @@
+@@ -547,74 +413,6 @@
            if (lang !== "zh" && lang !== "en") return;
            localStorage.setItem(STORAGE_KEY, lang);
            applyLang(lang);

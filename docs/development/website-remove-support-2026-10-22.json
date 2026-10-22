@@ -7,7 +7,7 @@
     "Consolidate duplicated mode/curve/monitoring descriptions into three capability rows",
     "Replace prominent free badge with one quiet sentence near actions",
     "Prioritize product explanation and download/source buttons",
-    "Keep M4 testing scope and other-device caveat visible; disclose context and two older-version links on demand",
+    "Keep M4 testing scope and other-device caveat visible; disclose context and compatibility fallback link on demand",
     "Preserve existing page identity, hero, voices, timeline, routes, backend and update distribution"
   ],
   "source_changes": [
@@ -16,7 +16,7 @@
   ],
   "reproduce_css_patch": "Copy docs/styles.20260610a.css to docs/styles.20261022a.css, then apply the CSS patch. The HTML patch updates the stylesheet reference.",
   "source_sha256": {
-    "../docs/index.html": "e451e625042bfc71a5858dbbcbf59550306866ce546dd842975c933f84549a41",
+    "../docs/index.html": "07859920b644c825ed2e1415e338c682a8d355e540680ac91074b2d7ced3a646",
     "../docs/styles.20261022a.css": "a3b0ef00e2d4e3c72f85945672c08903d68bac41b4e69f36840314173bf895a7"
   },
   "verification": [
@@ -171,20 +171,14 @@
   "preserved": [
     "Native app support page",
     "User feedback and voices",
-    "Download/source/legacy links",
+    "Download/source and 2.9.8 compatibility fallback",
+    "In-app migration through 2.9.9",
     "Update feeds and packages",
     "Backend/data/authentication",
     "Production deployment"
   ],
-  "revision": 3,
+  "revision": 4,
   "review_feedback": "Sidebar instructions looked cluttered and lacked hierarchy.",
-  "in_app_verification": {
-    "updated_existing_preview_tab": true,
-    "disclosure_click_and_Return_verified": true,
-    "fallback_and_bridge_hrefs_verified": true,
-    "final_state": "Collapsed disclosure; new introduction and download area in view",
-    "screenshot": "packaging/pkg/output/website-no-support-20261022/in-app-review.png"
-  },
   "design_principle": "Say each capability once. Establish product/actions/compatibility hierarchy through typography and grouping. Keep important compatibility caveats visible; move optional details behind a labelled disclosure.",
   "revision3_feedback": "Bottom-right space felt empty in the actual wide layout.",
   "revision3_change": "Overview and download sections share spare desktop height via flex growth with vertically centered content; compatibility moves down to form the bottom group with build. At <=819px growth is disabled, preserving natural compact flow.",
@@ -225,5 +219,26 @@
     },
     "browser_viewport_restored": true,
     "language_restored": "zh"
+  },
+  "revision4_direction": "Remove manual 2.9.9 bridge download from homepage; existing in-app updater handles the 2.9.9 to 3.0 transition.",
+  "revision4_changes": [
+    "Remove bridge link and zh/en translations",
+    "Rename disclosure to Compatibility details / 兼容性说明",
+    "Keep 2.9.8 compatibility fallback; no updater/feed/package/backend changes"
+  ],
+  "revision2_in_app_verification": {
+    "updated_existing_preview_tab": true,
+    "disclosure_click_and_Return_verified": true,
+    "fallback_and_bridge_hrefs_verified": true,
+    "final_state": "Collapsed disclosure; new introduction and download area in view",
+    "screenshot": "packaging/pkg/output/website-no-support-20261022/in-app-review.png"
+  },
+  "in_app_verification": {
+    "preview_reloaded": true,
+    "disclosure_opened": true,
+    "bridge_entry_count": 0,
+    "compatibility_link_count": 1,
+    "remaining_link": "https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.8",
+    "screenshot": "packaging/pkg/output/website-no-support-20261022/compatibility-without-bridge.png"
   }
 }
