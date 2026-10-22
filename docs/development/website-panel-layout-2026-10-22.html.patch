@@ -1,0 +1,175 @@
+--- a/docs/index.html
++++ b/docs/index.html
+@@ -9,7 +9,7 @@
+       content="iFanControl 是一款 Apple Silicon Mac 风扇控制工具。开发者仅在自己的 Mac mini M4 上长期实测，已稳定运行数月；其他带风扇的 M 系列 Mac 理论上可用，实际兼容性需试用确认。"
+     />
+     <link rel="icon" type="image/png" href="./assets/app-icon.png" />
+-    <link rel="stylesheet" href="./styles.20261022a.css" />
++    <link rel="stylesheet" href="./styles.20261022b.css" />
+   </head>
+   <body>
+     <section class="landing-screen">
+@@ -54,59 +54,68 @@
+         </div>
+       </section>
+ 
+-      <aside class="control-panel" data-calligraph-trigger>
+-        <header class="panel-header">
+-          <div class="label-micro" data-i18n="panel_home">官方网站</div>
+-          <div class="system-status">
+-            <div class="status-dot"></div>
+-            <div class="label-micro" data-i18n="panel_open_source">开源项目</div>
++      <aside class="control-panel" aria-labelledby="overview-title">
++        <header class="panel-topbar">
++          <div class="panel-brand">
++            <img src="./assets/app-icon.png" alt="" width="40" height="40" />
++            <strong>iFanControl</strong>
++          </div>
++          <div class="lang-switch" data-lang-switch>
++            <button class="lang-btn" type="button" data-lang="zh">中文</button>
++            <button class="lang-btn" type="button" data-lang="en">EN</button>
+           </div>
+         </header>
+ 
+-        <div class="lang-switch" data-lang-switch>
+-          <button class="lang-btn" type="button" data-lang="zh">中文</button>
+-          <button class="lang-btn" type="button" data-lang="en">EN</button>
+-        </div>
+-
+-        <section class="product-intro">
+-          <img class="product-icon" src="./assets/app-icon.png" alt="iFanControl app icon" />
+-          <div class="product-name-row">
+-            <strong>iFanControl</strong>
++        <div class="panel-main">
++          <section class="product-overview" aria-labelledby="overview-title">
++            <h2 id="overview-title" data-i18n="overview_title">风扇控制，
++尽在菜单栏。</h2>
++            <p data-i18n="overview_body">实时温度、转速与风扇曲线，集中在熟悉的菜单栏。</p>
++          </section>
++
++          <ul class="capability-list" aria-labelledby="overview-title">
++            <li>
++              <strong data-i18n="cap_monitor">实时监测</strong>
++              <span data-i18n="cap_monitor_detail">CPU / GPU 温度与风扇转速。</span>
++            </li>
++            <li>
++              <strong data-i18n="cap_control">自动 / 手动</strong>
++              <span data-i18n="cap_control_detail">按曲线自动调速，也可手动设定。</span>
++            </li>
++            <li>
++              <strong data-i18n="cap_curve">5 点风扇曲线</strong>
++              <span data-i18n="cap_curve_detail">自定义温度与转速，平滑过渡。</span>
++            </li>
++          </ul>
++
++          <section class="download-section">
++            <p class="platform-note">macOS 15+ <span aria-hidden="true">·</span> Apple Silicon</p>
++            <div class="cta-group">
++              <a class="cta-button primary" href="./download" data-i18n="cta_download">下载应用</a>
++            </div>
++            <div class="download-meta">
++              <p class="free-note" data-i18n="free_note">免费开源，无订阅或内购。</p>
++              <a class="source-link" href="https://github.com/PureMilkchun/iFanControl" data-i18n="cta_source">查看源码</a>
++            </div>
++          </section>
++        </div>
++
++        <footer class="panel-bottom">
++          <section class="compatibility-note" aria-labelledby="compatibility-heading">
++            <h3 id="compatibility-heading" data-i18n="compat_status">Mac mini M4 长期实测</h3>
++            <p data-i18n="compat_caveat">其他带风扇的 M 系列 Mac，需试用确认兼容性。</p>
++          </section>
++          <div class="panel-footer-row">
++            <details class="compatibility-details">
++              <summary data-i18n="compat_details">兼容性说明</summary>
++              <div class="compatibility-content">
++                <p data-i18n="compat_context">开发者目前仅有一台 Mac mini M4，已在日常使用中稳定运行数月。</p>
++                <a href="https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.8" data-i18n="compat_fallback_download">兼容性问题：下载 2.9.8</a>
++              </div>
++            </details>
++            <div class="build-tag" data-latest-build>build —</div>
+           </div>
+-        </section>
+-
+-        <section class="product-overview" aria-labelledby="overview-title">
+-          <h2 id="overview-title" data-i18n="overview_title">风扇控制，尽在菜单栏。</h2>
+-          <p data-i18n="overview_body">实时查看温度与转速，按自己的习惯调节。</p>
+-        </section>
+-
+-        <ul class="capability-list" aria-labelledby="overview-title">
+-          <li><strong data-i18n="cap_monitor">实时监测</strong><span data-i18n="cap_monitor_detail">温度与转速，一目了然</span></li>
+-          <li><strong data-i18n="cap_control">自动 / 手动</strong><span data-i18n="cap_control_detail">按需切换控制模式</span></li>
+-          <li><strong data-i18n="cap_curve">5 点风扇曲线</strong><span data-i18n="cap_curve_detail">自定义转速，平滑过渡</span></li>
+-        </ul>
+-
+-        <section class="download-section">
+-          <p class="free-note" data-i18n="free_note">完全免费，无订阅，无内购。</p>
+-          <div class="cta-group">
+-            <a class="cta-button primary" href="./download" data-i18n="cta_download">下载应用</a>
+-            <a class="cta-button secondary" href="https://github.com/PureMilkchun/iFanControl" data-i18n="cta_source">查看源码</a>
+-          </div>
+-          <p class="platform-note">macOS 15+ <span aria-hidden="true">·</span> Apple Silicon</p>
+-        </section>
+-
+-        <section class="compatibility-note" aria-labelledby="compatibility-heading">
+-          <h3 id="compatibility-heading" data-i18n="compat_status">Mac mini M4 长期实测</h3>
+-          <p data-i18n="compat_caveat">其他带风扇的 M 系列 Mac，需试用确认兼容性。</p>
+-          <details class="compatibility-details">
+-            <summary data-i18n="compat_details">兼容性说明</summary>
+-            <div class="compatibility-content">
+-              <p data-i18n="compat_context">开发者目前仅有一台 Mac mini M4，已在日常使用中稳定运行数月。</p>
+-              <a href="https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.8" data-i18n="compat_fallback_download">兼容性问题：下载 2.9.8</a>
+-            </div>
+-          </details>
+-        </section>
+-        <div class="build-tag label-micro" data-latest-build data-calligraph data-calligraph-from="build 00">build --</div>
++        </footer>
+       </aside>
+     </section>
+ 
+@@ -267,17 +276,15 @@
+           zh: {
+             hero_micro: "Apple Silicon Mac",
+             hero_tagline: "简洁的风扇控制工具。",
+-            panel_home: "官方网站",
+-            panel_open_source: "开源项目",
+-            overview_title: "风扇控制，尽在菜单栏。",
+-            overview_body: "实时查看温度与转速，按自己的习惯调节。",
++            overview_title: "风扇控制，\n尽在菜单栏。",
++            overview_body: "实时温度、转速与风扇曲线，集中在熟悉的菜单栏。",
+             cap_monitor: "实时监测",
+-            cap_monitor_detail: "温度与转速，一目了然",
++            cap_monitor_detail: "CPU / GPU 温度与风扇转速。",
+             cap_control: "自动 / 手动",
+-            cap_control_detail: "按需切换控制模式",
++            cap_control_detail: "按曲线自动调速，也可手动设定。",
+             cap_curve: "5 点风扇曲线",
+-            cap_curve_detail: "自定义转速，平滑过渡",
+-            free_note: "完全免费，无订阅，无内购。",
++            cap_curve_detail: "自定义温度与转速，平滑过渡。",
++            free_note: "免费开源，无订阅或内购。",
+             compat_status: "Mac mini M4 长期实测",
+             compat_caveat: "其他带风扇的 M 系列 Mac，需试用确认兼容性。",
+             compat_details: "兼容性说明",
+@@ -322,16 +329,14 @@
+           en: {
+             hero_micro: "Apple Silicon Mac",
+             hero_tagline: "A restrained fan control utility.",
+-            panel_home: "Official Homepage",
+-            panel_open_source: "Open Source",
+-            overview_title: "Fan control, in your menu bar.",
+-            overview_body: "See live temperature and RPM. Adjust to suit your Mac.",
++            overview_title: "Fan control,\nin your menu bar.",
++            overview_body: "Live temperature, RPM and fan curves in one familiar place.",
+             cap_monitor: "Live monitoring",
+-            cap_monitor_detail: "Temperature and RPM at a glance",
++            cap_monitor_detail: "CPU / GPU temperatures and fan speed.",
+             cap_control: "Auto / Manual",
+-            cap_control_detail: "Switch control modes as needed",
++            cap_control_detail: "Follow a fan curve or set the speed manually.",
+             cap_curve: "5-point curve",
+-            cap_curve_detail: "Custom RPM, smooth transitions",
++            cap_curve_detail: "Set temperature and RPM, with smooth transitions.",
+             free_note: "Free. No subscriptions or in-app purchases.",
+             compat_status: "Tested daily on Mac mini M4",
+             compat_caveat: "Other fan-equipped M-series Macs require compatibility testing on your device.",

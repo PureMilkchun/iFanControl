@@ -1,0 +1,138 @@
+{
+  "status": "local preview; not deployed; awaiting maintainer visual review",
+  "recorded_at": "2026-10-22T17:39:40+08:00",
+  "baseline_production": "80d80198-7883-4de8-924f-f1e36783a79f",
+  "preview_url": "http://127.0.0.1:8765/",
+  "source_changes": [
+    "../docs/index.html",
+    "../docs/styles.20261022b.css (new)"
+  ],
+  "reproduce": "From the production 80d80198 baseline, copy docs/styles.20261022a.css to docs/styles.20261022b.css; apply the CSS patch and HTML patch. Keep a unchanged.",
+  "source_sha256": {
+    "docs/index.html": "a3133f9eb5ee3cb9990c2875ce0ab183890327daac7147a9087a3019fb308a6b",
+    "docs/styles.20261022b.css": "5525fddb025508cd4af27664d55072b496fdf08e2f8633a94f8e23d58a284a44"
+  },
+  "skills": [
+    "better-interface",
+    "better-accessibility",
+    "better-layout",
+    "better-writing",
+    "better-typography",
+    "better-colors",
+    "better-ui",
+    "visual-verification"
+  ],
+  "checks": {
+    "published_a_unchanged": true,
+    "shared_css_prefix_unchanged": true,
+    "served_html_css_exact": true,
+    "inline_javascript_syntax": "node --check: passed",
+    "desktop_zh": [
+      1440,
+      1000
+    ],
+    "narrow_en": [
+      320,
+      844
+    ],
+    "mobile_zh_visual": [
+      390,
+      844
+    ],
+    "laptop_en": {
+      "clipped": 0,
+      "downloadY": 549.1953125,
+      "overflow": false,
+      "viewport": [
+        1280,
+        800
+      ]
+    },
+    "edge_viewports": [
+      {
+        "contentClips": 0,
+        "overflow": false,
+        "panelWidth": 400,
+        "viewport": [
+          820,
+          900
+        ]
+      },
+      {
+        "contentClips": 0,
+        "overflow": false,
+        "panelWidth": 512,
+        "viewport": [
+          1920,
+          1080
+        ]
+      }
+    ],
+    "text_resize_fixture": {
+      "downloadPresent": true,
+      "headerItems": [
+        {
+          "class": "panel-brand",
+          "width": 272
+        },
+        {
+          "class": "lang-switch",
+          "width": 120.953125
+        }
+      ],
+      "overflowingContent": [],
+      "panelWidth": 320,
+      "rootFont": "32px",
+      "viewport": [
+        320,
+        844
+      ]
+    },
+    "rtl_fixture": {
+      "controls": [
+        {
+          "class": "panel-brand",
+          "width": 163.5234375,
+          "x": 132.4765625
+        },
+        {
+          "class": "lang-switch",
+          "width": 92,
+          "x": 24
+        }
+      ],
+      "direction": "rtl",
+      "featureAlign": "start",
+      "headingAlign": "start",
+      "overflow": false
+    },
+    "contrast": {
+      "muted_on_paper": 5.452,
+      "primary_label_on_button": 17.179
+    },
+    "keyboard": "Tab reaches named language, download, source and disclosure controls; visible focus; Return toggles native details",
+    "removed_support_and_manual_299_bridge_nodes": 0,
+    "fallback": "https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.8"
+  },
+  "final_reviewed_screenshots": [
+    "packaging/pkg/output/website-layout-skill-20261022/desktop-zh.png",
+    "packaging/pkg/output/website-layout-skill-20261022/panel-zh.png",
+    "packaging/pkg/output/website-layout-skill-20261022/laptop-en.png",
+    "packaging/pkg/output/website-layout-skill-20261022/mobile-zh.png",
+    "packaging/pkg/output/website-layout-skill-20261022/edge-820.png",
+    "packaging/pkg/output/website-layout-skill-20261022/keyboard-download.png"
+  ],
+  "not_verified": [
+    "VoiceOver narration / complete WCAG audit",
+    "Browser chrome 200% zoom (only root text-size fixture tested)",
+    "Arabic translation (only RTL structure checked)",
+    "OS reduced-motion and forced-colors runtime (CSS reviewed)"
+  ],
+  "excluded": [
+    "left hero and later page content",
+    "backend, routes, update feeds and packages",
+    "native app builds",
+    "production deployment"
+  ],
+  "history_note": "Parent website repo contains unrelated local changes; only isolated patches and review records are committed in the active app repo."
+}

@@ -1,0 +1,211 @@
+--- a/docs/styles.20261022b.css
++++ b/docs/styles.20261022b.css
+@@ -2168,40 +2168,174 @@
+   }
+ }
+ 
+-/* Homepage introduction: product, actions, then compatibility. */
+-.control-panel { justify-content: flex-start; }
+-.control-panel .product-intro { margin-top: 24px; padding-bottom: 0; border-bottom: 0; }
+-.control-panel .product-icon { width: 52px; height: 52px; border-radius: 16px; }
+-.control-panel .product-name-row strong { font-size: 1.9rem; }
+-.product-overview { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; margin: 32px 0 24px; }
+-.product-overview h2 { max-width: 15em; font-size: 1.75rem; font-weight: 600; line-height: 1.3; letter-spacing: -0.035em; text-wrap: balance; }
+-.product-overview p { margin-top: 12px; font-size: 0.9rem; line-height: 1.65; color: rgba(17, 17, 17, 0.65); text-wrap: pretty; }
+-.capability-list { display: grid; gap: 16px; list-style: none; padding: 22px 0; border-block: 1px solid rgba(17, 17, 17, 0.09); }
+-.capability-list li { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 20px; font-size: 0.84rem; line-height: 1.5; }
+-.capability-list strong { font-weight: 600; }
+-.capability-list span { color: rgba(17, 17, 17, 0.63); text-align: right; text-wrap: pretty; }
+-.download-section { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; margin-top: 28px; }
+-.free-note { margin-bottom: 12px; font-size: 0.8rem; line-height: 1.55; color: rgba(17, 17, 17, 0.65); }
+-.platform-note { display: flex; justify-content: center; gap: 8px; margin-top: 12px; font-size: 0.7rem; letter-spacing: 0.03em; line-height: 1.5; color: rgba(17, 17, 17, 0.6); }
+-.compatibility-note { margin-top: 28px; padding-top: 22px; border-top: 1px solid rgba(17, 17, 17, 0.09); }
+-.compatibility-note h3 { font-size: 0.83rem; line-height: 1.5; font-weight: 600; }
+-.compatibility-note > p { margin-top: 7px; color: rgba(17, 17, 17, 0.63); font-size: 0.8rem; line-height: 1.65; text-wrap: pretty; }
+-.compatibility-details { margin-top: 16px; font-size: 0.78rem; line-height: 1.6; }
+-.compatibility-details summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; list-style: none; cursor: pointer; padding-block: 8px; }
++/* First-screen product sheet: one reading edge and three coherent groups. */
++.control-panel {
++  --text-ink-muted: #66635c;
++  --control-border: #878279;
++  --action-hover: #33312d;
++  display: grid;
++  grid-template-rows: auto minmax(min-content, 1fr) auto;
++  gap: 40px;
++  inline-size: clamp(25rem, 34vw, 32rem);
++  width: clamp(25rem, 34vw, 32rem);
++  min-inline-size: 0;
++  padding: 36px clamp(28px, 2.5vw, 40px) 28px;
++  background: var(--panel-paper);
++  justify-content: normal;
++}
++
++.panel-topbar {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  flex-wrap: wrap;
++  gap: 16px;
++  min-inline-size: 0;
++}
++
++.panel-brand {
++  display: flex;
++  align-items: center;
++  gap: 12px;
++  min-inline-size: 0;
++  max-inline-size: 100%;
++}
++
++.panel-brand img { flex: none; border-radius: 12px; }
++.panel-brand strong {
++  min-inline-size: 0;
++  overflow-wrap: anywhere;
++  font-family: var(--font-display);
++  font-size: 1.625rem;
++  font-weight: 700;
++  line-height: 1.2;
++  letter-spacing: -0.02em;
++}
++
++.control-panel .lang-switch {
++  display: flex;
++  gap: 4px;
++  margin: 0;
++  align-self: auto;
++  flex: none;
++}
++
++.control-panel .lang-btn {
++  min-inline-size: 40px;
++  min-block-size: 40px;
++  padding: 8px;
++  font-size: 0.75rem;
++  font-weight: 500;
++  letter-spacing: 0;
++  line-height: 1.25;
++  border-color: var(--control-border);
++  color: var(--text-ink-muted);
++  transition: background-color 150ms ease-out, color 150ms ease-out;
++}
++.control-panel .lang-btn.active { color: var(--panel-paper); border-color: var(--text-ink); }
++
++.panel-main {
++  display: grid;
++  align-self: center;
++  gap: 32px;
++  min-inline-size: 0;
++}
++
++.product-overview h2 {
++  font-size: 2.375rem;
++  font-weight: 600;
++  line-height: 1.25;
++  letter-spacing: -0.02em;
++  white-space: pre-line;
++  overflow-wrap: break-word;
++  text-align: start;
++}
++.product-overview p {
++  margin-block-start: 16px;
++  font-size: 0.9375rem;
++  font-weight: 400;
++  line-height: 1.6;
++  color: var(--text-ink-muted);
++  text-wrap: pretty;
++}
++
++.capability-list { display: grid; gap: 16px; list-style: none; }
++.capability-list li { display: grid; gap: 4px; text-align: start; }
++.capability-list strong { font-size: 0.9375rem; font-weight: 600; line-height: 1.5; }
++.capability-list span { font-size: 0.875rem; font-weight: 400; line-height: 1.6; color: var(--text-ink-muted); text-wrap: pretty; }
++
++.download-section { display: grid; gap: 12px; min-inline-size: 0; }
++.platform-note { font-size: 0.8125rem; font-weight: 400; line-height: 1.5; color: var(--text-ink-muted); }
++.platform-note span { margin-inline: 4px; }
++.control-panel .cta-group { display: block; }
++.control-panel .cta-button {
++  display: flex;
++  inline-size: 100%;
++  min-block-size: 52px;
++  padding: 14px 20px;
++  font-size: 0.9375rem;
++  font-weight: 500;
++  line-height: 1.5;
++  text-transform: none;
++  letter-spacing: 0;
++  white-space: normal;
++  text-align: center;
++  transform: none;
++  transition: background-color 150ms ease-out;
++}
++.download-meta { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
++.free-note { text-wrap: pretty; flex: 1 1 14ch; font-size: 0.8125rem; font-weight: 400; line-height: 1.6; color: var(--text-ink-muted); }
++.source-link {
++  display: inline-flex;
++  align-items: center;
++  min-block-size: 40px;
++  font-size: 0.8125rem;
++  font-weight: 500;
++  line-height: 1.6;
++  text-decoration: underline;
++  text-underline-position: from-font;
++  text-underline-offset: 4px;
++  flex: none;
++}
++
++.panel-bottom { padding-block-start: 24px; border-top: 1px solid rgba(17, 17, 17, 0.12); min-inline-size: 0; }
++.compatibility-note h3 { font-size: 0.875rem; font-weight: 600; line-height: 1.5; }
++.compatibility-note > p { margin-block-start: 8px; font-size: 0.8125rem; font-weight: 400; line-height: 1.6; color: var(--text-ink-muted); text-wrap: pretty; }
++.panel-footer-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 16px; margin-block-start: 12px; }
++.compatibility-details { min-inline-size: 0; font-size: 0.8125rem; font-weight: 400; line-height: 1.6; }
++.compatibility-details summary { display: flex; align-items: center; gap: 12px; min-block-size: 40px; inline-size: fit-content; cursor: pointer; list-style: none; text-decoration: underline; text-underline-offset: 4px; }
+ .compatibility-details summary::-webkit-details-marker { display: none; }
+-.compatibility-details summary::after { content: "+"; font-size: 1rem; line-height: 1; }
++.compatibility-details summary::after { content: "+"; text-decoration: none; }
+ .compatibility-details[open] summary::after { content: "−"; }
+-.compatibility-content { display: grid; gap: 12px; padding-top: 8px; color: rgba(17, 17, 17, 0.65); }
+-.compatibility-content a { width: fit-content; color: var(--text-ink); text-decoration: underline; text-underline-offset: 4px; text-decoration-color: rgba(17, 17, 17, 0.3); }
+-.compatibility-content a:hover { text-decoration-color: currentColor; }
+-.cta-button:focus-visible, .compatibility-details summary:focus-visible { outline: 2px solid var(--text-ink); outline-offset: 4px; }
+-.control-panel .build-tag { margin-top: auto; padding-top: 24px; }
++.compatibility-content { display: grid; gap: 12px; padding-block-start: 8px; color: var(--text-ink-muted); overflow-wrap: break-word; }
++.compatibility-content a { display: inline-flex; align-items: center; min-block-size: 40px; color: var(--text-ink); text-decoration: underline; text-underline-offset: 4px; }
++.control-panel .build-tag { align-self: start; margin: 0; padding-block: 10px; font-size: 0.75rem; font-weight: 400; line-height: 1.6; letter-spacing: 0; color: var(--text-ink-muted); font-variant-numeric: tabular-nums; text-align: end; }
++.control-panel :is(a, button, summary):focus-visible { outline: 2px solid var(--text-ink); outline-offset: 3px; }
++
++@media (hover: hover) {
++  .control-panel .cta-button:hover { background-color: var(--action-hover); }
++  .control-panel .source-link:hover, .compatibility-details summary:hover { text-decoration-thickness: 2px; }
++}
++@media (prefers-reduced-motion: no-preference) {
++  .control-panel .cta-button { transition: transform 150ms ease-out, background-color 150ms ease-out; }
++  .control-panel .cta-button:active { transform: scale(0.96); }
++}
++@media (prefers-reduced-motion: reduce) {
++  .control-panel .cta-button, .control-panel .lang-btn { transition: none; }
++}
+ @media (max-width: 819px) {
+-  .product-overview { flex-grow: 0; margin-top: 28px; }
+-  .download-section { flex-grow: 0; }
+-  .control-panel .build-tag { margin-top: 16px; padding-top: 0; text-align: left; }
+-}
+-@media (max-width: 360px) {
+-  .product-overview h2 { font-size: 1.6rem; }
+-  .capability-list li { gap: 14px; font-size: 0.8rem; }
+-}
++  .control-panel { inline-size: 100%; width: 100%; grid-template-rows: auto auto auto; gap: 32px; padding: 32px 24px; }
++  .panel-main { align-self: start; }
++  .control-panel .lang-btn { min-inline-size: 44px; min-block-size: 44px; }
++  .product-overview h2 { font-size: 2.125rem; }
++}
++@media (max-width: 380px) {
++  .panel-topbar { gap: 12px; }
++  .panel-brand { gap: 8px; }
++  .panel-brand strong { font-size: 1.375rem; }
++  .panel-brand img { inline-size: 36px; block-size: 36px; }
++  .product-overview h2 { font-size: 2rem; line-height: 1.4; }
++}
++@media (forced-colors: active) {
++  .control-panel :is(a, button, summary):focus-visible { outline-color: CanvasText; }
++}
