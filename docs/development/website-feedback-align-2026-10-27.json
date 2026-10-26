@@ -1,0 +1,159 @@
+{
+  "status": "local review; not deployed",
+  "preview": "http://127.0.0.1:8765/?review=bottom-aligned#app-menu",
+  "last_published_baseline": "953fce42-1c0d-45fa-83d8-69077bc0c514",
+  "change": "Shared grid row aligns menu image and feedback card bottom. Caption occupies next row. ResizeObserver keeps decorative bent leader attached after locale, resize and loaded content. Full feedback and all existing motion preserved.",
+  "source_sha256": {
+    "index.html": "91ce09787c466dff09bac869dea024f5e9ed3980b73eeb5b514d99f81992d665",
+    "styles.20261027d.css": "60f121e66a29ab5d7341a9600874d07c9ecf206371d2f39645f9d9ddeb889068",
+    "assets/calligraph-islands.20261026.mjs": "bde16a11dee04b33de816545ccdbff40763b5e98d20a5c5caa32e03646ce5f81",
+    "assets/tour-3-0/curve-en.webp": "edace8131c3807c93f80ba1a4c58665356c23960197d2f58f28c37e9eb68c467",
+    "assets/tour-3-0/curve-zh.webp": "6afb5cf68c1ee79c59f2bfe66c4161dda1212ace26b25c82b63ac76b6a884415",
+    "assets/tour-3-0/display-en.webp": "4ed12127d1fd365856b5b171bf38cb8b5a64422fb867e4e1130dff35fcc371ca",
+    "assets/tour-3-0/display-zh.webp": "75dd66f2c624ee373769abb85fc456221bfc5f4349beb2e99d73e30a66eda608",
+    "assets/tour-3-0/menu-en.webp": "fdf45a7e4796481522def0914ec7e2ac6493d6d74636b31b3875b98ea1faf2f1",
+    "assets/tour-3-0/menu-zh.webp": "5ab978081c30e0f556b7a4441cf8e2389d44e473a6362b35990da21289373baf",
+    "assets/tour-3-0/safety-en.webp": "e684f65c417978c01d5cc147b16e01ab6217fd6c9c267c685d28cf3999382e70",
+    "assets/tour-3-0/safety-zh.webp": "bba24153989412d417be82b3b972de406f993916ae900c0936e3936f3a05357b",
+    "assets/tour-3-0/startup-en.webp": "607191e297b4fbff2be82cce630b73548a02e0467971d8818d0367fe53a85d99",
+    "assets/tour-3-0/startup-zh.webp": "554a4bac68d48ca04b4777fb1e0e7b54a3f43b255a0541db2dc6018a9ce36c26"
+  },
+  "checks": [
+    {
+      "contentFits": true,
+      "delta": 0,
+      "lang": "zh-CN",
+      "overflow": false,
+      "width": 1440
+    },
+    {
+      "contentFits": true,
+      "delta": 0,
+      "lang": "zh-CN",
+      "overflow": false,
+      "width": 1440
+    },
+    {
+      "contentFits": true,
+      "delta": 0,
+      "lang": "zh-CN",
+      "overflow": false,
+      "width": 1440
+    },
+    {
+      "contentFits": true,
+      "delta": 0,
+      "lang": "zh-CN",
+      "overflow": false,
+      "width": 1440
+    },
+    {
+      "contentFits": true,
+      "delta": 0,
+      "lang": "zh-CN",
+      "overflow": false,
+      "width": 1024
+    },
+    {
+      "contentFits": true,
+      "delta": 0,
+      "lang": "zh-CN",
+      "overflow": false,
+      "width": 1024
+    },
+    {
+      "contentFits": true,
+      "delta": 0,
+      "lang": "zh-CN",
+      "overflow": false,
+      "width": 1024
+    },
+    {
+      "contentFits": true,
+      "delta": 0,
+      "lang": "zh-CN",
+      "overflow": false,
+      "width": 1024
+    },
+    {
+      "contentFits": true,
+      "delta": 0,
+      "lang": "zh-CN",
+      "overflow": false,
+      "width": 820
+    },
+    {
+      "contentFits": true,
+      "delta": 0,
+      "lang": "zh-CN",
+      "overflow": false,
+      "width": 820
+    },
+    {
+      "contentFits": true,
+      "delta": 0,
+      "lang": "zh-CN",
+      "overflow": false,
+      "width": 820
+    },
+    {
+      "contentFits": true,
+      "delta": 0,
+      "lang": "zh-CN",
+      "overflow": false,
+      "width": 820
+    },
+    {
+      "contentFits": true,
+      "delta": 0,
+      "lang": "en",
+      "overflow": false,
+      "width": 1024
+    },
+    {
+      "contentFits": true,
+      "delta": 0,
+      "lang": "en",
+      "overflow": false,
+      "width": 1024
+    },
+    {
+      "contentFits": true,
+      "delta": 0,
+      "lang": "en",
+      "overflow": false,
+      "width": 1024
+    },
+    {
+      "contentFits": true,
+      "delta": 0,
+      "lang": "en",
+      "overflow": false,
+      "width": 1024
+    },
+    {
+      "connectorHidden": true,
+      "contentFits": true,
+      "lang": "en",
+      "overflow": false,
+      "stacked": true,
+      "width": 320
+    }
+  ],
+  "validation": [
+    "Actual desktop Chinese and English screenshots inspected; mobile response/date inspected",
+    "JS syntax passed",
+    "13 local HTTP assets byte exact",
+    "Cumulative patch reconstructs all 13 files exactly"
+  ],
+  "screenshots": [
+    "packaging/pkg/output/website-feedback-align-20261027/desktop-zh.png",
+    "packaging/pkg/output/website-feedback-align-20261027/desktop-en.png",
+    "packaging/pkg/output/website-feedback-align-20261027/narrow-en.png"
+  ],
+  "reproduce": "From production953fce42 copy styles.20261022b.css to styles.20261027d.css. Apply these cumulative patches; copy website-story-2026-10-26-assets into docs/assets. Prior local HTML/CSS patches superseded.",
+  "limits": [
+    "No native build or production deployment",
+    "OS browser matrix, 200% zoom and VoiceOver not rerun"
+  ]
+}

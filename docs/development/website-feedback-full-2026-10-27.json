@@ -1,5 +1,5 @@
 {
-  "status": "local review; not deployed",
+  "status": "superseded local review; not deployed",
   "preview": "http://127.0.0.1:8765/#app-menu",
   "replaces": "website-menu-refine-2026-10-27 local review",
   "last_published_baseline": "953fce42-1c0d-45fa-83d8-69077bc0c514",
@@ -60,5 +60,6 @@
   "limits": [
     "No production deployment or native App build",
     "Full VoiceOver and OS reduced-motion switching not retested"
-  ]
+  ],
+  "superseded_by": "website-feedback-align-2026-10-27.json"
 }
