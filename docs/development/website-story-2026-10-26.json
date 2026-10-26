@@ -1,5 +1,5 @@
 {
-  "status": "local preview; awaiting maintainer review; not deployed",
+  "status": "superseded local review; not deployed",
   "baseline_source_commit": "207302bde40378b81491ba4d20a19a83ade93ccb",
   "last_published_baseline": "953fce42-1c0d-45fa-83d8-69077bc0c514",
   "preview_url": "http://127.0.0.1:8765/#app-menu",
@@ -320,5 +320,6 @@
     "monthly statistics endpoint and semantics",
     "release manifest, update feeds, PKG/ZIP packages, backend and routing"
   ],
-  "history": "Only isolated patches and newly used public assets are committed in the active app repo; unrelated dirty parent-repository changes are not staged."
+  "history": "Only isolated patches and newly used public assets are committed in the active app repo; unrelated dirty parent-repository changes are not staged.",
+  "superseded_by": "website-menu-focus-2026-10-27.json"
 }

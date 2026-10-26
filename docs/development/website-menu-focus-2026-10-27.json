@@ -1,0 +1,63 @@
+{
+  "status": "local review only; not deployed",
+  "preview": "http://127.0.0.1:8765/#app-menu",
+  "replaces": "website-story-2026-10-26 local review",
+  "last_published_baseline": "953fce42-1c0d-45fa-83d8-69077bc0c514",
+  "changes": [
+    "Persistent Full/Compact/Mini views are the immediate second-screen primary visual",
+    "Expanded native-menu image kept behind a visible native details control",
+    "One concise result per feedback slide, retaining the sliding transition and pause control",
+    "Curve/display/safety/monthly-use/startup copy shortened; duplicated case narrative removed"
+  ],
+  "copy_count": {
+    "before_static_paragraph_characters": 630,
+    "after_static_paragraph_characters": 258,
+    "reduction_percent": 59
+  },
+  "illustration_provenance": {
+    "type": "HTML/CSS illustrations, explicitly labelled sample values; not native screenshots",
+    "full": "main.swift:3293-3304;65℃ | 2400 RPM [Auto]",
+    "compact": "main.swift:3253-3259;65｜2400｜A",
+    "mini": "main.swift:2703-2717,3260-3290 and MiniDisplayFormatter.swift;top65℃｜A,bottom2400 RPM",
+    "layout": "Cropped menu-bar context at illustration scale, not a literal desktop capture"
+  },
+  "source_sha256": {
+    "index.html": "97be0c080c48dcee8b221ebbb2c8ae4e861815d08ea5524482f0bf6acecc2243",
+    "styles.20261027a.css": "866e5b73838e844646697d587bfce055b3f2ab6de19d808211b8b100fb532130",
+    "assets/calligraph-islands.20261026.mjs": "bde16a11dee04b33de816545ccdbff40763b5e98d20a5c5caa32e03646ce5f81",
+    "assets/tour-3-0/curve-en.webp": "edace8131c3807c93f80ba1a4c58665356c23960197d2f58f28c37e9eb68c467",
+    "assets/tour-3-0/curve-zh.webp": "6afb5cf68c1ee79c59f2bfe66c4161dda1212ace26b25c82b63ac76b6a884415",
+    "assets/tour-3-0/display-en.webp": "4ed12127d1fd365856b5b171bf38cb8b5a64422fb867e4e1130dff35fcc371ca",
+    "assets/tour-3-0/display-zh.webp": "75dd66f2c624ee373769abb85fc456221bfc5f4349beb2e99d73e30a66eda608",
+    "assets/tour-3-0/menu-en.webp": "fdf45a7e4796481522def0914ec7e2ac6493d6d74636b31b3875b98ea1faf2f1",
+    "assets/tour-3-0/menu-zh.webp": "5ab978081c30e0f556b7a4441cf8e2389d44e473a6362b35990da21289373baf",
+    "assets/tour-3-0/safety-en.webp": "e684f65c417978c01d5cc147b16e01ab6217fd6c9c267c685d28cf3999382e70",
+    "assets/tour-3-0/safety-zh.webp": "bba24153989412d417be82b3b972de406f993916ae900c0936e3936f3a05357b",
+    "assets/tour-3-0/startup-en.webp": "607191e297b4fbff2be82cce630b73548a02e0467971d8818d0367fe53a85d99",
+    "assets/tour-3-0/startup-zh.webp": "554a4bac68d48ca04b4777fb1e0e7b54a3f43b255a0541db2dc6018a9ce36c26"
+  },
+  "checks": {
+    "local_http_bytes_exact": true,
+    "cumulative_patches_and_existing_review_assets_reconstruct_exact": true,
+    "inline_js_syntax": "node --check passed",
+    "narrow_en": {
+      "clipped": [],
+      "closed": true,
+      "overflow": false,
+      "width": 320
+    },
+    "expanded_menu": "Pointer opened; Enter closed; screenshot asset loaded",
+    "carousel": "Visible one-sentence case, original controls and pause retained",
+    "motion": "Calligraph adapter byte-identical to previous reviewed version; previous CSS retained as prefix; hero markup unchanged"
+  },
+  "screenshots": [
+    "packaging/pkg/output/website-menu-focus-20261027/desktop-zh.png",
+    "packaging/pkg/output/website-menu-focus-20261027/mobile-zh.png"
+  ],
+  "reproduce": "From production953fce42 copy styles.20261022b.css to styles.20261027a.css, apply these cumulative HTML/CSS patches, copy website-story-2026-10-26-assets/ contents into docs/assets/. Do not apply the superseded26HTML/CSS patch afterward.",
+  "limits": [
+    "No production deployment or native App build",
+    "No new live hardware screenshot: menu-bar format examples are labelled illustrations",
+    "Full VoiceOver and actual OS reduced-motion switch not rechecked"
+  ]
+}
