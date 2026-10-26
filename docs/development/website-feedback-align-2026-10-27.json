@@ -1,5 +1,5 @@
 {
-  "status": "local review; not deployed",
+  "status": "published",
   "preview": "http://127.0.0.1:8765/?review=bottom-aligned#app-menu",
   "last_published_baseline": "953fce42-1c0d-45fa-83d8-69077bc0c514",
   "change": "Shared grid row aligns menu image and feedback card bottom. Caption occupies next row. ResizeObserver keeps decorative bent leader attached after locale, resize and loaded content. Full feedback and all existing motion preserved.",
@@ -155,5 +155,7 @@
   "limits": [
     "No native build or production deployment",
     "OS browser matrix, 200% zoom and VoiceOver not rerun"
-  ]
+  ],
+  "deployment_id": "1554e837-11fa-4efa-85b0-b4cae32d0cec",
+  "publication_record": "docs/releases/website-app-tour-2026-10-27-publication.json"
 }
