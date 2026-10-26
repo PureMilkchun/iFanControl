@@ -1,0 +1,64 @@
+{
+  "status": "local review; not deployed",
+  "preview": "http://127.0.0.1:8765/#app-menu",
+  "replaces": "website-menu-refine-2026-10-27 local review",
+  "last_published_baseline": "953fce42-1c0d-45fa-83d8-69077bc0c514",
+  "change": "Restore complete feedback quote/response/date/version card beside visible menu. Bent leader starts at invitation and points to card. Keep other introduction sections concise.",
+  "source_sha256": {
+    "index.html": "157c554d187ed3f6706bf922ce9513b2f6b67f753b3764b53849f1cbbacf4227",
+    "styles.20261027c.css": "ae6991ee0bfc101c0e9873661bbcc2b091f110f60713838d116ab7018aa17ed1",
+    "assets/calligraph-islands.20261026.mjs": "bde16a11dee04b33de816545ccdbff40763b5e98d20a5c5caa32e03646ce5f81",
+    "assets/tour-3-0/curve-en.webp": "edace8131c3807c93f80ba1a4c58665356c23960197d2f58f28c37e9eb68c467",
+    "assets/tour-3-0/curve-zh.webp": "6afb5cf68c1ee79c59f2bfe66c4161dda1212ace26b25c82b63ac76b6a884415",
+    "assets/tour-3-0/display-en.webp": "4ed12127d1fd365856b5b171bf38cb8b5a64422fb867e4e1130dff35fcc371ca",
+    "assets/tour-3-0/display-zh.webp": "75dd66f2c624ee373769abb85fc456221bfc5f4349beb2e99d73e30a66eda608",
+    "assets/tour-3-0/menu-en.webp": "fdf45a7e4796481522def0914ec7e2ac6493d6d74636b31b3875b98ea1faf2f1",
+    "assets/tour-3-0/menu-zh.webp": "5ab978081c30e0f556b7a4441cf8e2389d44e473a6362b35990da21289373baf",
+    "assets/tour-3-0/safety-en.webp": "e684f65c417978c01d5cc147b16e01ab6217fd6c9c267c685d28cf3999382e70",
+    "assets/tour-3-0/safety-zh.webp": "bba24153989412d417be82b3b972de406f993916ae900c0936e3936f3a05357b",
+    "assets/tour-3-0/startup-en.webp": "607191e297b4fbff2be82cce630b73548a02e0467971d8818d0367fe53a85d99",
+    "assets/tour-3-0/startup-zh.webp": "554a4bac68d48ca04b4777fb1e0e7b54a3f43b255a0541db2dc6018a9ce36c26"
+  },
+  "checks": {
+    "complete_quote_and_response_sections": 4,
+    "date_and_version_sections": 4,
+    "connector_path": "M0 100 H28 L82 0 H112",
+    "desktop_no_overflow": true,
+    "narrow_en": {
+      "caseQuote": "Could the fan curve use a reversed Y-axis with 0 as the origin? Ideally, users should be able to switch between normal and reversed.",
+      "connectorHidden": true,
+      "hasDates": true,
+      "hasResponse": true,
+      "hasVersion": true,
+      "overflow": false,
+      "pause": "Resume stories",
+      "textClips": 0,
+      "width": 320,
+      "carousel_height": 665.671875,
+      "carousel_scroll_top": 0,
+      "carousel_content_fits": true,
+      "fixed_height_removed": true
+    },
+    "pause_and_case_navigation": "Pointer pause and story1 selection verified",
+    "local_http_bytes_exact": 13,
+    "cumulative_patch_reconstruction_exact": true,
+    "inline_js_syntax": "node --check passed"
+  },
+  "preserved": [
+    "Full/Compact/Mini strips without wallpaper rectangles",
+    "Always-visible native menu",
+    "Exact real-user MAU copy and breathing dot",
+    "Existing hero/Calligraph/case/number motion and reduced-motion treatment",
+    "Other concise tour paragraphs",
+    "Backend, routes, update feeds, packages and production deployment"
+  ],
+  "screenshots": [
+    "packaging/pkg/output/website-feedback-full-20261027/desktop-zh.png",
+    "packaging/pkg/output/website-feedback-full-20261027/narrow-en.png"
+  ],
+  "reproduce": "From production953fce42 copy styles.20261022b.css to styles.20261027c.css, apply these cumulative HTML/CSS patches, copy website-story-2026-10-26-assets contents into docs/assets. Earlier local HTML/CSS revisions are superseded.",
+  "limits": [
+    "No production deployment or native App build",
+    "Full VoiceOver and OS reduced-motion switching not retested"
+  ]
+}
