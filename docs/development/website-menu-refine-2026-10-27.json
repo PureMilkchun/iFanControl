@@ -1,0 +1,71 @@
+{
+  "status": "local review; not deployed",
+  "preview": "http://127.0.0.1:8765/#app-menu",
+  "replaces": "website-menu-focus-2026-10-27 local review",
+  "last_published_baseline": "953fce42-1c0d-45fa-83d8-69077bc0c514",
+  "changes": [
+    "Removed all three wallpaper rectangles; only horizontal menu strips remain",
+    "Native expanded-menu screenshot is always visible, no disclosure action required",
+    "Decorative line runs from feedback invitation to concise historic case carousel; on mobile a vertical connector groups the case",
+    "Restored exact Chinese copy: 不是作者一个人自娱自乐，而是有真实的用户在使用。",
+    "Added breathing circle before the last30days anonymous-active label; reduced-motion has a static circle"
+  ],
+  "source_sha256": {
+    "index.html": "fde7e920b50a75a23e6c4a21de083a7c45c08f80a909df3043d5345b054505cd",
+    "styles.20261027b.css": "05323bceb0b0164f6a3dd091a7719cfc2ef1741476b22a4e5aef7797be96eed1",
+    "assets/calligraph-islands.20261026.mjs": "bde16a11dee04b33de816545ccdbff40763b5e98d20a5c5caa32e03646ce5f81",
+    "assets/tour-3-0/curve-en.webp": "edace8131c3807c93f80ba1a4c58665356c23960197d2f58f28c37e9eb68c467",
+    "assets/tour-3-0/curve-zh.webp": "6afb5cf68c1ee79c59f2bfe66c4161dda1212ace26b25c82b63ac76b6a884415",
+    "assets/tour-3-0/display-en.webp": "4ed12127d1fd365856b5b171bf38cb8b5a64422fb867e4e1130dff35fcc371ca",
+    "assets/tour-3-0/display-zh.webp": "75dd66f2c624ee373769abb85fc456221bfc5f4349beb2e99d73e30a66eda608",
+    "assets/tour-3-0/menu-en.webp": "fdf45a7e4796481522def0914ec7e2ac6493d6d74636b31b3875b98ea1faf2f1",
+    "assets/tour-3-0/menu-zh.webp": "5ab978081c30e0f556b7a4441cf8e2389d44e473a6362b35990da21289373baf",
+    "assets/tour-3-0/safety-en.webp": "e684f65c417978c01d5cc147b16e01ab6217fd6c9c267c685d28cf3999382e70",
+    "assets/tour-3-0/safety-zh.webp": "bba24153989412d417be82b3b972de406f993916ae900c0936e3936f3a05357b",
+    "assets/tour-3-0/startup-en.webp": "607191e297b4fbff2be82cce630b73548a02e0467971d8818d0367fe53a85d99",
+    "assets/tour-3-0/startup-zh.webp": "554a4bac68d48ca04b4777fb1e0e7b54a3f43b255a0541db2dc6018a9ce36c26"
+  },
+  "checks": {
+    "strip_height_desktop_px": [
+      46,
+      46,
+      46
+    ],
+    "wallpaper_nodes": 0,
+    "default_hidden_menu_details": 0,
+    "desktop_leader_y": 665.9540625,
+    "feedback_heading_center_y": 665.953125,
+    "narrow_en": {
+      "lang": "en",
+      "menuVisible": true,
+      "overflow": false,
+      "pageWidth": 305,
+      "width": 320
+    },
+    "breathing_dot_observation": {
+      "animation": "tour-activity-breathe",
+      "duration": "2.6s",
+      "observed_opacities": [
+        0.192423,
+        0.477312
+      ],
+      "observed_transform": "matrix(1.21435, 0, 0, 1.21435, 0, 0)"
+    },
+    "existing_calligraph_adapter_byte_identical": true,
+    "previous_css_preserved_as_prefix": true,
+    "served_files_exact": 13,
+    "patch_reconstruction_exact": true,
+    "inline_script_syntax": "node --check passed"
+  },
+  "screenshots": [
+    "packaging/pkg/output/website-menu-refine-20261027/menu-desktop-zh.png",
+    "packaging/pkg/output/website-menu-refine-20261027/active-desktop-zh.png",
+    "packaging/pkg/output/website-menu-refine-20261027/menu-mobile-zh.png"
+  ],
+  "semantics": "Breathing dot is decorative and aria-hidden; label remains last30days anonymous active users, not a concurrent-online count. Local stats use existing public-data snapshot.",
+  "reproduce": "From production953fce42 copy styles.20261022b.css to styles.20261027b.css, apply these cumulative HTML/CSS patches, copy website-story-2026-10-26-assets contents into docs/assets. Earlier local HTML/CSS revisions are superseded.",
+  "limits": [
+    "OS reduced-motion was checked in CSS, not toggled live",
+    "No native App build, production deployment, backend/feed/package or runtime configuration changes"
+  ]
+}

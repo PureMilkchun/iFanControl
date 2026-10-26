@@ -1,0 +1,696 @@
+--- a/docs/index.html
++++ b/docs/index.html
+@@ -9,7 +9,7 @@
+       content="iFanControl 是一款 Apple Silicon Mac 风扇控制工具。开发者仅在自己的 Mac mini M4 上长期实测，已稳定运行数月；其他带风扇的 M 系列 Mac 理论上可用，实际兼容性需试用确认。"
+     />
+     <link rel="icon" type="image/png" href="./assets/app-icon.png" />
+-    <link rel="stylesheet" href="./styles.20261022b.css" />
++    <link rel="stylesheet" href="./styles.20261027b.css" />
+   </head>
+   <body>
+     <section class="landing-screen">
+@@ -119,139 +119,185 @@
+       </aside>
+     </section>
+ 
+-    <section class="active-section" aria-labelledby="active-title" data-calligraph-trigger>
+-      <div class="active-copy">
+-        <div class="label-micro muted" data-i18n="active_label">真实使用</div>
+-        <h2
+-          id="active-title"
+-          data-i18n="active_title"
+-          data-calligraph
+-          data-calligraph-variant="text"
+-          data-calligraph-from-zh="不是作者一个人的自娱自乐。"
+-          data-calligraph-from-en="Not just a solo experiment."
+-        >它确实在真实设备上运行。</h2>
+-        <p data-i18n="active_body">近 30 天内保持活跃，也在日常使用里持续修正。</p>
+-      </div>
+-
+-      <div class="active-board" aria-label="iFanControl monthly active users">
+-        <div class="active-stat active-stat-primary">
+-          <span class="active-number" data-monthly-active-users data-calligraph data-calligraph-from="00">--</span>
+-          <span class="active-unit" data-i18n="active_metric">月活跃用户</span>
+-        </div>
+-        <div class="active-stat">
+-          <span class="active-card-number" data-latest-build-number data-calligraph data-calligraph-from="00">--</span>
+-          <span class="active-unit" data-i18n="iteration_builds">次构建迭代</span>
+-        </div>
+-        <div class="active-stat">
+-          <span class="active-card-number" data-latest-version data-calligraph data-calligraph-from="0.0.0">--</span>
+-          <span class="active-unit" data-i18n="iteration_current">当前版本</span>
+-        </div>
+-      </div>
+-
+-      <div class="iteration-note">
+-        <span class="iteration-pulse" aria-hidden="true"></span>
+-        <span data-i18n="active_fineprint">匿名统计，仅用于判断软件是否仍被使用。</span>
++  <main id="app-tour">
++    <section class="tour-section tour-dark" id="app-menu" aria-labelledby="tour-menu-title">
++      <div class="tour-inner">
++        <div class="menu-focus-intro">
++          <div data-i18n="tour_menu_label" class="tour-kicker">01 / 常驻菜单栏</div>
++          <h2 data-i18n="tour_menu_title" id="tour-menu-title" data-calligraph data-calligraph-variant="text" data-calligraph-from-zh="温度与转速，就在这里。" data-calligraph-from-en="Always in your menu bar.">菜单栏上，一眼看清。</h2>
++          <p data-i18n="tour_menu_body">完整、简洁、迷你，三种样式任选。</p>
++        </div>
++        <div class="bar-gallery">
++          <figure class="bar-style">
++            <div class="bar-desktop" role="img" data-i18n-aria="bar_full_alt" aria-label="完整菜单栏样式示意：65摄氏度，2400转，自动模式">
++              <div class="bar-system-strip"><span class="bar-context" aria-hidden="true">•••</span><span class="bar-reading bar-reading-full">65℃ | 2400 RPM [Auto]</span><svg class="bar-system-icon" aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="4"/><circle cx="8" cy="10" r="1.5"/><path d="M13 10h4M7 14h10"/></svg></div>
++
++            </div>
++            <figcaption data-i18n="bar_full">完整</figcaption>
++          </figure>
++          <figure class="bar-style">
++            <div class="bar-desktop" role="img" data-i18n-aria="bar_compact_alt" aria-label="简洁菜单栏样式示意：65摄氏度，2400转，自动模式">
++              <div class="bar-system-strip"><span class="bar-context" aria-hidden="true">•••</span><span class="bar-reading bar-reading-compact">65｜2400｜A</span><svg class="bar-system-icon" aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="4"/><circle cx="8" cy="10" r="1.5"/><path d="M13 10h4M7 14h10"/></svg></div>
++
++            </div>
++            <figcaption data-i18n="bar_compact">简洁</figcaption>
++          </figure>
++          <figure class="bar-style">
++            <div class="bar-desktop" role="img" data-i18n-aria="bar_mini_alt" aria-label="迷你菜单栏样式示意：65摄氏度，2400转，自动模式">
++              <div class="bar-system-strip"><span class="bar-context" aria-hidden="true">•••</span><span class="bar-reading bar-reading-mini"><span>65℃｜<em>A</em></span><span>2400 RPM</span></span><svg class="bar-system-icon" aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="4"/><circle cx="8" cy="10" r="1.5"/><path d="M13 10h4M7 14h10"/></svg></div>
++
++            </div>
++            <figcaption data-i18n="bar_mini">迷你</figcaption>
++          </figure>
++        </div>
++        <p class="bar-example-note" data-i18n="bar_example">菜单栏样式示意 · 示例数据，A 为自动模式</p>
++        <div class="menu-annotated">
++        <figure class="tour-figure tour-figure-menu">
++          <div class="menu-image-wrap">
++          <img src="./assets/tour-3-0/menu-zh.webp" data-tour-image="menu" data-i18n-alt="tour_menu_alt" alt="iFanControl 主菜单，包含控制模式、曲线编辑和告诉开发者邀请框" width="500" height="727" loading="lazy" decoding="async" />
++          </div>
++          <figcaption>
++            <span data-i18n="tour_menu_caption">主菜单 · 保留直接、醒目的反馈邀请</span> · <a data-tour-fullimage="menu" href="./assets/tour-3-0/menu-zh.webp" target="_blank" rel="noopener" data-i18n="tour_open_image">查看大图</a>
++          </figcaption>
++        </figure>
++          <div class="tour-feedback">
++            <h3 data-i18n="tour_feedback_title">反馈，就在菜单里。</h3>
++            <p data-i18n="tour_feedback_body">点「告诉开发者」，直接联系作者。</p>
++            <p class="tour-sr-only" id="tour-feedback-cases" data-i18n="tour_feedback_cases">用户建议带来的改进</p>
++            <div class="voices-carousel" data-voices-carousel role="region" aria-labelledby="tour-feedback-cases">
++              <div class="voices-card-track" data-voices-track></div>
++              <div class="voices-carousel-nav"><div class="voices-carousel-dots" data-voices-dots></div><button class="tour-carousel-pause" type="button" data-voices-pause data-i18n="tour_case_pause">暂停轮播</button></div>
++            </div>
++          </div>
++        </div>
+       </div>
+     </section>
+-
+-    <section class="voices-section" aria-labelledby="voices-title" data-calligraph-trigger>
+-      <div class="voices-header">
+-        <div class="label-micro muted" data-i18n="voices_label">用户声音</div>
+-        <h2
+-          id="voices-title"
+-          data-i18n="voices_title"
+-          data-calligraph
+-          data-calligraph-variant="text"
+-          data-calligraph-from-zh="听见真实反馈"
+-          data-calligraph-from-en="Real voices matter"
+-        >高效采纳用户建议</h2>
+-        <p data-i18n="voices_subtitle">快速的用户反馈入口就设计在菜单里，我们倾听每一位真实用户的声音。</p>
+-      </div>
+-
+-      <div class="voices-stats">
+-        <div class="voices-stat-card">
+-          <span class="voices-stat-number" data-i18n="voices_stat_adopted_value" data-calligraph data-calligraph-from="0">4</span>
+-          <span class="voices-stat-label" data-i18n="voices_stat_adopted">已采纳建议</span>
+-        </div>
+-        <div class="voices-stat-card">
+-          <span class="voices-stat-number" data-i18n="voices_stat_response_value" data-calligraph data-calligraph-from="&lt; 00h">&lt; 24h</span>
+-          <span class="voices-stat-label" data-i18n="voices_stat_response">平均响应</span>
+-        </div>
+-        <div class="voices-stat-card">
+-          <span class="voices-stat-number" data-i18n="voices_stat_speed_value" data-calligraph data-calligraph-from="≈ 0.0d">≈ 0.5d</span>
+-          <span class="voices-stat-label" data-i18n="voices_stat_speed">采纳到上线</span>
+-        </div>
+-      </div>
+-
+-      <div class="voices-carousel" data-voices-carousel>
+-        <div class="voices-card-track" data-voices-track></div>
+-        <div class="voices-carousel-nav">
+-          <div class="voices-carousel-dots" data-voices-dots></div>
+-        </div>
++    <section class="tour-section tour-paper" id="fan-curves" aria-labelledby="tour-curve-title">
++      <div class="tour-inner">
++        <div class="tour-wide-intro">
++          <div>
++            <div data-i18n="tour_curve_label" class="tour-kicker">02 / 曲线与控制</div>
++            <h2 data-i18n="tour_curve_title" id="tour-curve-title" data-calligraph data-calligraph-variant="text" data-calligraph-from-zh="从温度，到曲线。" data-calligraph-from-en="From a temperature to a curve.">温度与转速，按你的习惯。</h2>
++          </div>
++          <p data-i18n="tour_curve_body" >五个点，自定温度与转速。自动跟随曲线，手动固定转速。</p>
++        </div>
++        <figure class="tour-figure tour-figure-curve">
++          <img src="./assets/tour-3-0/curve-zh.webp" data-tour-image="curve" data-i18n-alt="tour_curve_alt" alt="五点风扇曲线编辑器，包含三套预设与坐标方向切换" width="1440" height="964" loading="lazy" decoding="async" />
++          <figcaption>
++            <span data-i18n="tour_curve_caption">曲线编辑 · 控制点、预设与坐标方向</span> · <a data-tour-fullimage="curve" href="./assets/tour-3-0/curve-zh.webp" target="_blank" rel="noopener" data-i18n="tour_open_image">查看大图</a>
++          </figcaption>
++        </figure>
++        <p class="tour-curve-summary" data-i18n="tour_presets_body">三套预设，按场景切换。支持数值编辑与 Y 轴正反向显示。</p>
+       </div>
+     </section>
+-
++    <section class="tour-section tour-dark" id="menu-display" aria-labelledby="tour-display-title">
++      <div class="tour-inner tour-split">
++        <div class="tour-copy">
++          <div data-i18n="tour_display_label" class="tour-kicker">03 / 日常查看</div>
++          <h2 data-i18n="tour_display_title" id="tour-display-title" data-calligraph data-calligraph-variant="text" data-calligraph-from-zh="回到菜单栏，按习惯安排。" data-calligraph-from-en="Back to your familiar menu bar.">想看的信息，抬眼就看到。</h2>
++          <p data-i18n="tour_display_body" >温度、转速、功率，选择想看的内容；预览即时生效。</p>
++          <p data-i18n="tour_display_note" class="tour-aside">功率为估算值，视设备支持。</p>
++        </div>
++        <figure class="tour-figure tour-figure-display">
++          <img src="./assets/tour-3-0/display-zh.webp" data-tour-image="display" data-i18n-alt="tour_display_alt" alt="信息栏展示设置，包含迷你样式预览和上下行内容选择" width="1080" height="800" loading="lazy" decoding="async" />
++          <figcaption>
++            <span data-i18n="tour_display_caption">信息栏展示 · 预览与设置同步</span> · <a data-tour-fullimage="display" href="./assets/tour-3-0/display-zh.webp" target="_blank" rel="noopener" data-i18n="tour_open_image">查看大图</a>
++          </figcaption>
++        </figure>
++      </div>
++    </section>
++    <section class="tour-section tour-paper" id="daily-use" aria-labelledby="tour-safety-title">
++      <div class="tour-inner">
++        <div class="tour-split">
++          <div class="tour-copy">
++            <div data-i18n="tour_safety_label" class="tour-kicker">04 / 日常常驻</div>
++            <h2 data-i18n="tour_safety_title" id="tour-safety-title" data-calligraph data-calligraph-variant="text" data-calligraph-from-zh="日常常驻，安心使用。" data-calligraph-from-en="Prepared for everyday use.">高温有兜底，异常有提示。</h2>
++            <p data-i18n="tour_safety_body" >临界高温时托底；必要硬件信息异常时，提示并兜底或交还系统。</p>
++          </div>
++          <figure class="tour-figure tour-figure-safety">
++            <img src="./assets/tour-3-0/safety-zh.webp" data-tour-image="safety" data-i18n-alt="tour_safety_alt" alt="安全兜底转速设置窗口" width="800" height="604" loading="lazy" decoding="async" />
++            <figcaption>
++              <span data-i18n="tour_safety_caption">安全兜底转速 · 临界高温时的最低转速</span> · <a data-tour-fullimage="safety" href="./assets/tour-3-0/safety-zh.webp" target="_blank" rel="noopener" data-i18n="tour_open_image">查看大图</a>
++            </figcaption>
++          </figure>
++        </div>
++        <div class="tour-adoption" data-calligraph-trigger>
++          <div class="tour-metric">
++            <span class="tour-metric-value" data-monthly-active-users data-calligraph data-calligraph-from="00">—</span>
++            <span class="tour-active-label"><span class="tour-activity-dot" aria-hidden="true"></span><span data-i18n="tour_mau_label">近 30 天匿名活跃用户</span></span>
++          </div>
++          <div>
++            <h3 data-i18n="tour_mau_title" data-calligraph data-calligraph-variant="text" data-calligraph-from-zh="日常使用，持续改进。" data-calligraph-from-en="Real use, real feedback.">不是作者一个人自娱自乐，而是有真实的用户在使用。</h3>
++          </div>
++        </div>
++        <p data-i18n="tour_safety_note" class="tour-device-note">开发者在 Mac mini M4 上长期日常使用。其他带风扇的 M 系列 Mac，仍需在你的设备上确认兼容性。</p>
++      </div>
++    </section>
++    <section class="tour-section tour-dark" id="startup-updates" aria-labelledby="tour-update-title">
++      <div class="tour-inner">
++        <div class="tour-split">
++          <div class="tour-copy">
++            <div data-i18n="tour_update_label" class="tour-kicker">05 / 启动与更新</div>
++            <h2 data-i18n="tour_update_title" id="tour-update-title" data-calligraph data-calligraph-variant="text" data-calligraph-from-zh="等待，也应该清清楚楚。" data-calligraph-from-en="Know what you are waiting for.">启动与更新，每一步清晰。</h2>
++            <p data-i18n="tour_update_body" >启动有阶段提示，更新有下载与校验进度。</p>
++          </div>
++          <figure class="tour-figure tour-figure-startup">
++            <img src="./assets/tour-3-0/startup-zh.webp" data-tour-image="startup" data-i18n-alt="tour_startup_alt" alt="正在启动 iFanControl，正在识别温度与风扇" width="760" height="312" loading="lazy" decoding="async" />
++            <figcaption>
++              <span data-i18n="tour_startup_caption">启动提示 · 对应实际准备阶段</span> · <a data-tour-fullimage="startup" href="./assets/tour-3-0/startup-zh.webp" target="_blank" rel="noopener" data-i18n="tour_open_image">查看大图</a>
++            </figcaption>
++          </figure>
++        </div>
++        <ol class="tour-steps">
++          <li>
++            <span aria-hidden="true">01</span>
++            <div>
++              <h3 data-i18n="tour_step_check" >检查更新</h3>
++            </div>
++          </li>
++          <li>
++            <span aria-hidden="true">02</span>
++            <div>
++              <h3 data-i18n="tour_step_verify" >下载与校验</h3>
++            </div>
++          </li>
++          <li>
++            <span aria-hidden="true">03</span>
++            <div>
++              <h3 data-i18n="tour_step_install" >系统引导安装</h3>
++            </div>
++          </li>
++        </ol>
++        <p data-i18n="tour_sample" class="tour-sample">界面为示意。安装完成后，从「应用程序」打开。</p>
++      </div>
++    </section>
+     <section class="timeline-section" aria-labelledby="timeline-title">
+       <div class="timeline-header">
+         <div class="label-micro muted" data-i18n="timeline_label">更新日志</div>
+-        <h2 id="timeline-title" data-i18n="timeline_title">项目时间线</h2>
++        <h2 id="timeline-title" data-i18n="tour_recent">持续改进，有迹可循。</h2>
+       </div>
+-
+-      <div class="timeline-track" data-timeline-track></div>
+-
++      <div class="timeline-track" data-timeline-track>
++      </div>
+       <div class="timeline-expand-wrap">
+         <button class="timeline-expand-btn" type="button" data-timeline-expand data-i18n="timeline_expand">展开完整时间线</button>
+       </div>
+     </section>
+-
+-    <section class="showcase-section" aria-labelledby="showcase-title" data-calligraph-trigger>
+-      <div class="showcase-header">
+-        <div class="label-micro muted" data-i18n="showcase_label">界面展示</div>
+-        <h2
+-          id="showcase-title"
+-          data-i18n="showcase_title"
+-          data-calligraph
+-          data-calligraph-variant="text"
+-          data-calligraph-from-zh="实时控制界面"
+-          data-calligraph-from-en="Live control surfaces"
+-        >菜单栏、曲线编辑与实时控制</h2>
++  </main>
++  <footer class="tour-section tour-paper tour-close">
++    <div class="tour-inner">
++      <div class="tour-kicker">iFanControl</div>
++      <h2 data-i18n="tour_close_title" >从你的菜单栏，开始。</h2>
++      <p data-i18n="tour_close_body" >免费开源，无订阅或内购。macOS 15+，适用于带风扇的 Apple Silicon Mac。</p>
++      <div class="tour-close-actions">
++        <a class="tour-download" href="./download" data-i18n="cta_download">下载应用</a>
++        <a class="tour-source" href="https://github.com/PureMilkchun/iFanControl" data-i18n="cta_source">查看源码</a>
+       </div>
+-
+-      <div class="showcase-grid">
+-        <div class="showcase-rail showcase-rail-left">
+-          <figure class="showcase-card showcase-card-small">
+-            <img src="./assets/showcase/status-pill.png" alt="Status pill preview" />
+-            <figcaption data-i18n="showcase_status">状态胶囊</figcaption>
+-          </figure>
+-          <figure class="showcase-card showcase-card-wide">
+-            <img src="./assets/showcase/curve-editor.png" alt="Curve editor preview" />
+-            <figcaption data-i18n="showcase_curve">5 点风扇曲线</figcaption>
+-          </figure>
+-        </div>
+-
+-        <div class="showcase-stage">
+-          <figure class="showcase-card showcase-card-tall showcase-card-primary">
+-            <img src="./assets/showcase/menu-overview.png" alt="App menu overview preview" />
+-            <figcaption data-i18n="showcase_panel">菜单总览与快捷控制</figcaption>
+-          </figure>
+-        </div>
+-
+-        <div class="showcase-rail showcase-rail-right">
+-          <figure class="showcase-card showcase-card-small-alt">
+-            <img src="./assets/showcase/info-display.png" alt="Info display preview" />
+-            <figcaption data-i18n="showcase_info">信息栏展示配置</figcaption>
+-          </figure>
+-          <figure class="showcase-card showcase-card-power">
+-            <img src="./assets/showcase/power-estimate.png" alt="Power estimate preview" />
+-            <figcaption data-i18n="showcase_power">实时电力估算</figcaption>
+-          </figure>
+-          <figure class="showcase-card showcase-card-medium">
+-            <img src="./assets/showcase/safety-floor.png" alt="Safety floor preview" />
+-            <figcaption data-i18n="showcase_safety">安全兜底转速</figcaption>
+-          </figure>
+-        </div>
+-      </div>
+-    </section>
++      <p class="tour-release">
++        <span data-i18n="tour_version">当前版本</span>
++        <span data-latest-version>—</span> · <span data-latest-build>build —</span>
++      </p>
++    </div>
++  </footer>
+ 
+     <script>
+       (function () {
+@@ -265,7 +311,7 @@
+             if (!window.__ifcCalligraphReady) {
+               var lang = document.documentElement.lang && document.documentElement.lang.indexOf("en") === 0 ? "en" : "zh";
+               var startValue = node.getAttribute("data-calligraph-from-" + lang) || node.getAttribute("data-calligraph-from");
+-              node.textContent = (startValue == null || startValue === "") ? value : startValue;
++              node.textContent = value;
+             }
+             return;
+           }
+@@ -274,6 +320,69 @@
+ 
+         var texts = {
+           zh: {
++            case_alert: "散热异常提醒，收到建议后当天上线。",
++            case_presets: "三套曲线预设，收到建议后当天上线。",
++            case_average: "CPU / GPU 平均温度，来自用户建议。",
++            case_axis: "Y 轴正反向切换，来自用户建议。",
++            bar_mini_alt: "迷你菜单栏样式示意：上行65℃｜A，下行2400 RPM",
++            bar_compact_alt: "简洁菜单栏样式示意：65｜2400｜A",
++            bar_full_alt: "完整菜单栏样式示意：65℃ | 2400 RPM [Auto]",
++
++            bar_example: "菜单栏样式示意 · 示例数据，A 为自动模式",
++            bar_mini: "迷你",
++            bar_compact: "简洁",
++            bar_full: "完整",
++            tour_open_image: "查看大图",
++            tour_menu_label: "01 / 常驻菜单栏",
++            tour_menu_title: "菜单栏上，一眼看清。",
++            tour_menu_body: "完整、简洁、迷你，三种样式任选。",
++            tour_feedback_title: "反馈，就在菜单里。",
++            tour_feedback_body: "点「告诉开发者」，直接联系作者。",
++            tour_feedback_cases: "用户建议带来的改进",
++            tour_case_pause: "暂停轮播",
++            tour_case_play: "继续轮播",
++            tour_curve_label: "02 / 曲线与控制",
++            tour_curve_title: "温度与转速，按你的习惯。",
++            tour_curve_body: "五个点，自定温度与转速。自动跟随曲线，手动固定转速。",
++
++            tour_presets_body: "三套预设，按场景切换。支持数值编辑与 Y 轴正反向显示。",
++
++            tour_display_label: "03 / 日常查看",
++            tour_display_title: "想看的信息，抬眼就看到。",
++            tour_display_body: "温度、转速、功率，选择想看的内容；预览即时生效。",
++            tour_display_note: "功率为估算值，视设备支持。",
++            tour_safety_label: "04 / 日常常驻",
++            tour_safety_title: "高温有兜底，异常有提示。",
++            tour_safety_body: "临界高温时托底；必要硬件信息异常时，提示并兜底或交还系统。",
++            tour_safety_note: "开发者在 Mac mini M4 上长期日常使用。其他带风扇的 M 系列 Mac，仍需在你的设备上确认兼容性。",
++            tour_mau_label: "近 30 天匿名活跃用户",
++            tour_mau_title: "不是作者一个人自娱自乐，而是有真实的用户在使用。",
++
++            tour_update_label: "05 / 启动与更新",
++            tour_update_title: "启动与更新，每一步清晰。",
++            tour_update_body: "启动有阶段提示，更新有下载与校验进度。",
++            tour_step_check: "检查更新",
++
++            tour_step_verify: "下载与校验",
++
++            tour_step_install: "系统引导安装",
++
++            tour_sample: "界面为示意。安装完成后，从「应用程序」打开。",
++            tour_menu_caption: "展开菜单 · 快捷控制与反馈",
++            tour_curve_caption: "五点曲线与三套预设",
++            tour_display_caption: "自定菜单栏内容",
++            tour_safety_caption: "安全兜底转速",
++            tour_startup_caption: "启动阶段提示",
++            tour_menu_alt: "iFanControl 主菜单，包含控制模式、曲线编辑和告诉开发者邀请框",
++            tour_curve_alt: "五点风扇曲线编辑器，包含三套预设与坐标方向切换",
++            tour_display_alt: "信息栏展示设置，包含迷你样式预览和上下行内容选择",
++            tour_safety_alt: "安全兜底转速设置窗口",
++            tour_startup_alt: "正在启动 iFanControl，正在识别温度与风扇",
++            tour_close_title: "从你的菜单栏，开始。",
++            tour_close_body: "免费开源，无订阅或内购。macOS 15+，适用于带风扇的 Apple Silicon Mac。",
++            tour_version: "当前版本",
++            tour_recent: "持续改进，有迹可循。",
++
+             hero_micro: "Apple Silicon Mac",
+             hero_tagline: "简洁的风扇控制工具。",
+             overview_title: "风扇控制，\n尽在菜单栏。",
+@@ -292,41 +401,80 @@
+             compat_fallback_download: "兼容性问题：下载 2.9.8",
+             cta_download: "下载应用",
+             cta_source: "查看源码",
+-            active_label: "真实使用",
+-            active_title: "它确实在真实设备上运行。",
+-            active_body: "近 30 天内保持活跃，也在日常使用里持续修正。",
+-            active_metric: "月活跃用户",
+-            active_fineprint: "匿名统计，仅用于判断软件是否仍被使用。",
+-            iteration_label: "活跃迭代",
+-            iteration_title: "开发者也是用户本身。",
+-            iteration_body: "iFanControl 正在被真实使用，也正在持续修正。每一次小更新，都来自日常使用里发现的具体问题。",
+-            iteration_builds: "次构建迭代",
+-            iteration_channel: "更新通道",
+-            iteration_current: "当前版本",
+-            iteration_note: "下载 PKG，按系统向导安装。2.9.8 及更早版本先通过应用内更新升级至 2.9.9。",
+-            showcase_label: "界面展示",
+-            showcase_title: "菜单栏、曲线编辑与实时控制",
+-            showcase_status: "迷你信息栏",
+-            showcase_curve: "5 点风扇曲线",
+-            showcase_panel: "菜单总览与快捷控制",
+-            showcase_info: "信息栏展示配置",
+-            showcase_power: "实时电力估算",
+-            showcase_safety: "安全兜底转速",
+-            voices_label: "用户声音",
+-            voices_title: "高效采纳用户建议",
+-            voices_subtitle: "快速的用户反馈入口就设计在菜单里，我们倾听每一位真实用户的声音。",
+-            voices_stat_adopted: "已采纳建议",
+-            voices_stat_adopted_value: "4",
+-            voices_stat_response: "平均响应",
+-            voices_stat_response_value: "< 24h",
+-            voices_stat_speed: "采纳到上线",
+-            voices_stat_speed_value: "≈ 0.5d",
++
++
++
++
++
+             timeline_label: "更新日志",
+             timeline_title: "项目时间线",
+             timeline_expand: "展开完整时间线",
+             timeline_collapse: "收起",
+           },
+           en: {
++            case_alert: "Thermal alerts, released the day they were suggested.",
++            case_presets: "Three curve presets, released the day they were suggested.",
++            case_average: "CPU / GPU averages, suggested by a user.",
++            case_axis: "Reversible Y axis, suggested by a user.",
++            bar_mini_alt: "Mini menu bar example: 65 degrees Celsius and A above 2400 RPM",
++            bar_compact_alt: "Compact menu bar example: 65, 2400, A",
++            bar_full_alt: "Full menu bar example: 65 degrees Celsius, 2400 RPM, Auto",
++
++            bar_example: "Menu bar illustrations · sample values; A means Auto",
++            bar_mini: "Mini",
++            bar_compact: "Compact",
++            bar_full: "Full",
++            tour_open_image: "View full size",
++            tour_menu_label: "01 / IN YOUR MENU BAR",
++            tour_menu_title: "A glance is all it takes.",
++            tour_menu_body: "Full, Compact or Mini. Choose your view.",
++            tour_feedback_title: "Feedback is right in the menu.",
++            tour_feedback_body: "Select “Talk to Dev” to contact the developer.",
++            tour_feedback_cases: "Improvements from user suggestions",
++            tour_case_pause: "Pause stories",
++            tour_case_play: "Resume stories",
++            tour_curve_label: "02 / FAN CURVES",
++            tour_curve_title: "Fan speed that follows your routine.",
++            tour_curve_body: "Five points set temperature and RPM. Auto follows the curve; Manual holds your target speed.",
++
++            tour_presets_body: "Three presets for different situations. Edit exact values and switch the Y-axis direction.",
++
++            tour_display_label: "03 / AT A GLANCE",
++            tour_display_title: "The details you need, right in sight.",
++            tour_display_body: "Choose temperature, RPM and power. See changes in the preview immediately.",
++            tour_display_note: "Power is estimated and depends on device support.",
++            tour_safety_label: "04 / DAILY USE",
++            tour_safety_title: "Control for the routine. Clarity when it changes.",
++            tour_safety_body: "A speed floor at critical heat. If essential readings fail, the app reports it and falls back or returns control to macOS.",
++            tour_safety_note: "Used daily by the developer on a Mac mini M4. Other fan-equipped M-series Macs still need compatibility testing on your device.",
++            tour_mau_label: "anonymous active users · last 30 days",
++            tour_mau_title: "More than a personal project. Real people use iFanControl.",
++
++            tour_update_label: "05 / STARTUP & UPDATES",
++            tour_update_title: "Clear progress, from startup to updates.",
++            tour_update_body: "Preparation status at startup. Download and verification progress during updates.",
++            tour_step_check: "Check for updates",
++
++            tour_step_verify: "Download and verify",
++
++            tour_step_install: "Follow the macOS installer",
++
++            tour_sample: "Interface previews. Open the app from Applications after installation.",
++            tour_menu_caption: "Expanded menu · control and feedback",
++            tour_curve_caption: "Five points. Three presets.",
++            tour_display_caption: "Choose your menu bar content",
++            tour_safety_caption: "Safety Floor RPM",
++            tour_startup_caption: "Startup status",
++            tour_menu_alt: "iFanControl menu with control modes, curve editing and the Talk to Dev feedback invitation",
++            tour_curve_alt: "Five-point fan curve editor with three presets and axis direction controls",
++            tour_display_alt: "Display settings with a Mini preview and top and bottom line choices",
++            tour_safety_alt: "Safety Floor RPM settings window",
++            tour_startup_alt: "Starting iFanControl, detecting temperatures and fans",
++            tour_close_title: "Start with your menu bar.",
++            tour_close_body: "Free and open source. No subscriptions or in-app purchases. macOS 15+ on fan-equipped Apple Silicon Macs.",
++            tour_version: "Current version",
++            tour_recent: "An ongoing record of improvements.",
++
+             hero_micro: "Apple Silicon Mac",
+             hero_tagline: "A restrained fan control utility.",
+             overview_title: "Fan control,\nin your menu bar.",
+@@ -345,35 +493,11 @@
+             compat_fallback_download: "Compatibility issues: download 2.9.8",
+             cta_download: "Download App",
+             cta_source: "View Source",
+-            active_label: "Real Use",
+-            active_title: "It is running on real Macs.",
+-            active_body: "Active over the last 30 days, and refined through daily use.",
+-            active_metric: "monthly active users",
+-            active_fineprint: "Anonymous count only, used to understand whether the app is still being used.",
+-            iteration_label: "Active Iteration",
+-            iteration_title: "The developer is also the user.",
+-            iteration_body: "iFanControl is used in real daily work and refined through concrete issues found along the way.",
+-            iteration_builds: "build iterations",
+-            iteration_channel: "update channel",
+-            iteration_current: "current version",
+-            iteration_note: "Install with the macOS PKG wizard. Versions 2.9.8 and earlier first update to 2.9.9 through the app.",
+-            showcase_label: "Interface",
+-            showcase_title: "Menu bar control, curve editing, and live adjustments",
+-            showcase_status: "Mini info bar",
+-            showcase_curve: "5-point fan curve",
+-            showcase_panel: "Menu overview and quick controls",
+-            showcase_info: "Info bar display options",
+-            showcase_power: "Live power estimate",
+-            showcase_safety: "Safety floor control",
+-            voices_label: "User Voices",
+-            voices_title: "Listening to Every Voice",
+-            voices_subtitle: "Feedback is one click away in the menu. We listen to every real user.",
+-            voices_stat_adopted: "Suggestions Adopted",
+-            voices_stat_adopted_value: "4",
+-            voices_stat_response: "Avg Response",
+-            voices_stat_response_value: "< 24h",
+-            voices_stat_speed: "Idea to Launch",
+-            voices_stat_speed_value: "≈ 0.5d",
++
++
++
++
++
+             timeline_label: "Changelog",
+             timeline_title: "Project Timeline",
+             timeline_expand: "View Full Timeline",
+@@ -402,6 +526,20 @@
+             var active = buttons[j].getAttribute("data-lang") === lang;
+             buttons[j].classList.toggle("active", active);
+             buttons[j].setAttribute("aria-pressed", active ? "true" : "false");
++          }
++          var illustratedViews = document.querySelectorAll("[data-i18n-aria]");
++          for (var v = 0; v < illustratedViews.length; v++) illustratedViews[v].setAttribute("aria-label", dict[illustratedViews[v].getAttribute("data-i18n-aria")]);
++          var images = document.querySelectorAll("[data-tour-image]");
++          for (var n = 0; n < images.length; n++) {
++            images[n].src = "./assets/tour-3-0/" + images[n].getAttribute("data-tour-image") + "-" + lang + ".webp";
++            images[n].alt = dict[images[n].getAttribute("data-i18n-alt")] || "";
++            // Localized captures may have different proportions; preserve their natural ratio.
++            images[n].removeAttribute("height");
++            var fullImage = document.querySelector('[data-tour-fullimage="' + images[n].getAttribute("data-tour-image") + '"]');
++            if (fullImage) {
++              fullImage.href = images[n].src;
++              fullImage.setAttribute("aria-label", dict["tour_" + images[n].getAttribute("data-tour-image") + "_caption"] + " · " + dict.tour_open_image);
++            }
+           }
+           renderTimeline();
+         }
+@@ -537,9 +675,11 @@
+         }
+ 
+         if (timelineExpandBtn) {
++          timelineExpandBtn.setAttribute("aria-expanded", "false");
+           timelineExpandBtn.addEventListener("click", function () {
+             var isCurrentlyExpanded = timelineTrack.classList.contains("is-expanded");
+             renderTimeline(!isCurrentlyExpanded);
++            timelineExpandBtn.setAttribute("aria-expanded", !isCurrentlyExpanded ? "true" : "false");
+           });
+         }
+ 
+@@ -558,7 +698,9 @@
+         (function () {
+           var DATA = [];
+           var track, dots, carousel;
+-          var index = 0, timer = null;
++          var index = 0, timer = null, userPaused = false, hovered = false, focused = false;
++          var motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
++          var pauseButton;
+           var INTERVAL = 6000;
+ 
+           function fmtDate(d, lang) {
+@@ -580,42 +722,38 @@
+             track.style.transform = "translateX(-" + (index * 100) + "%)";
+             var ds = dots.querySelectorAll("[data-vd]");
+             for (var d = 0; d < ds.length; d++) {
+-              ds[d].classList.toggle("is-active", parseInt(ds[d].getAttribute("data-vd"), 10) === index);
++              var selected = parseInt(ds[d].getAttribute("data-vd"), 10) === index;
++              ds[d].classList.toggle("is-active", selected);
++              ds[d].setAttribute("aria-current", selected ? "true" : "false");
++            }
++            var cards = track.querySelectorAll(".voices-feedback-card");
++            for (var c = 0; c < cards.length; c++) {
++              cards[c].setAttribute("aria-hidden", c === index ? "false" : "true");
+             }
+           }
+ 
+           function render(lang) {
+             if (!track) return;
+             var h = "", lang = lang || resolveLang();
++            var caseKeys = { "v2.9.8 / build 50": "case_axis", "v2.9.8 / build 48": "case_average", "v2.9.3 / build 33": "case_presets", "v2.9.8 / build 45": "case_alert" };
+             for (var i = 0; i < DATA.length; i++) {
+-              var it = DATA[i];
+-              h += '<div class="voices-feedback-card">';
+-              h += '<div class="voices-card-section voices-card-quote">';
+-              h += '<div class="label-micro voices-card-label">' + it.quote_label[lang] + '</div>';
+-              h += '<p>' + it.quote[lang] + '</p>';
+-              h += '</div>';
+-              h += '<div class="voices-card-section voices-card-built">';
+-              h += '<div class="label-micro voices-card-label">' + it.built_label[lang] + '</div>';
+-              h += '<p>' + it.built[lang] + '</p>';
+-              h += '</div>';
+-              h += '<div class="voices-card-meta">';
+-              h += '<span class="voices-card-date">' + fmtDate(it.feedback_at, lang) + '</span>';
+-              h += '<span class="voices-card-arrow">&rarr;</span>';
+-              h += '<span class="voices-card-date">' + fmtDate(it.released_at, lang) + '</span>';
+-              h += '<span class="voices-card-version">' + it.version + '</span>';
+-              h += '</div></div>';
++              var key = caseKeys[DATA[i].version];
++              h += '<div class="voices-feedback-card"><p>' + (texts[lang][key] || texts[lang].tour_feedback_cases) + '</p></div>';
+             }
+             track.innerHTML = h;
+             var dh = "";
+             for (var j = 0; j < DATA.length; j++) {
+-              dh += '<button class="voices-carousel-dot" type="button" data-vd="' + j + '"></button>';
++              dh += '<button class="voices-carousel-dot" type="button" data-vd="' + j + '" aria-label="' + (lang === "zh" ? "查看反馈案例 " : "Show feedback story ") + (j + 1) + '"></button>';
+             }
+             dots.innerHTML = dh;
+-            goTo(0);
++            goTo(Math.min(2, DATA.length - 1));
+           }
+ 
+           function next() { goTo(index + 1); }
+-          function startT() { stopT(); timer = setInterval(next, INTERVAL); }
++          function startT() {
++            stopT();
++            if (!userPaused && !hovered && !focused && !motionQuery.matches && !document.hidden && DATA.length > 1) timer = setInterval(next, INTERVAL);
++          }
+           function stopT() { if (timer) { clearInterval(timer); timer = null; } }
+ 
+           function init() {
+@@ -627,19 +765,34 @@
+             fetch("./voices.json", { cache: "no-store" })
+               .then(function (r) { return r.ok ? r.json() : Promise.reject("voices_unavailable"); })
+               .then(function (json) {
++                if (!Array.isArray(json) || !json.length) throw new Error("voices_unavailable");
+                 DATA = json;
+                 render(resolveLang());
+                 startT();
+               })
+-              .catch(function () {});
++              .catch(function () {
++                carousel.hidden = true;
++                document.getElementById("tour-feedback-cases").hidden = true;
++              });
+ 
+             if (dots) dots.addEventListener("click", function (e) {
+               var d = e.target;
+               if (d && d.matches("[data-vd]")) { goTo(parseInt(d.getAttribute("data-vd"), 10)); startT(); }
+             });
+             if (carousel) {
+-              carousel.addEventListener("mouseenter", stopT);
+-              carousel.addEventListener("mouseleave", startT);
++              carousel.addEventListener("mouseenter", function () { hovered = true; stopT(); });
++              carousel.addEventListener("mouseleave", function () { hovered = false; startT(); });
++              carousel.addEventListener("focusin", function () { focused = true; stopT(); });
++              carousel.addEventListener("focusout", function (e) { if (!carousel.contains(e.relatedTarget)) { focused = false; startT(); } });
++              pauseButton = carousel.querySelector("[data-voices-pause]");
++              if (pauseButton) pauseButton.addEventListener("click", function () {
++                userPaused = !userPaused;
++                pauseButton.setAttribute("data-i18n", userPaused ? "tour_case_play" : "tour_case_pause");
++                pauseButton.textContent = texts[resolveLang()][userPaused ? "tour_case_play" : "tour_case_pause"];
++                startT();
++              });
++              motionQuery.addEventListener("change", startT);
++              document.addEventListener("visibilitychange", startT);
+             }
+ 
+             var sw = document.querySelector("[data-lang-switch]");
+@@ -657,6 +810,6 @@
+       })();
+     </script>
+     <script type="module" src="./assets/hero-fan-guard.mjs"></script>
+-    <script type="module" src="./assets/calligraph-islands.mjs"></script>
++    <script type="module" src="./assets/calligraph-islands.20261026.mjs"></script>
+   </body>
+ </html>
