@@ -1,5 +1,5 @@
 {
-  "status": "ready to publish",
+  "status": "published",
   "baseline": "1554e837-11fa-4efa-85b0-b4cae32d0cec",
   "source_sha256": {
     "index.html": "456da8a16d74f85c73aee01464e5d1a8497e4d333f256f94a84e140ac26260ae",
@@ -95,5 +95,7 @@
   "reproduce": "From1554e837 copy styles.20261027d.css to styles.20261104a.css and apply these incremental HTML/CSS patches. Preserve all other published assets.",
   "limitations": [
     "OS browser matrix and200percent zoom not rerun"
-  ]
+  ],
+  "deployment_id": "cf61fdcc-d0db-4b49-bfb5-16f3ad685408",
+  "publication_record": "docs/releases/website-github-2026-11-04-publication.json"
 }

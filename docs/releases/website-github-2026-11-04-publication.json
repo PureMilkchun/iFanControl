@@ -1,0 +1,102 @@
+{
+  "deployment_id": "cf61fdcc-d0db-4b49-bfb5-16f3ad685408",
+  "previous_deployment": "1554e837-11fa-4efa-85b0-b4cae32d0cec",
+  "published_at": "2026-11-04T05:55:09.636287Z",
+  "url": "https://ifancontrol.puremilkchun.top",
+  "changed_existing_assets": [
+    "/index.html"
+  ],
+  "added_assets": [
+    "/styles.20261104a.css"
+  ],
+  "other_existing_assets_preserved": 79,
+  "runtime_config_preserved": true,
+  "backend_sha256": "d4216535b5d48ac8766530002faf6c354b57dd673c640c4ed5102c853dc9e2c8",
+  "backend_exact_copy": true,
+  "origins": [
+    {
+      "origin": "https://ifancontrol.puremilkchun.top",
+      "assets": [
+        {
+          "asset": "index.html",
+          "raw_bytes_match": false,
+          "recognized_edge_additions": {
+            "cloudflare_invisible_link": 1,
+            "cloudflare_js_detection": 1
+          },
+          "application_bytes_match_reviewed": true
+        },
+        {
+          "asset": "styles.20261104a.css",
+          "raw_bytes_match": true,
+          "recognized_edge_additions": {},
+          "application_bytes_match_reviewed": true
+        }
+      ]
+    },
+    {
+      "origin": "https://ifan-59w.pages.dev",
+      "assets": [
+        {
+          "asset": "index.html",
+          "raw_bytes_match": true,
+          "recognized_edge_additions": {},
+          "application_bytes_match_reviewed": true
+        },
+        {
+          "asset": "styles.20261104a.css",
+          "raw_bytes_match": true,
+          "recognized_edge_additions": {},
+          "application_bytes_match_reviewed": true
+        }
+      ]
+    }
+  ],
+  "legacy_guard": [
+    {
+      "client": "mac14",
+      "build": 0
+    },
+    {
+      "client": "mac15",
+      "build": 52
+    },
+    {
+      "client": "mac26",
+      "build": 52
+    },
+    {
+      "client": "unknown",
+      "build": 0
+    }
+  ],
+  "stable_build": 71,
+  "beta_build": 71,
+  "download_routes": [
+    {
+      "origin": "https://ifancontrol.puremilkchun.top",
+      "download_redirect_build": 71
+    },
+    {
+      "origin": "https://ifan-59w.pages.dev",
+      "download_redirect_build": 71
+    }
+  ],
+  "html_sha256": "456da8a16d74f85c73aee01464e5d1a8497e4d333f256f94a84e140ac26260ae",
+  "css_sha256": "13518aa480f6b697fc684f6404e518cb2512e1a16b05fa453d35d1c3cadbaad3",
+  "source_commit": "8c4c632dcf49a9a1411998ab05dab8c9be0b2971",
+  "review_record": "docs/development/website-github-2026-11-04.json",
+  "rollback": "Cloudflare Pages rollback to 1554e837-11fa-4efa-85b0-b4cae32d0cec",
+  "application_or_package_build_performed": false,
+  "visual_verification": "Actual local desktop Chinese1280 and narrow English320 screenshots, including closing CTA, inspected. Live official CUA acquisition timed out once; no live screenshot claimed. Both origins reviewed HTML/CSS application bytes match; official HTML recognized Cloudflare additions only.",
+  "github_buttons": {
+    "count": 2,
+    "href": "https://github.com/PureMilkchun/iFanControl",
+    "placement": [
+      "first-screen next to Download",
+      "closing actions next to Download"
+    ],
+    "target": "_blank",
+    "rel": "noopener noreferrer"
+  }
+}
