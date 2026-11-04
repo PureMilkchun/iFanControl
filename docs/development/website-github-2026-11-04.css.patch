@@ -1,0 +1,16 @@
+--- a/docs/styles.20261104a.css
++++ b/docs/styles.20261104a.css
+@@ -2536,3 +2536,13 @@
+  .menu-annotated .tour-figure-menu figcaption { margin-block-start: 0; }
+  .menu-annotated > .tour-feedback { grid-column: 2; grid-row: 1; margin-block-start: 0; align-self: end; }
+ }
++
++/* Keep downloading primary, with an explicit GitHub button beside it. */
++.control-panel .download-section .cta-group { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
++.control-panel .cta-group .cta-button { padding-inline: 10px; letter-spacing: 0; }
++.tour-close-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; inline-size: min(100%, 22.5rem); margin-inline: auto; }
++.tour-close-actions > a { padding-inline: 12px; }
++.tour-source { justify-content: center; min-block-size: 52px; padding-block: 13px; border: 1px solid var(--text-ink); border-radius: 999px; line-height: 1.5; text-decoration: none; }
++@media (hover: hover) {
++ .control-panel .cta-button.secondary:hover, .tour-source:hover { background-color: #ebe7df; }
++}

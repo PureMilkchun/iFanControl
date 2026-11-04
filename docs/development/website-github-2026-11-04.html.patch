@@ -1,0 +1,50 @@
+--- a/docs/index.html
++++ b/docs/index.html
+@@ -9,7 +9,7 @@
+       content="iFanControl 是一款 Apple Silicon Mac 风扇控制工具。开发者仅在自己的 Mac mini M4 上长期实测，已稳定运行数月；其他带风扇的 M 系列 Mac 理论上可用，实际兼容性需试用确认。"
+     />
+     <link rel="icon" type="image/png" href="./assets/app-icon.png" />
+-    <link rel="stylesheet" href="./styles.20261027d.css" />
++    <link rel="stylesheet" href="./styles.20261104a.css" />
+   </head>
+   <body>
+     <section class="landing-screen">
+@@ -92,10 +92,10 @@
+             <p class="platform-note">macOS 15+ <span aria-hidden="true">·</span> Apple Silicon</p>
+             <div class="cta-group">
+               <a class="cta-button primary" href="./download" data-i18n="cta_download">下载应用</a>
++              <a class="cta-button secondary" href="https://github.com/PureMilkchun/iFanControl" target="_blank" rel="noopener noreferrer">GitHub</a>
+             </div>
+             <div class="download-meta">
+               <p class="free-note" data-i18n="free_note">免费开源，无订阅或内购。</p>
+-              <a class="source-link" href="https://github.com/PureMilkchun/iFanControl" data-i18n="cta_source">查看源码</a>
+             </div>
+           </section>
+         </div>
+@@ -294,7 +294,7 @@
+       <p data-i18n="tour_close_body" >免费开源，无订阅或内购。macOS 15+，适用于带风扇的 Apple Silicon Mac。</p>
+       <div class="tour-close-actions">
+         <a class="tour-download" href="./download" data-i18n="cta_download">下载应用</a>
+-        <a class="tour-source" href="https://github.com/PureMilkchun/iFanControl" data-i18n="cta_source">查看源码</a>
++        <a class="tour-source" href="https://github.com/PureMilkchun/iFanControl" target="_blank" rel="noopener noreferrer">GitHub</a>
+       </div>
+       <p class="tour-release">
+         <span data-i18n="tour_version">当前版本</span>
+@@ -404,7 +404,6 @@
+             compat_context: "开发者目前仅有一台 Mac mini M4，已在日常使用中稳定运行数月。",
+             compat_fallback_download: "兼容性问题：下载 2.9.8",
+             cta_download: "下载应用",
+-            cta_source: "查看源码",
+ 
+ 
+ 
+@@ -495,8 +494,7 @@
+             compat_details: "Compatibility details",
+             compat_context: "The developer owns only a Mac mini M4, used reliably for several months in daily work.",
+             compat_fallback_download: "Compatibility issues: download 2.9.8",
+-            cta_download: "Download App",
+-            cta_source: "View Source",
++            cta_download: "Download",
+ 
+ 
+ 

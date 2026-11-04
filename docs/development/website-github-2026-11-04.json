@@ -1,0 +1,99 @@
+{
+  "status": "ready to publish",
+  "baseline": "1554e837-11fa-4efa-85b0-b4cae32d0cec",
+  "source_sha256": {
+    "index.html": "456da8a16d74f85c73aee01464e5d1a8497e4d333f256f94a84e140ac26260ae",
+    "styles.20261104a.css": "13518aa480f6b697fc684f6404e518cb2512e1a16b05fa453d35d1c3cadbaad3"
+  },
+  "change": "Promote source text link to explicit outlined GitHub button next to first-screen download; use matching GitHub button in closing actions. Open canonical repository in new tab. English download label shortened to Download to fit 320px.",
+  "checks": {
+    "desktop": {
+      "buttons": [
+        {
+          "clipped": false,
+          "height": 52.5,
+          "href": "./download",
+          "label": "下载应用",
+          "target": null,
+          "width": 179.59375
+        },
+        {
+          "clipped": false,
+          "height": 52.5,
+          "href": "https://github.com/PureMilkchun/iFanControl",
+          "label": "GitHub",
+          "target": "_blank",
+          "width": 179.6015625
+        },
+        {
+          "clipped": false,
+          "height": 52,
+          "href": "./download",
+          "label": "下载应用",
+          "target": null,
+          "width": 174
+        },
+        {
+          "clipped": false,
+          "height": 52,
+          "href": "https://github.com/PureMilkchun/iFanControl",
+          "label": "GitHub",
+          "target": "_blank",
+          "width": 174
+        }
+      ],
+      "overflow": false,
+      "width": 1280
+    },
+    "narrow": {
+      "buttons": [
+        {
+          "clipped": false,
+          "height": 52,
+          "href": "./download",
+          "label": "Download",
+          "width": 122.5
+        },
+        {
+          "clipped": false,
+          "height": 52,
+          "href": "https://github.com/PureMilkchun/iFanControl",
+          "label": "GitHub",
+          "width": 122.5
+        },
+        {
+          "clipped": false,
+          "height": 52,
+          "href": "./download",
+          "label": "Download",
+          "width": 122.5
+        },
+        {
+          "clipped": false,
+          "height": 52,
+          "href": "https://github.com/PureMilkchun/iFanControl",
+          "label": "GitHub",
+          "width": 122.5
+        }
+      ],
+      "overflow": false,
+      "width": 320
+    }
+  },
+  "verification": [
+    "Rendered desktop Chinese1280, narrow English320 and closing CTA inspected",
+    "Keyboard focus traversed GitHub to compatibility control",
+    "All buttons same height within their row, min52px, no horizontal overflow/clipping",
+    "Inline scripts identical except unused source labels removed and English download label",
+    "Patches reconstruct exact approved source from published1554e837"
+  ],
+  "screenshots": [
+    "packaging/pkg/output/website-github-20261104/desktop-zh.png",
+    "packaging/pkg/output/website-github-20261104/narrow-en.png",
+    "packaging/pkg/output/website-github-20261104/footer-en.png"
+  ],
+  "reproduce": "From1554e837 copy styles.20261027d.css to styles.20261104a.css and apply these incremental HTML/CSS patches. Preserve all other published assets.",
+  "limitations": [
+    "OS browser matrix and200percent zoom not rerun"
+  ]
+}
