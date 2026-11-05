@@ -1,0 +1,124 @@
+{
+  "deployment": "d764fb1c-4a00-4987-8f88-50a53e37716b",
+  "url": "https://d764fb1c.ifan-59w.pages.dev",
+  "previous_deployment": "a32f33ed-a443-4051-b961-8db282a78c5e",
+  "published_at": "2026-11-05T04:01:40.31065Z",
+  "stable_build": 71,
+  "beta_version": "3.0.1",
+  "beta_build": 73,
+  "legacy_build": 52,
+  "prior_non_beta_feed_assets_preserved": 87,
+  "production_backend_bundle_reused": true,
+  "runtime_bindings_preserved": true,
+  "website_unchanged": true,
+  "origins": [
+    {
+      "origin": "https://ifan-59w.pages.dev",
+      "beta_build": 73,
+      "stable_build": 71,
+      "json_no_store": true,
+      "package_sha256": "038f00928212a20bd740db435c4411ac1dfdc12759325b2a855658da5935f878",
+      "download_build": 71,
+      "exact_package_bytes": true
+    },
+    {
+      "origin": "https://ifancontrol.puremilkchun.top",
+      "beta_build": 73,
+      "stable_build": 71,
+      "json_no_store": true,
+      "package_sha256": "038f00928212a20bd740db435c4411ac1dfdc12759325b2a855658da5935f878",
+      "download_build": 71,
+      "exact_package_bytes": true
+    }
+  ],
+  "legacy_guard": [
+    {
+      "client": "mac14",
+      "build": 0
+    },
+    {
+      "client": "mac15",
+      "build": 52
+    },
+    {
+      "client": "mac26",
+      "build": 52
+    },
+    {
+      "client": "unknown",
+      "build": 0
+    }
+  ],
+  "package_sha256": "038f00928212a20bd740db435c4411ac1dfdc12759325b2a855658da5935f878",
+  "native_installation_performed_by_agent": false,
+  "actual_update_install_relaunch_test": "Maintainer validates online update to Beta73",
+  "status": "published",
+  "source_commit": "1c6f174e6111bbd424404e388602088da9fc7a0f",
+  "source_tag": "v3.0.1-beta.73",
+  "source_record": "docs/releases/3.0.1-beta.73.json",
+  "real_client_live_package_validation": true,
+  "userAuthorizedBetaPublication": true,
+  "complete_wordmark_includes_CONTROL": true,
+  "visible_edge_checks": [
+    {
+      "image": "about-zh-light.png",
+      "icon_top_bottom": [
+        154,
+        278
+      ],
+      "complete_wordmark_top_bottom": [
+        154,
+        278
+      ],
+      "edge_delta_pixels": [
+        0,
+        0
+      ]
+    },
+    {
+      "image": "startup-zh-light.png",
+      "icon_top_bottom": [
+        81,
+        159
+      ],
+      "complete_wordmark_top_bottom": [
+        82,
+        159
+      ],
+      "edge_delta_pixels": [
+        1,
+        0
+      ]
+    },
+    {
+      "image": "about-en-light.png",
+      "icon_top_bottom": [
+        154,
+        278
+      ],
+      "complete_wordmark_top_bottom": [
+        154,
+        278
+      ],
+      "edge_delta_pixels": [
+        0,
+        0
+      ]
+    },
+    {
+      "image": "startup-en-light.png",
+      "icon_top_bottom": [
+        81,
+        159
+      ],
+      "complete_wordmark_top_bottom": [
+        82,
+        159
+      ],
+      "edge_delta_pixels": [
+        1,
+        0
+      ]
+    }
+  ]
+}
