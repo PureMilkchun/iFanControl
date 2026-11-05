@@ -1,0 +1,61 @@
+{
+  "deployment": "a32f33ed-a443-4051-b961-8db282a78c5e",
+  "url": "https://a32f33ed.ifan-59w.pages.dev",
+  "previous_deployment": "3caf8707-d274-42c9-90c8-5681bf30e7d9",
+  "published_at": "2026-11-05T03:36:10.778443Z",
+  "stable_build": 71,
+  "beta_version": "3.0.1",
+  "beta_build": 72,
+  "legacy_build": 52,
+  "prior_non_beta_feed_assets_preserved": 86,
+  "production_backend_bundle_reused": true,
+  "runtime_bindings_preserved": true,
+  "website_unchanged": true,
+  "origins": [
+    {
+      "origin": "https://ifan-59w.pages.dev",
+      "beta_build": 72,
+      "stable_build": 71,
+      "json_no_store": true,
+      "package_sha256": "9c4cf46e19998735b91d0e7047a2b25e0e8f94f2b2edee6ca76f541e6dba243c",
+      "download_build": 71,
+      "exact_package_bytes": true
+    },
+    {
+      "origin": "https://ifancontrol.puremilkchun.top",
+      "beta_build": 72,
+      "stable_build": 71,
+      "json_no_store": true,
+      "package_sha256": "9c4cf46e19998735b91d0e7047a2b25e0e8f94f2b2edee6ca76f541e6dba243c",
+      "download_build": 71,
+      "exact_package_bytes": true
+    }
+  ],
+  "legacy_guard": [
+    {
+      "client": "mac14",
+      "build": 0
+    },
+    {
+      "client": "mac15",
+      "build": 52
+    },
+    {
+      "client": "mac26",
+      "build": 52
+    },
+    {
+      "client": "unknown",
+      "build": 0
+    }
+  ],
+  "package_sha256": "9c4cf46e19998735b91d0e7047a2b25e0e8f94f2b2edee6ca76f541e6dba243c",
+  "native_installation_performed_by_agent": false,
+  "actual_update_install_relaunch_test": "Maintainer validates online update to Beta72",
+  "status": "published",
+  "source_commit": "a8a5d0587e814f16b36b2cf9b5c599b2a1f4e0f2",
+  "source_tag": "v3.0.1-beta.72",
+  "source_record": "docs/releases/3.0.1-beta.72.json",
+  "real_client_live_package_validation": true,
+  "userAuthorizedBetaPublication": true
+}

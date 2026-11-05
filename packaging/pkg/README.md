@@ -1,5 +1,7 @@
 # iFanControl PKG 构建
 
+当前Beta为3.0.1/build72（2026-11-05），维护者已明确授权独立Beta发布。包含定稿品牌字标与关于页排版；正式仍3.0.0/build71，旧52不变。当前Pages Production `a32f33ed-a443-4051-b961-8db282a78c5e`；未来build必须大于72。源码标签v3.0.1-beta.72，构建/发布核验见`../../docs/releases/3.0.1-beta.72*.json`。助手未安装或替换本机App；实际在线安装由维护者验证。后文62～70为历史。
+
 2026-10-15维护者随后明确授权降低准入、替换2.9.9和3.0，覆盖本文件历史冻结包限制一次：版本/build仍52和71，App/PKG准入15.0，控制程序区段、工具和PKG安装脚本保持。新版ZIP/PKG使用macos15独立路径及revision缓存标记，旧不可变71包保留；guard允许Darwin≥24，其余暂停。安装介绍/ZIP文档/更新说明/官网/GitHub提供2.9.8回退链接。修订记录见../../docs/releases/macos15-repack-2026-10-15.json；后续以新版legacy-channel.json为固定哈希，禁止再次无授权替换。旧v3.0.0/v2.9.9-build52标签不移动，新修订标签v3.0.0-macos15-r1。以下26要求及部署信息为本次替换前历史。
 
 2026-10-15应急保护：旧静态清单/双ZIP仍固定52，但线上旧manifest已按系统请求分流，旧系统/未知UA暂停升级。后续部署必须保留当前Production `6f3a60a0-a09b-42d7-99dc-cd5258aa943f`的guard和路由。`verify_channels.py`验证固定文件；线上行为另用`scripts/verify_legacy_os_guard.mjs`与公网UA检查。详见`../../docs/development/macos15-upgrade-incident.md`。当前71仍要求macOS26，旧系统兼容尚未验收。
