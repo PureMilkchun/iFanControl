@@ -5565,7 +5565,7 @@ class HelpWindowController: NSWindowController {
         iconView.identifier = NSUserInterfaceItemIdentifier("developer-unlock-icon")
         iconView.addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(overviewIconClicked(_:))))
 
-        let appName = BrandIdentity.wordmark(.stacked, width: 142)
+        let appName = BrandIdentity.wordmark(.stacked, matching: iconView, iconSize: 64)
         let version = NativeInterface.label(
             appL10n("版本 \(UpdateService.shared.currentVersionDisplay)", "Version \(UpdateService.shared.currentVersionDisplay)"),
             size: 11, color: .secondaryLabelColor)

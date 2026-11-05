@@ -69,7 +69,7 @@ def build(out):
     (app / 'Contents/Resources').mkdir(parents=True, exist_ok=True)
     (app / 'Contents/Resources/icon.png').write_bytes((ROOT / 'icon.png').read_bytes())
     shutil.copytree(ROOT / 'Sources/MacFanControl/Resources/Brand', app / 'Contents/Resources/Brand', dirs_exist_ok=True)
-    (app / 'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier': 'com.ifancontrol.startup-test.validation70', 'CFBundleExecutable': 'LaunchValidation', 'CFBundlePackageType': 'APPL', 'CFBundleName': 'iFanControl Startup Validation', 'CFBundleShortVersionString': '2.9.10', 'CFBundleVersion': '70', 'IFanControlReleaseChannel': 'beta'}))
+    (app / 'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier': 'com.ifancontrol.startup-test.validation70', 'CFBundleExecutable': 'LaunchValidation', 'CFBundlePackageType': 'APPL', 'CFBundleName': 'iFanControl Startup Validation', 'CFBundleIconFile': 'icon', 'CFBundleShortVersionString': '2.9.10', 'CFBundleVersion': '70', 'IFanControlReleaseChannel': 'beta'}))
     files = [str(out / 'main.swift'), str(out / 'StartupProgressWindow.swift')] + [str(p) for p in (ROOT / 'Sources/MacFanControl').glob('*.swift') if p.name not in ['main.swift', 'StartupProgressWindow.swift']]
     executable = app / 'Contents/MacOS/LaunchValidation'
     subprocess.run(['swiftc', '-swift-version', '6', '-I', str(out), '-L', str(out), '-lFanCurveEditor', '-Xcc', '-fmodule-map-file=' + str(bridge_map), str(bridge_object), *files, '-framework', 'AppKit', '-framework', 'ServiceManagement', '-lIOReport', '-o', str(executable)], check=True)

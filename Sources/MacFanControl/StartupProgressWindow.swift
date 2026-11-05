@@ -47,17 +47,14 @@ import AppKit
         panel.contentView = surface
         let icon = NSImageView(image: NSApp.applicationIconImage)
         icon.imageScaling = .scaleProportionallyUpOrDown
-        icon.widthAnchor.constraint(equalToConstant: 48).isActive = true
-        icon.heightAnchor.constraint(equalToConstant: 48).isActive = true
-        let title = BrandIdentity.wordmark(.horizontal, width: 180)
+        icon.widthAnchor.constraint(equalToConstant: 40).isActive = true
+        icon.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        icon.identifier = NSUserInterfaceItemIdentifier("startup-brand-icon")
+        let title = BrandIdentity.wordmark(.horizontal, matching: icon, iconSize: 40)
         stageField.font = .systemFont(ofSize: 12)
         stageField.textColor = .secondaryLabelColor
         stageField.identifier = NSUserInterfaceItemIdentifier("startup-stage")
-        let text = NSStackView(views: [title, stageField])
-        text.orientation = .vertical
-        text.alignment = .leading
-        text.spacing = 6
-        let header = NSStackView(views: [icon, text])
+        let header = NSStackView(views: [icon, title])
         header.alignment = .centerY
         header.spacing = 16
 
@@ -68,8 +65,7 @@ import AppKit
         progress.setAccessibilityLabel(Self.text("正在启动", "Starting"))
         progress.widthAnchor.constraint(equalToConstant: 16).isActive = true
         progress.heightAnchor.constraint(equalToConstant: 16).isActive = true
-        let hint = NativeInterface.label(Self.text("准备完成后，可在菜单栏使用。", "Available in your menu bar when ready."), size: 12, color: .secondaryLabelColor)
-        let footer = NSStackView(views: [progress, hint])
+        let footer = NSStackView(views: [progress, stageField])
         footer.alignment = .centerY
         footer.spacing = 8
         let stack = NSStackView(views: [header, footer])
@@ -83,7 +79,8 @@ import AppKit
             stack.trailingAnchor.constraint(equalTo: surface.trailingAnchor, constant: -24),
             stack.centerYAnchor.constraint(equalTo: surface.centerYAnchor),
             header.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            stageField.widthAnchor.constraint(equalTo: text.widthAnchor)
+            footer.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            stageField.widthAnchor.constraint(equalTo: footer.widthAnchor, constant: -24)
         ])
     }
 

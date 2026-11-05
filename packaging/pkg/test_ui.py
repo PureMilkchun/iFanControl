@@ -45,7 +45,7 @@ Task { @MainActor in
     UserDefaults.standard.removePersistentDomain(forName:domain)
     do {
         if let directory=ProcessInfo.processInfo.environment["IFAN_BRAND_CAPTURE_DIR"] {
-            application.applicationIconImage=NSImage(contentsOfFile:Bundle.main.resourcePath!+"/icon.png")
+            application.applicationIconImage=NSWorkspace.shared.icon(forFile:Bundle.main.bundlePath)
             try BrandPreview.capture(directory:URL(fileURLWithPath:directory))
             UserDefaults.standard.removePersistentDomain(forName:domain)
             exit(0)

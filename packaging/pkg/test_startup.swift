@@ -78,7 +78,7 @@ if !CommandLine.arguments.contains("--first-launch") {
 }
 UserDefaults.standard.set(true, forKey: "ifancontrol.ui.temperature_source_hint_shown")
 UserDefaults.standard.set(CommandLine.arguments.contains("--future-receipt") ? 71 : 70, forKey: "ifancontrol.update.pending_build")
-application.applicationIconImage = NSImage(contentsOfFile: Bundle.main.resourcePath! + "/icon.png")
+application.applicationIconImage = NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath)
 application.appearance = NSAppearance(named: CommandLine.arguments.contains("--dark") ? .darkAqua : .aqua)
 var fixtureConfig = ConfigManager.shared.loadConfig()
 fixtureConfig.autoStart = false
