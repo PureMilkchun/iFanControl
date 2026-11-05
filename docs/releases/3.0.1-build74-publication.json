@@ -1,0 +1,105 @@
+{
+  "deployment": "24a182ea-eabf-499e-912e-aa829f4db560",
+  "url": "https://24a182ea.ifan-59w.pages.dev",
+  "previous_deployment": "d764fb1c-4a00-4987-8f88-50a53e37716b",
+  "published_at": "2026-11-05T05:04:20.683233Z",
+  "stable_version": "3.0.1",
+  "stable_build": 74,
+  "beta_feed_build": 74,
+  "beta_feed_channel": "stable",
+  "legacy_build": 52,
+  "prior_assets_preserved": 85,
+  "changed_existing_assets": [
+    "/iFanControl-macOS.pkg",
+    "/timeline.json",
+    "/update-manifest-beta.json",
+    "/update-manifest-pkg.json"
+  ],
+  "backend_change": "only download target build71 -> build74",
+  "runtime_bindings_preserved": true,
+  "website_html_css_unchanged": true,
+  "origins": [
+    {
+      "origin": "https://ifan-59w.pages.dev",
+      "stable_build": 74,
+      "beta_build": 74,
+      "beta_channel": "stable",
+      "json_no_store": true,
+      "package_sha256": "0e40df3e73569afdce2f44522000e84b98968f31080e2d5e6fda2b297d7de085",
+      "download_build": 74,
+      "both_packages_exact": true,
+      "timeline_exact": true
+    },
+    {
+      "origin": "https://ifancontrol.puremilkchun.top",
+      "stable_build": 74,
+      "beta_build": 74,
+      "beta_channel": "stable",
+      "json_no_store": true,
+      "package_sha256": "0e40df3e73569afdce2f44522000e84b98968f31080e2d5e6fda2b297d7de085",
+      "download_build": 74,
+      "both_packages_exact": true,
+      "timeline_exact": true
+    }
+  ],
+  "legacy_guard": [
+    {
+      "client": "mac14",
+      "build": 0
+    },
+    {
+      "client": "mac15",
+      "build": 52
+    },
+    {
+      "client": "mac26",
+      "build": 52
+    },
+    {
+      "client": "unknown",
+      "build": 0
+    }
+  ],
+  "legacy_zip_hashes_preserved": true,
+  "package_sha256": "0e40df3e73569afdce2f44522000e84b98968f31080e2d5e6fda2b297d7de085",
+  "github_release": "https://github.com/PureMilkchun/iFanControl/releases/tag/v3.0.1",
+  "github_published_at": "2026-11-05T05:03:41Z",
+  "source_tag": "v3.0.1",
+  "application_recompiled": false,
+  "actual_installation_performed": false,
+  "status": "published",
+  "source_commit": "c037fc025cae55728659a2d7876dccda040d27df",
+  "source_record": "docs/releases/3.0.1-build74.json",
+  "github_attachment_download_matches_package": true,
+  "real_client_stable_and_beta_package_validation": true,
+  "github_latest_tag": "v3.0.1",
+  "website": {
+    "url": "https://ifancontrol.puremilkchun.top",
+    "checks": [
+      {
+        "name": "desktop",
+        "versions": [
+          "3.0.1",
+          "3.0.1"
+        ],
+        "newTimelineEntry": true,
+        "overflow": false
+      },
+      {
+        "name": "mobile",
+        "versions": [
+          "3.0.1",
+          "3.0.1"
+        ],
+        "newTimelineEntry": true,
+        "overflow": false
+      }
+    ],
+    "desktop_mobile_timeline_visually_reviewed": true,
+    "evidence_sha256": {
+      "website-desktop.png": "20cfe95cb41ba3185a7b940174d5150bc1d82fec14560e3504b90cc9fe7eaafc",
+      "website-mobile.png": "bcbb2ba8c199298a1933887e6eac922086406f95668bdeee88c85b6bb90e7917",
+      "website-timeline.png": "d3a7cdfa121670a8bd6e8e1b1e6d0c97822a7ba86b6d04924a126a43a3734ac4"
+    }
+  }
+}
