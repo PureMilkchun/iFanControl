@@ -93,6 +93,14 @@
 @MainActor extension HelpWindowController {
     static func runUIRegression() {
         let c = HelpWindowController()
+        let automatic = c.automaticUpdateSwitch!
+        let initial = UpdateService.shared.automaticChecksEnabled
+        for enabled in [!initial, initial] {
+            automatic.state = enabled ? .on : .off
+            automatic.sendAction(automatic.action!, to: automatic.target)
+            precondition(UpdateService.shared.automaticChecksEnabled == enabled, "Native switch must keep the existing update preference action")
+        }
+        precondition(c.anonymousStatsSwitch?.accessibilityLabel()?.isEmpty == false)
         for page in [Section.overview, .diagnostics, .faq, .donation] {
             c.select(section: page); c.window?.contentView?.layoutSubtreeIfNeeded()
             let document = c.sectionContainerView as! NSStackView

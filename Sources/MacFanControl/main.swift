@@ -5353,8 +5353,8 @@ class HelpWindowController: NSWindowController {
     }
 
     private var versionLabel: NSTextField?
-    private var automaticUpdateCheckbox: NSButton?
-    private var anonymousStatsCheckbox: NSButton?
+    private var automaticUpdateSwitch: NSSwitch?
+    private var anonymousStatsSwitch: NSSwitch?
     private var currentSection: Section = .overview
     private var sidebarButtons: [Section: NSButton] = [:]
     private var sidebarStack: NSStackView?
@@ -5476,11 +5476,11 @@ class HelpWindowController: NSWindowController {
         button.imageScaling = .scaleProportionallyDown
         button.imagePosition = .imageLeading
         button.bezelStyle = .regularSquare; button.isBordered = false
-        button.setButtonType(.momentaryChange); button.font = .systemFont(ofSize: 14)
+        button.setButtonType(.momentaryChange); button.font = .systemFont(ofSize: 13)
         button.alignment = .left; button.contentTintColor = .secondaryLabelColor
         button.wantsLayer = true; button.layer?.cornerRadius = 6
         button.translatesAutoresizingMaskIntoConstraints = false
-        button.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 30).isActive = true
         button.widthAnchor.constraint(equalToConstant: sidebarWidth - 24).isActive = true
         button.identifier = NSUserInterfaceItemIdentifier("sidebar-\(section.rawValue)")
         button.setAccessibilityLabel(section.title())
@@ -5491,7 +5491,7 @@ class HelpWindowController: NSWindowController {
         for (section, button) in sidebarButtons {
             let isSelected = section == currentSection
             button.contentTintColor = .labelColor
-            button.font = .systemFont(ofSize: 14, weight: isSelected ? .medium : .regular)
+            button.font = .systemFont(ofSize: 13, weight: isSelected ? .medium : .regular)
             button.layer?.backgroundColor = isSelected
                 ? NSColor.controlAccentColor.withAlphaComponent(0.12).cgColor
                 : NSColor.clear.cgColor
@@ -5505,9 +5505,9 @@ class HelpWindowController: NSWindowController {
         sidebar.translatesAutoresizingMaskIntoConstraints = false; contentView.addSubview(sidebar)
         let navigation = NSStackView(); navigation.orientation = .vertical; navigation.alignment = .leading; navigation.spacing = 4
         navigation.translatesAutoresizingMaskIntoConstraints = false; sidebar.addSubview(navigation)
-        let caption = NativeInterface.label("iFanControl", size: 12, weight: .medium, color: .secondaryLabelColor)
+        let caption = BrandIdentity.wordmark(.horizontal, width: 112)
         navigation.addArrangedSubview(caption)
-        navigation.setCustomSpacing(12, after: caption)
+        navigation.setCustomSpacing(20, after: caption)
         for section in Section.allCases where section != .developer || UpdatePreferences.shared.developerModeEnabled {
             let button = makeSidebarButton(for: section); navigation.addArrangedSubview(button); sidebarButtons[section] = button
         }
@@ -5543,110 +5543,122 @@ class HelpWindowController: NSWindowController {
     }
 
     private func makeOverviewSection() -> NSView {
-        let (view, stack) = makeSectionRoot(horizontalCentered: true, verticalCentered: true)
+        let view = NSView()
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 28
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: view.topAnchor, constant: 20),
+            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            stack.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor, constant: -24)
+        ])
 
-        let iconView = NSImageView()
-        iconView.image = NSApp.applicationIconImage
+        let iconView = NSImageView(image: NSApp.applicationIconImage)
         iconView.imageScaling = .scaleProportionallyUpOrDown
-        iconView.wantsLayer = true
-        iconView.layer?.cornerRadius = 14
-        iconView.layer?.masksToBounds = true
         iconView.translatesAutoresizingMaskIntoConstraints = false
-        iconView.widthAnchor.constraint(equalToConstant: 72).isActive = true
-        iconView.heightAnchor.constraint(equalToConstant: 72).isActive = true
+        iconView.widthAnchor.constraint(equalToConstant: 64).isActive = true
+        iconView.heightAnchor.constraint(equalToConstant: 64).isActive = true
         iconView.identifier = NSUserInterfaceItemIdentifier("developer-unlock-icon")
-        let unlockClick = NSClickGestureRecognizer(target: self, action: #selector(overviewIconClicked(_:)))
-        iconView.addGestureRecognizer(unlockClick)
-        stack.addArrangedSubview(iconView)
+        iconView.addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(overviewIconClicked(_:))))
 
-        let appName = NSTextField(labelWithString: "iFanControl")
-        appName.font = .systemFont(ofSize: 26, weight: .semibold)
-        appName.alignment = .center
-        stack.addArrangedSubview(appName)
+        let appName = BrandIdentity.wordmark(.stacked, width: 142)
+        let version = NativeInterface.label(
+            appL10n("版本 \(UpdateService.shared.currentVersionDisplay)", "Version \(UpdateService.shared.currentVersionDisplay)"),
+            size: 11, color: .secondaryLabelColor)
+        versionLabel = version
+        let brand = NSStackView(views: [iconView, appName, NSView(), version])
+        brand.alignment = .bottom
+        brand.spacing = 22
 
-        let version = NSTextField(labelWithString: appL10n("版本 \(UpdateService.shared.currentVersionDisplay)", "Version \(UpdateService.shared.currentVersionDisplay)"))
-        version.font = .systemFont(ofSize: 12)
-        version.textColor = .secondaryLabelColor
-        version.alignment = .center
-        stack.addArrangedSubview(version)
+        let intro = NativeInterface.label(
+            appL10n("Apple Silicon 的温度监测与风扇控制。", "Temperature monitoring and fan control for Apple Silicon."),
+            size: 13, color: .secondaryLabelColor, wrapping: true)
+        let product = NSStackView(views: [brand, intro])
+        product.orientation = .vertical
+        product.alignment = .leading
+        product.spacing = 20
+        stack.addArrangedSubview(product)
+        product.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        brand.widthAnchor.constraint(equalTo: product.widthAnchor).isActive = true
+        intro.widthAnchor.constraint(equalTo: product.widthAnchor).isActive = true
 
-        let intro = makeBodyLabel(
-            appL10n(
-                "面向 Apple Silicon 的温度监测与风扇控制工具。",
-                "Temperature monitoring and fan control for Apple Silicon."
-            )
-        )
-        intro.font = .systemFont(ofSize: 13)
-        intro.alignment = .center
-        intro.preferredMaxLayoutWidth = 360
-        intro.widthAnchor.constraint(equalToConstant: 360).isActive = true
-        stack.addArrangedSubview(intro)
-
-        let buttonRow = NSStackView()
-        buttonRow.orientation = .horizontal
-        buttonRow.spacing = 10
-        let updateButton = NSButton(title: appL10n("检查更新", "Check Updates"), target: self, action: #selector(checkUpdates))
-        updateButton.bezelStyle = .rounded
-        let githubButton = NSButton(title: "GitHub", target: self, action: #selector(openGitHub))
-        githubButton.bezelStyle = .rounded
-        let websiteButton = NSButton(title: appL10n("访问官网", "Visit Website"), target: self, action: #selector(openWebsite))
-        websiteButton.bezelStyle = .rounded
+        let updateButton = NativeInterface.button(appL10n("检查更新", "Check Updates"), target: self, action: #selector(checkUpdates))
+        updateButton.identifier = NSUserInterfaceItemIdentifier("overview-check-updates")
+        let websiteButton = NativeInterface.button(appL10n("访问官网", "Visit Website"), target: self, action: #selector(openWebsite))
         websiteButton.identifier = NSUserInterfaceItemIdentifier("visit-website")
         websiteButton.toolTip = "https://ifancontrol.puremilkchun.top"
-        // Restart is available with the diagnostic quick checks.
-        buttonRow.addArrangedSubview(updateButton)
-        buttonRow.addArrangedSubview(websiteButton)
-        buttonRow.addArrangedSubview(githubButton)
-        stack.addArrangedSubview(buttonRow)
+        let githubButton = NativeInterface.button("GitHub", target: self, action: #selector(openGitHub))
+        let actions = NSStackView(views: [updateButton, websiteButton, githubButton])
+        actions.spacing = 10
+        actions.alignment = .centerY
+        stack.addArrangedSubview(actions)
+        stack.setCustomSpacing(32, after: actions)
 
-        let autoCheck = NSButton(
-            checkboxWithTitle: appL10n("自动检查更新", "Check updates automatically"),
-            target: self,
-            action: #selector(toggleAutomaticChecks(_:))
-        )
-        autoCheck.state = UpdateService.shared.automaticChecksEnabled ? .on : .off
-        automaticUpdateCheckbox = autoCheck
-        autoCheck.controlSize = .small; autoCheck.font = .systemFont(ofSize: 12)
-        let preferences = NSStackView(); preferences.orientation = .vertical; preferences.alignment = .leading; preferences.spacing = 10
-        preferences.addArrangedSubview(autoCheck)
+        let settingsTitle = NativeInterface.label(appL10n("偏好设置", "Preferences"), size: 11, weight: .medium, color: .secondaryLabelColor)
+        let automatic = NSSwitch()
+        automatic.target = self
+        automatic.action = #selector(toggleAutomaticChecks(_:))
+        automatic.state = UpdateService.shared.automaticChecksEnabled ? .on : .off
+        automatic.identifier = NSUserInterfaceItemIdentifier("automatic-update-switch")
+        automaticUpdateSwitch = automatic
+        let stats = NSSwitch()
+        stats.target = self
+        stats.action = #selector(toggleAnonymousStats(_:))
+        stats.state = PrivacyStatsService.shared.anonymousStatsEnabled ? .on : .off
+        stats.identifier = NSUserInterfaceItemIdentifier("anonymous-stats-switch")
+        anonymousStatsSwitch = stats
 
-        let statsCheck = NSButton(
-            checkboxWithTitle: appL10n("匿名统计用户量", "Anonymous user-count stats"),
-            target: self,
-            action: #selector(toggleAnonymousStats(_:))
-        )
-        statsCheck.state = PrivacyStatsService.shared.anonymousStatsEnabled ? .on : .off
-        anonymousStatsCheckbox = statsCheck
+        let statsHelp = NSButton(title: "", target: self, action: #selector(showAnonymousStatsHelp))
+        statsHelp.bezelStyle = .helpButton
+        statsHelp.controlSize = .small
+        statsHelp.setAccessibilityLabel(appL10n("了解匿名统计", "About anonymous statistics"))
+        statsHelp.toolTip = appL10n("了解匿名统计", "About anonymous statistics")
 
-        let statsHelpButton = NSButton(title: "?", target: self, action: #selector(showAnonymousStatsHelp))
-        statsHelpButton.bezelStyle = .helpButton
-        statsHelpButton.font = .systemFont(ofSize: 11, weight: .semibold)
-        statsHelpButton.setContentHuggingPriority(.required, for: .horizontal)
-
-        let statsRow = NSStackView()
-        statsRow.orientation = .horizontal
-        statsRow.alignment = .centerY
-        statsRow.spacing = 6
-        statsRow.addArrangedSubview(statsCheck)
-        statsRow.addArrangedSubview(statsHelpButton)
-        statsRow.setHuggingPriority(.required, for: .horizontal)
-        statsCheck.controlSize = .small; statsCheck.font = .systemFont(ofSize: 12)
-        preferences.addArrangedSubview(statsRow)
-
-        let statsHint = makeBodyLabel(
-            appL10n(
-                "匿名统计使用人数，不上传姓名、邮箱、序列号或设备名称。",
-                "Counts usage anonymously. No name, email, serial number or device name is uploaded."
-            )
-        )
-        statsHint.font = .systemFont(ofSize: 11)
-        statsHint.alignment = .left
-        statsHint.preferredMaxLayoutWidth = 360
-        statsHint.widthAnchor.constraint(equalToConstant: 360).isActive = true
-        preferences.addArrangedSubview(statsHint)
-        stack.addArrangedSubview(preferences)
-
+        let automaticRow = makeOverviewPreference(
+            title: appL10n("自动检查更新", "Check for updates automatically"),
+            detail: appL10n("有新版本时提醒你。", "Get notified when a new version is available."),
+            control: automatic)
+        let statsRow = makeOverviewPreference(
+            title: appL10n("匿名使用统计", "Anonymous usage statistics"),
+            detail: appL10n("仅统计使用人数，不含个人信息。", "Counts users without collecting personal information."),
+            control: stats, help: statsHelp)
+        let settings = NSStackView(views: [settingsTitle, automaticRow, statsRow])
+        settings.orientation = .vertical
+        settings.alignment = .leading
+        settings.spacing = 18
+        settings.setCustomSpacing(14, after: settingsTitle)
+        stack.addArrangedSubview(settings)
+        settings.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        automaticRow.widthAnchor.constraint(equalTo: settings.widthAnchor).isActive = true
+        statsRow.widthAnchor.constraint(equalTo: settings.widthAnchor).isActive = true
         return view
+    }
+
+    private func makeOverviewPreference(title: String, detail: String, control: NSSwitch, help: NSButton? = nil) -> NSView {
+        control.controlSize = .small
+        control.setAccessibilityLabel(title)
+        control.setAccessibilityHelp(detail)
+        control.setContentHuggingPriority(.required, for: .horizontal)
+        let heading = NativeInterface.label(title, size: 13)
+        let titleRow = NSStackView(views: [heading])
+        titleRow.spacing = 6
+        titleRow.alignment = .centerY
+        if let help { titleRow.addArrangedSubview(help) }
+        let description = NativeInterface.label(detail, size: 11, color: .secondaryLabelColor, wrapping: true)
+        let text = NSStackView(views: [titleRow, description])
+        text.orientation = .vertical
+        text.alignment = .leading
+        text.spacing = 4
+        let row = NSStackView(views: [text, NSView(), control])
+        row.alignment = .centerY
+        row.spacing = 16
+        text.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        description.widthAnchor.constraint(equalTo: text.widthAnchor).isActive = true
+        return row
     }
 
     private func addDeveloperSectionIfNeeded() {
@@ -5907,8 +5919,8 @@ class HelpWindowController: NSWindowController {
     override func showWindow(_ sender: Any?) {
         window?.title = appL10n("关于/帮助", "About / Help")
         versionLabel?.stringValue = appL10n("版本 \(UpdateService.shared.currentVersionDisplay)", "Version \(UpdateService.shared.currentVersionDisplay)")
-        automaticUpdateCheckbox?.state = UpdateService.shared.automaticChecksEnabled ? .on : .off
-        anonymousStatsCheckbox?.state = PrivacyStatsService.shared.anonymousStatsEnabled ? .on : .off
+        automaticUpdateSwitch?.state = UpdateService.shared.automaticChecksEnabled ? .on : .off
+        anonymousStatsSwitch?.state = PrivacyStatsService.shared.anonymousStatsEnabled ? .on : .off
         refreshDeveloperSettings()
         refreshDonationPreview()
         super.showWindow(sender)
@@ -5998,7 +6010,7 @@ class HelpWindowController: NSWindowController {
         AppDelegate.shared?.beginUninstallFlow()
     }
 
-    @objc private func toggleAutomaticChecks(_ sender: NSButton) {
+    @objc private func toggleAutomaticChecks(_ sender: NSSwitch) {
         UpdateService.shared.automaticChecksEnabled = (sender.state == .on)
     }
 
@@ -6030,7 +6042,7 @@ class HelpWindowController: NSWindowController {
         alert.runModal()
     }
 
-    @objc private func toggleAnonymousStats(_ sender: NSButton) {
+    @objc private func toggleAnonymousStats(_ sender: NSSwitch) {
         let shouldEnable = (sender.state == .on)
         if !shouldEnable {
             let alert = NSAlert()

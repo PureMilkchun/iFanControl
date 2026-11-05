@@ -23,6 +23,7 @@ let package = Package(
         .executableTarget(
             name: "MacFanControl",
             dependencies: ["FanCurveEditor", "IOReportBridge"],
+            resources: [.copy("Resources/Brand")],
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("Foundation"),

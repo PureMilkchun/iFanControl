@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
 """Compile real native controllers with isolated config/defaults and external-effect seams."""
 from pathlib import Path
-import subprocess, tempfile, plistlib, uuid
+import subprocess, tempfile, plistlib, uuid, shutil, argparse, os
 from native_test_bridge import compile_test_bridge
 ROOT=Path(__file__).resolve().parents[2]
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--capture-directory',type=Path,help='Render real brand surfaces in light/dark Chinese and English; no hardware or network')
+args=parser.parse_args()
 expr='FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!.appendingPathComponent("MacFanControl")'
 with tempfile.TemporaryDirectory(prefix='ifan-ui-tests-') as d:
     out=Path(d); config=out/'config'; replacement='URL(fileURLWithPath: "'+str(config)+'", isDirectory:true)'
     bridge_map,bridge_object=compile_test_bridge(out)
     app=out/'UITests.app';(app/'Contents/MacOS').mkdir(parents=True)
+    shutil.copytree(ROOT/'Sources/MacFanControl/Resources/Brand', app/'Contents/Resources/Brand')
+    shutil.copy2(ROOT/'icon.png', app/'Contents/Resources/icon.png')
     domain='com.ifancontrol.ui-regression.'+str(uuid.uuid4())
-    (app/'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier':domain,'CFBundleExecutable':'UITests','CFBundlePackageType':'APPL','CFBundleShortVersionString':'2.9.10','CFBundleVersion':'64'}))
+    info=plistlib.loads((ROOT/'packaging/app/Info.plist').read_bytes())
+    info.update(CFBundleIdentifier=domain,CFBundleExecutable='UITests')
+    (app/'Contents/Info.plist').write_bytes(plistlib.dumps(info))
     curve=(ROOT/'Sources/FanCurveEditor/FanCurveWindow.swift').read_text().replace(expr,replacement).replace('NSAlert()','NativeUITestAlert()')
     curve+='''\n@MainActor enum UIRegressionPaths { static let config = '''+replacement+''' }
 @MainActor class NativeUITestAlert: NSAlert {
@@ -29,7 +36,7 @@ with tempfile.TemporaryDirectory(prefix='ifan-ui-tests-') as d:
         try? await Task.sleep(for:.milliseconds(20));return !content.contains("fail")
     }
 '''+s[b:]
-    s+='\n'+(ROOT/'packaging/pkg/test_ui.swift').read_text()+'''
+    s+='\n'+(ROOT/'packaging/pkg/test_ui.swift').read_text()+'\n'+(ROOT/'packaging/pkg/render_brand.swift').read_text()+'''
 let application=NSApplication.shared
 application.setActivationPolicy(.accessory)
 Task { @MainActor in
@@ -37,6 +44,12 @@ Task { @MainActor in
     precondition(domain.hasPrefix("com.ifancontrol.ui-regression."))
     UserDefaults.standard.removePersistentDomain(forName:domain)
     do {
+        if let directory=ProcessInfo.processInfo.environment["IFAN_BRAND_CAPTURE_DIR"] {
+            application.applicationIconImage=NSImage(contentsOfFile:Bundle.main.resourcePath!+"/icon.png")
+            try BrandPreview.capture(directory:URL(fileURLWithPath:directory))
+            UserDefaults.standard.removePersistentDomain(forName:domain)
+            exit(0)
+        }
         try FanCurvePresetWindowController.runUIRegression()
         DisplaySettingsWindowController.runUIRegression()
         PowerConsumptionWindowController.runUIRegression()
@@ -53,3 +66,8 @@ application.run()
     files=[str(out/'main.swift')]+[str(p) for p in (ROOT/'Sources/MacFanControl').glob('*.swift') if p.name!='main.swift']
     subprocess.run(['swiftc','-swift-version','6','-I',str(out),'-L',str(out),'-lFanCurveEditor','-Xcc','-fmodule-map-file='+str(bridge_map),str(bridge_object),*files,'-framework','AppKit','-framework','ServiceManagement','-lIOReport','-o',str(app/'Contents/MacOS/UITests')],check=True)
     subprocess.run([str(app/'Contents/MacOS/UITests'),'-ifancontrol.ui.language','en'],check=True,timeout=20)
+    if args.capture_directory:
+        args.capture_directory.mkdir(parents=True,exist_ok=True)
+        for language in ['zh','en']:
+            subprocess.run([str(app/'Contents/MacOS/UITests'),'-ifancontrol.ui.language',language],
+                env={**os.environ,'IFAN_BRAND_CAPTURE_DIR':str(args.capture_directory.resolve())},check=True,timeout=20)

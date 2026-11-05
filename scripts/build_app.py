@@ -48,6 +48,8 @@ def main():
     (output / 'Contents/Resources').mkdir()
     shutil.copy2(bin_path / 'MacFanControl', output / 'Contents/MacOS/iFanControl')
     shutil.copy2(ROOT / 'icon.png', output / 'Contents/Resources/icon.png')
+    resources = bin_path / 'MacFanControl_MacFanControl.bundle'
+    shutil.copytree(resources, output / 'Contents/Resources' / resources.name)
     if args.version is None and args.build is None and args.channel is None:
         shutil.copy2(template, output / 'Contents/Info.plist')
     else:
@@ -64,6 +66,10 @@ def main():
         'executable_sha256': hashlib.sha256((output / 'Contents/MacOS/iFanControl').read_bytes()).hexdigest(),
         'info_plist_sha256': hashlib.sha256((output / 'Contents/Info.plist').read_bytes()).hexdigest(),
         'icon_sha256': hashlib.sha256((ROOT / 'icon.png').read_bytes()).hexdigest(),
+        'brand_assets_sha256': {
+            p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in sorted((ROOT / 'Sources/MacFanControl/Resources/Brand').glob('*.pdf'))
+        },
     }
     (output.parent / 'app-build.json').write_text(json.dumps(record, indent=2) + '\n')
     print(f"Built {record['version']} / {record['channel']} / build {record['build']}: {output}")

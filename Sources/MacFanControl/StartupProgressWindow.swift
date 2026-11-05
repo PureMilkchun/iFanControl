@@ -49,7 +49,7 @@ import AppKit
         icon.imageScaling = .scaleProportionallyUpOrDown
         icon.widthAnchor.constraint(equalToConstant: 48).isActive = true
         icon.heightAnchor.constraint(equalToConstant: 48).isActive = true
-        let title = NativeInterface.label(Self.text("正在启动 iFanControl", "Starting iFanControl"), size: 17, weight: .semibold)
+        let title = BrandIdentity.wordmark(.horizontal, width: 180)
         stageField.font = .systemFont(ofSize: 12)
         stageField.textColor = .secondaryLabelColor
         stageField.identifier = NSUserInterfaceItemIdentifier("startup-stage")
