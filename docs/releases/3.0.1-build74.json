@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "tag": "v3.0.1",
+  "version": "3.0.1",
+  "build": 74,
+  "channel": "stable",
+  "source_hashes": {
+    "Sources/FanCurveEditor/FanCurveWindow.swift": "88531c31050719d848befd9afbfdc39bd0bd04f9e178af1204f458f19035003c",
+    "Sources/FanCurveEditor/FanCurveView.swift": "152d2535b91301b994f900ad39f39395dba5f02ed82a7a478e5590432f4fc628",
+    "Sources/MacFanControl/UpdatePreferences.swift": "dc2ca7248821b63b8062b2dbb3749b42f897f5c53e22ee1ed8c1defa3d6027f3",
+    "Sources/MacFanControl/SensorCatalog.swift": "cc56f4afb4c92d5dcb9b5b68fd59bee8641b5c1717a993028997ab3b919aeee8",
+    "Sources/MacFanControl/UpdatePackageDownloader.swift": "a17b6c5465311ad4a3a87490c57e1c5a67ce89e1e335b404e023258c93b0ee8f",
+    "Sources/MacFanControl/MiniDisplayFormatter.swift": "5e63e8f67996a61c4bbfce06426ad9842939daf254bfa68f22522619770d22ef",
+    "Sources/MacFanControl/NativeInterface.swift": "276c9920f2328232587448f9105503260f8dd9b53d98622f7b8494e541443eed",
+    "Sources/MacFanControl/UpdateManifest.swift": "009865d8739a1273eb9db1a9781b9d08816cc312ca30281c2b8f17d4b3d379b5",
+    "Sources/MacFanControl/UpdateProgressWindow.swift": "25bb00e169fb369524118ec5146ecd2ac21eb0cd4169237a531ea57b9e9af501",
+    "Sources/MacFanControl/main.swift": "6cca8874c1740d2e1b9b2ec9d2e2ef1f7e97d4d82636dc4ffe6f3d858869ad62",
+    "Sources/MacFanControl/InteractionNotice.swift": "82865a5ab883fe68e02f28bcc3d896bccebb772321a9975ed2b1d9cff1e85c60",
+    "packaging/pkg/scripts/preinstall": "40b9a82c8f6d015a47d30616567f71ee920da5ff52ad92ffb2a8fb8d502b31aa",
+    "packaging/pkg/scripts/postinstall": "d254053b6341f7fce5b24816462ba92611cf7bd40ec18b4a019e64cb64934bfa",
+    "Sources/MacFanControl/StartupProgressWindow.swift": "044e674fbc93ed5b337c2b8aa1c854d3bbc8108e18f5e17d089f47d07f86c781",
+    "packaging/app/Info.plist": "810482fd592871fd256898ba3ed8de94f32e7cfe6127814e411ed59b4250d28c",
+    "icon.png": "b460e15c3834479a771bcc200a7a7622c53a5fd84dd62392bb179cc646b52324",
+    "kentsmc": "56b9b4f7239b4b043b8b69c92ed23f184eaf55a6b7d67c419d899da3a7254605",
+    "Sources/IOReportBridge/bridge.c": "8a06e4da0d02bccd33220b67fceb05bd3cb6c5606c224308a9a8e3beea30f98d",
+    "Sources/IOReportBridge/include/bridge.h": "1e03653689f855d2748d1cc2cf9b31211c2d376cd21b199dfb27bfebda7168f9",
+    "Package.swift": "67789c6f7a1f9928dedeeb190ae8adadb03f8f9034d59dd7fc16e6e4d37bac4a",
+    "packaging/pkg/build.py": "3b8de30bcb554d5ccd54352295991f57d96589dca42aa2da926ede4e7fc8555d",
+    "packaging/pkg/resources/Welcome.json": "ea4b524e0a57a62a28cb5ca374b5d847ba2ed49ac6af38a694fe5f4f3bd725bc",
+    "packaging/pkg/render_welcome.swift": "825fdbc16546363db5e0f912b59b35948ee1b3e26ee17e4ec42f930d20e39198",
+    "packaging/pkg/legacy-channel.json": "3b0c1fc069d3e619a50f361f5968edc4268b8b340304e8b37b39951187c7fff2",
+    "packaging/pkg/legacy-update-os-guard.mjs": "5451b739cd51ce2110c23bb1a4ef797821511e1485cac130f21d9df589e3da51",
+    "scripts/repack_macos15.py": "cc33a92a5738e3ed9a3ef9fb0830b9b9394f29f68dc8959bfb3af652952bef05",
+    "scripts/verify_legacy_os_guard.mjs": "0b2288b4bb2489126bc6e7326fc1658706771586867b9fde7440ec438d191041",
+    "packaging/pkg/verify_channels.py": "948d8ead5883af7246cf5710a8bb837fb727d791bb1444dcb9a2e68c2ef2f71f",
+    "docs/releases/macos15-website.patch": "7a2c0dce8f69fe0d7163006f108848fd852c465e657f8c6f67befe8fbee9d33a",
+    "Sources/MacFanControl/BrandIdentity.swift": "dd4fdd448106f57ceb055107b1ded86608389b738c7496c55a548f1a42e287b2",
+    "scripts/build_app.py": "0376c2e9d481cb108d8a1028c0512b796f1f1eb125232281d066accde321ea43",
+    "Sources/MacFanControl/Resources/Brand/WordmarkHorizontal.pdf": "1e358b9915b70279bdc851821632a36ac214a49963b8213514f4d584955ad197",
+    "Sources/MacFanControl/Resources/Brand/WordmarkStacked.pdf": "6e6b714ee66e0b2fc29e52716ed156cbd451c038d1622075edce8e45665c2d07",
+    "packaging/pkg/test_ui.py": "a438193f8c20b73a472e9ed3b2ce899242924b2c0e9d2a1af129037fd415b2f0",
+    "packaging/pkg/test_startup.py": "ebfbb97644106efb574f178650b6b81aeb9089664400bdace681a5779b80c716",
+    "packaging/pkg/test_startup.swift": "25bfba2acd3d4e7456939012c50dc6fea4998ea7360e2b9a7709785f591eda37"
+  },
+  "package": {
+    "url": "https://ifan-59w.pages.dev/iFanControl-3.0.1-74.pkg?build=74",
+    "canonical_url": "https://ifan-59w.pages.dev/iFanControl-macOS.pkg?build=74",
+    "sha256": "0e40df3e73569afdce2f44522000e84b98968f31080e2d5e6fda2b297d7de085",
+    "executable_sha256": "dd28332f46cb220f7480ca1af446cb1304d0fd02dc254d63576ae750d393a1e8",
+    "signed": false,
+    "notarized": false
+  },
+  "validation": {
+    "release_build": true,
+    "update_contracts_and_real_updater": true,
+    "native_ui_controller_regressions": true,
+    "native_ui_inspected": true,
+    "channel_isolation_and_pinned_legacy": true,
+    "fan_control_source_unchanged": true,
+    "icon_tool_and_installer_scripts_unchanged": true,
+    "package_expanded_payload_and_signatures": true,
+    "native_installation_performed_by_agent": false,
+    "actual_delegate_launch_scenarios": 6,
+    "complete_wordmark_includes_CONTROL": true,
+    "visible_edge_checks": [
+      {
+        "image": "about-zh-light.png",
+        "icon_top_bottom": [
+          154,
+          278
+        ],
+        "complete_wordmark_top_bottom": [
+          154,
+          278
+        ],
+        "edge_delta_pixels": [
+          0,
+          0
+        ]
+      },
+      {
+        "image": "startup-zh-light.png",
+        "icon_top_bottom": [
+          81,
+          159
+        ],
+        "complete_wordmark_top_bottom": [
+          82,
+          159
+        ],
+        "edge_delta_pixels": [
+          1,
+          0
+        ]
+      },
+      {
+        "image": "about-en-light.png",
+        "icon_top_bottom": [
+          154,
+          278
+        ],
+        "complete_wordmark_top_bottom": [
+          154,
+          278
+        ],
+        "edge_delta_pixels": [
+          0,
+          0
+        ]
+      },
+      {
+        "image": "startup-en-light.png",
+        "icon_top_bottom": [
+          81,
+          159
+        ],
+        "complete_wordmark_top_bottom": [
+          82,
+          159
+        ],
+        "edge_delta_pixels": [
+          1,
+          0
+        ]
+      }
+    ]
+  },
+  "publication": {
+    "status": "prepared",
+    "base_deployment": "d764fb1c-4a00-4987-8f88-50a53e37716b",
+    "stable_build": 74,
+    "beta_feed_build": 74,
+    "beta_feed_channel": "stable",
+    "legacy_build": 52
+  },
+  "provenance": "Build inputs hashed from reviewed worktree; executable embeds no Git commit. Source checkpoint tag records these exact inputs.",
+  "promotion": {
+    "from_tag": "v3.0.1-beta.73",
+    "from_build": 73,
+    "version": "3.0.1",
+    "build": 74,
+    "channel": "stable",
+    "application_recompiled": false,
+    "program_sections_identical_to_beta73": {
+      "__TEXT,__text": "9fad24f536e9c1d5b28497517f34a7f596b3dba682f266f44574fc093c178457",
+      "__TEXT,__stubs": "49355da04a49999eb77b58975c69f53cf93de64eb060f67c5bf03abc3a7c988a",
+      "__TEXT,__objc_stubs": "f9ffbe40e8aa1f7e91b5b2d61a5f0013ae9e673388cea44fff705ee76705ac4a",
+      "__TEXT,__objc_methlist": "86492f3f99b2c604aede0e600cb655cdad7fd958411e93f73c3c76648ad3cda8",
+      "__TEXT,__const": "8923545c6694c21d23dea4a34899e0de611905f06deb28cba87ffbfac082aa9c",
+      "__TEXT,__cstring": "0406e3a819f9814c112ac2d2012f08fa8e8b385e6c76778d524568a81934d8e0",
+      "__TEXT,__swift5_entry": "ebdf98d25fac40c2e6c6118b30e82828577f126c192c3adf36bfeb1124bcad90",
+      "__TEXT,__objc_classname": "492b06c2076428eddc1f67899a8f1d5dfe8afbb0d59c70bd11012fcbbb9bb0bd",
+      "__TEXT,__objc_methname": "9f6cbf271614661bae671d658b99951b218fcae4eb694bafa3a93f0465bea486",
+      "__TEXT,__objc_methtype": "a987e27fa0aeda5c72c2616de21651ad28eac57bc11f81add9c287bb8df18c54",
+      "__TEXT,__constg_swiftt": "b467cc4522e64b6a077d6094eb8b74a92d1fc7c2a38f29d3219b326b4008ce1b",
+      "__TEXT,__swift5_typeref": "f2abd4edeb0defb43ce07eaaf507c81d2443d36f4da0555392d95f8b4c6595cc",
+      "__TEXT,__swift5_reflstr": "22efb7fa0c3b609ff13b32724735949808d747cefcdd48f1cad3d37d0013911a",
+      "__TEXT,__swift5_fieldmd": "af7f1800d65ae1e917bb0190db189f599fe18202ff49c3c1735696ca86fbe685",
+      "__TEXT,__swift5_assocty": "d1dfba85bfdc9b03106201891bb63dee84aa3f76708c94b0b7ff5ffc0a6f7fd0",
+      "__TEXT,__swift5_capture": "1cf97d51351283cb34eff08649eaa193848415448c8897bd46ea7df28cb4714e",
+      "__TEXT,__oslogstring": "315a4b205b57fefde56ec7208f88ac34104848f99c10c2ab25039d16aa918810",
+      "__TEXT,__swift5_builtin": "a6aeda7c2d0779605ae30e9561aa3de60825271dd69fd80ca94c56f6b169b2a2",
+      "__TEXT,__swift5_proto": "78249fe58435fb21a4fea860299b970d8a6b1e0cc4c71aafb128d1c8fc2325dd",
+      "__TEXT,__swift5_types": "b4534daf6d5acd1f44fdc5abbca6ac77cb85a3db8e26bdbcf7b2f635a7350de8",
+      "__TEXT,__swift_as_entry": "11f4d1dfa6ba65a7871fa5508843eb84b471c49d2aa746be12ac8fe91d7d0051",
+      "__TEXT,__swift_as_ret": "eba0921d0d749527d7f187a16ca342fa2a015877265bdf7a61b38954260db9ed",
+      "__TEXT,__swift_as_cont": "e60dbf131254220d99ebcf9dbb202f7a58b4a6fd91a7b033ecbfe3dd51c3870b",
+      "__TEXT,__unwind_info": "801c7b351d20a16b51357603ef3ddb61ea4ddb2c70821038de3c83823f790bee",
+      "__TEXT,__eh_frame": "e3b2993053341bfe4b054c9439f078dcc403fe24add4166fbc5a1a97348f38a4",
+      "__DATA_CONST,__const": "1e4657adf4a7a1298d2dc3572d916264f23987d7c79b73aa3db112dec3e8f700",
+      "__DATA_CONST,__objc_classlist": "67ecc3f52497ab5315200facdd64075367645d0808d221766f9275b32673b407",
+      "__DATA_CONST,__objc_protolist": "81287c03a17bdeedd6002046241a3b590b920b1e5f89aa932080ed11bb86d620",
+      "__DATA_CONST,__objc_imageinfo": "7408fcdda372aaed9b8d62d262bd8e7ad4da66abeb61efb31e7c98020b1321ce",
+      "__DATA_CONST,__got": "e9a5c8fea526cef2d5bba269ff7d96959f92b57345a2a2f9709915bee628797c",
+      "__DATA,__objc_const": "d5d05219c8452fd104e6a1a78f45c50f31e08a596eeb69dbe0a4ac7c13910073",
+      "__DATA,__objc_selrefs": "22990bc0a2521b45c7e08b86831f4f9b2b6b9adb11a4f3366e336e1af730f0c4",
+      "__DATA,__objc_protorefs": "1ac7e55439b63ee3055d034857911ee66998bb9b11cf0a02b18beba4babc7669",
+      "__DATA,__objc_classrefs": "5f890aa0baeb0e99d8fb91a74d30bab59db143b071b97fba6ca0be29594d4c58",
+      "__DATA,__objc_data": "f00f587a8e669cf36cc3c4b2dcf6c35e18c6ed1e47367c449a7aa3759d01ea40",
+      "__DATA,__data": "a99fcbaaddc41e5fc9f9397db13cb897739808e0a54878f56b8e7f92f13864b6"
+    },
+    "changed_bundle_files": [
+      "Contents/Info.plist",
+      "Contents/MacOS/iFanControl"
+    ],
+    "executable_sha256": "dd28332f46cb220f7480ca1af446cb1304d0fd02dc254d63576ae750d393a1e8",
+    "minimum_os": "15.0",
+    "installed": false
+  },
+  "publication_record": "3.0.1-build74-publication.json"
+}

@@ -19,9 +19,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>3.0.1</string>
 	<key>CFBundleVersion</key>
-	<string>73</string>
-	<key>IFanControlReleaseChannel</key>
-	<string>beta</string>
+	<string>74</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>15.0</string>
 	<key>LSUIElement</key>
