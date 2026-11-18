@@ -1,0 +1,35 @@
+{
+  "version": "3.0.2",
+  "build": 84,
+  "release_channel": "beta",
+  "stable_build": 74,
+  "legacy_build": 52,
+  "package_sha256": "1e06e71f81150d5e78b71155ae2d16c7057330053e5aaf096349ceb3efbb42b4",
+  "deployment": "779a7c58-0b80-4003-9944-26d7899aee7e",
+  "deployed_at": "2026-11-18T01:59:06.510116Z",
+  "previous_site_deployment": "f82de2cb-17a4-474d-b046-388bdd19381b",
+  "beta_only": true,
+  "unchanged_assets": 90,
+  "runtime_preserved": true,
+  "sleep_acknowledgement_budget_seconds": 2,
+  "simulated_sleep_checks_passed": true,
+  "agent_installed_app": false,
+  "hardware_sleep_tested": false,
+  "origins": [
+    {
+      "origin": "https://ifan-59w.pages.dev",
+      "stable_build": 74,
+      "beta_build": 84,
+      "sha256": "1e06e71f81150d5e78b71155ae2d16c7057330053e5aaf096349ceb3efbb42b4",
+      "legacy_protection_verified": true
+    },
+    {
+      "origin": "https://ifancontrol.puremilkchun.top",
+      "stable_build": 74,
+      "beta_build": 84,
+      "sha256": "1e06e71f81150d5e78b71155ae2d16c7057330053e5aaf096349ceb3efbb42b4",
+      "legacy_protection_verified": true
+    }
+  ],
+  "source_commit": "bcae1d50f2bf0f21ea9ebfee16cac188d1d3dc0d"
+}
