@@ -4,6 +4,7 @@ import CryptoKit
 // This endpoint is separate from the frozen pre-2.9.9 ZIP update channel.
 struct UpdateManifest: Decodable, Sendable {
     static let channelURL = URL(string: "https://ifan-59w.pages.dev/update-manifest-pkg.json")!
+    static let stableRestoreURL = URL(string: "https://ifan-59w.pages.dev/update-manifest-stable-restore.json")!
 
     let latestVersion: String
     let latestBuild: Int
@@ -13,6 +14,7 @@ struct UpdateManifest: Decodable, Sendable {
     let assets: Assets?
     let releaseChannel: String?
     let releaseURL: String?
+    let stablePackageSHA256: String?
 
     var versionDisplay: String {
         releaseChannel == "beta" ? "\(latestVersion) Beta" : latestVersion
@@ -21,6 +23,16 @@ struct UpdateManifest: Decodable, Sendable {
     // A Beta feed may point to a promoted stable package. Stable never accepts Beta metadata.
     func isCompatible(with channel: UpdateChannel) -> Bool {
         releaseChannel == nil || releaseChannel == "stable" || (channel == .beta && releaseChannel == "beta")
+    }
+
+    func matchesStableRestoreTarget(_ stable: UpdateManifest) -> Bool {
+        guard releaseChannel == "stable", stable.releaseChannel == "stable",
+              latestBuild > 0, latestBuild == stable.latestBuild, latestVersion == stable.latestVersion,
+              let sourceHash = stablePackageSHA256, let stableHash = stable.assets?.packageSHA256,
+              sourceHash.lowercased() == stableHash.lowercased(),
+              let url = try? packageDownloadURL(), url.host == Self.stableRestoreURL.host else { return false }
+        let stableHashPrefix = stableHash.lowercased().prefix(12)
+        return url.lastPathComponent == "iFanControl-stable-restore-\(latestVersion)-\(latestBuild)-\(stableHashPrefix).pkg"
     }
 
     var betaReleaseURL: URL? {
@@ -37,6 +49,7 @@ struct UpdateManifest: Decodable, Sendable {
         case notes, mandatory, assets
         case releaseChannel = "release_channel"
         case releaseURL = "release_url"
+        case stablePackageSHA256 = "stable_package_sha256"
     }
 
     struct Assets: Decodable, Sendable {

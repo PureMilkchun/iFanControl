@@ -2463,8 +2463,12 @@ class UpdateService: NSObject {
         Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0") ?? 0
     }
 
+    var isBetaBuild: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "IFanControlReleaseChannel") as? String == "beta"
+    }
+
     var currentVersionDisplay: String {
-        let betaLabel = Bundle.main.object(forInfoDictionaryKey: "IFanControlReleaseChannel") as? String == "beta" ? " Beta" : ""
+        let betaLabel = isBetaBuild ? " Beta" : ""
         return "\(currentShortVersion)\(betaLabel) (\(currentBuild))"
     }
 
@@ -2486,6 +2490,30 @@ class UpdateService: NSObject {
     }
 
     func checkForUpdates(triggeredByUser: Bool) {
+        let returningToStable = triggeredByUser && isBetaBuild && updatePreferences.channel == .stable
+        checkAvailableVersion(triggeredByUser: triggeredByUser, returningToStable: returningToStable)
+    }
+
+    func returnToStable() {
+        checkAvailableVersion(triggeredByUser: true, returningToStable: true)
+    }
+
+    private func checkAvailableVersion(triggeredByUser: Bool, returningToStable: Bool) {
+        if returningToStable {
+            guard triggeredByUser, isBetaBuild else { return }
+            let installedPath = URL(fileURLWithPath: "/Applications/iFanControl.app").resolvingSymlinksInPath()
+            let currentPath = Bundle.main.bundleURL.resolvingSymlinksInPath()
+            guard currentPath.path == installedPath.path else {
+                showInfoAlert(title: appL10n("请打开已安装的 iFanControl", "Open the Installed iFanControl"),
+                    message: appL10n("请从「应用程序」打开 iFanControl Beta，再返回正式版。", "Open iFanControl Beta from Applications before returning to Stable."))
+                return
+            }
+            if isChecking || isDownloading {
+                showInfoAlert(title: appL10n("已有更新操作", "Update in Progress"),
+                    message: appL10n("请完成或取消当前操作，再返回正式版。", "Finish or cancel the current update before returning to Stable."))
+                return
+            }
+        }
         if isChecking || isDownloading {
             if triggeredByUser {
                 manualCheckRequested = true
@@ -2501,10 +2529,13 @@ class UpdateService: NSObject {
 
         isChecking = true
         let selection = updatePreferences.selection
+        let channel: UpdateChannel = returningToStable ? .stable : selection.channel
         activeSelection = selection
         manualCheckRequested = triggeredByUser
         if triggeredByUser {
-            progressWindow.present(title: appL10n("正在检查更新", "Checking for Updates"), detail: appL10n("当前通道：\(selection.channel == .beta ? "Beta" : "正式版")", "Update channel: \(selection.channel == .beta ? "Beta" : "Stable")"), cancel: { [weak self] in self?.cancelCurrentOperation() })
+            let detail = channel == .beta ? appL10n("正在查询 Beta 版", "Looking for a Beta release") : appL10n("正在查询正式版", "Looking for a stable release")
+            progressWindow.present(title: appL10n("正在检查更新", "Checking for Updates"), detail: detail,
+                cancel: { [weak self] in self?.cancelCurrentOperation() })
         }
         logger.info("Starting update check. triggeredByUser=\(triggeredByUser, privacy: .public)")
 
@@ -2512,13 +2543,30 @@ class UpdateService: NSObject {
             defer { isChecking = false; checkTask = nil }
 
             do {
-                let (data, _) = try await URLSession.shared.data(from: selection.channel.manifestURL)
+                let manifest = try await fetchManifest(at: channel.manifestURL)
                 guard !Task.isCancelled, updatePreferences.selection == selection else { return }
-                let manifest = try JSONDecoder().decode(UpdateManifest.self, from: data)
-                guard manifest.isCompatible(with: selection.channel) else {
+                guard manifest.isCompatible(with: channel) else {
                     throw NSError(domain: "UpdateService", code: 1005, userInfo: [NSLocalizedDescriptionKey: appL10n("更新通道信息不匹配，请稍后重试。", "Update channel information does not match. Please try again later.")])
                 }
                 recordLastCheckNow()
+
+                if returningToStable {
+                    guard manifest.releaseChannel == "stable", manifest.latestBuild > 0 else { throw UpdateManifest.PackageError.invalidMetadata }
+                    _ = try manifest.packageDownloadURL()
+                    let installer: UpdateManifest
+                    if manifest.latestBuild > currentBuild {
+                        installer = manifest
+                    } else {
+                        installer = try await fetchManifest(at: UpdateManifest.stableRestoreURL)
+                        guard installer.matchesStableRestoreTarget(manifest) else {
+                            throw NSError(domain: "UpdateService", code: 1006, userInfo: [NSLocalizedDescriptionKey: appL10n("当前正式版的回退安装包暂不可用，请稍后重试。", "The restore installer for the current stable release is unavailable. Try again later.")])
+                        }
+                    }
+                    guard !Task.isCancelled, updatePreferences.selection == selection else { return }
+                    progressWindow.dismiss()
+                    presentUpdatePrompt(manifest: installer, selection: selection, returningToStable: true)
+                    return
+                }
 
                 if manifest.latestBuild <= currentBuild {
                     self.logger.info("No update available. currentBuild=\(self.currentBuild, privacy: .public) remoteBuild=\(manifest.latestBuild, privacy: .public)")
@@ -2543,8 +2591,8 @@ class UpdateService: NSObject {
                 self.logger.error("Update check failed: \(error.localizedDescription, privacy: .public)")
                 if manualCheckRequested {
                     progressWindow.present(title: appL10n("检查更新失败", "Update Check Failed"), detail: error.localizedDescription,
-                        retry: { [weak self] in self?.checkForUpdates(triggeredByUser: true) },
-                        manual: { [weak self] in guard let self else { return }; NSWorkspace.shared.open(self.releasesHomeURL) })
+                        retry: { [weak self] in self?.checkAvailableVersion(triggeredByUser: true, returningToStable: returningToStable) },
+                        manual: returningToStable ? nil : { [weak self] in guard let self else { return }; NSWorkspace.shared.open(self.releasesHomeURL) })
                 } else {
                     print("Update check failed: \(error)")
                 }
@@ -2552,28 +2600,45 @@ class UpdateService: NSObject {
         }
     }
 
+    private func fetchManifest(at url: URL) async throws -> UpdateManifest {
+        let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
+            throw NSError(domain: "UpdateService", code: 1001, userInfo: [NSLocalizedDescriptionKey: appL10n("更新信息暂不可用，请稍后重试。", "Update information is unavailable. Please try again later.")])
+        }
+        return try JSONDecoder().decode(UpdateManifest.self, from: data)
+    }
+
     private func recordLastCheckNow() {
         UserDefaults.standard.set(Date(), forKey: lastCheckKey)
     }
 
-    private func presentUpdatePrompt(manifest: UpdateManifest, selection: UpdateSelection) {
+    private func presentUpdatePrompt(manifest: UpdateManifest, selection: UpdateSelection, returningToStable: Bool = false) {
         let notes = manifest.notes?.isEmpty == false ? manifest.notes! : appL10n("包含稳定性与功能改进。", "Includes stability and feature improvements.")
         let alert = NSAlert()
-        alert.messageText = appL10n("发现新版本 \(manifest.versionDisplay)", "New Version Available \(manifest.versionDisplay)")
-        alert.informativeText = appL10n(
+        alert.messageText = returningToStable ? appL10n("返回正式版", "Return to Stable")
+            : appL10n("发现新版本 \(manifest.versionDisplay)", "New Version Available \(manifest.versionDisplay)")
+        alert.informativeText = returningToStable ? appL10n(
+            "当前：\(currentVersionDisplay)\n正式版：\(manifest.versionDisplay) (\(manifest.latestBuild))\n\n曲线与设置会保留。验证下载后，应用会退出并打开系统安装器。",
+            "Current: \(currentVersionDisplay)\nStable: \(manifest.versionDisplay) (\(manifest.latestBuild))\n\nYour curves and settings will be kept. After verifying the download, the app will quit and open Installer."
+        ) : appL10n(
             "当前版本：\(currentVersionDisplay)\n可用版本：\(manifest.versionDisplay) (\(manifest.latestBuild))\n\n\(notes)\n\n下载安装包并验证后，应用会退出并打开系统安装器。",
             "Current: \(currentVersionDisplay)\nLatest: \(manifest.versionDisplay) (\(manifest.latestBuild))\n\n\(notes)\n\nAfter download and verification, the app will quit and open the system installer."
         )
         alert.alertStyle = .informational
-        alert.addButton(withTitle: appL10n("立即更新", "Update Now"))
-        alert.addButton(withTitle: appL10n("稍后", "Later"))
+        let install = alert.addButton(withTitle: returningToStable ? appL10n("下载正式版", "Download Stable") : appL10n("立即更新", "Update Now"))
+        let cancel = alert.addButton(withTitle: returningToStable ? appL10n("取消", "Cancel") : appL10n("稍后", "Later"))
+        if returningToStable {
+            install.keyEquivalent = ""
+            cancel.keyEquivalent = "\r"
+        }
 
         if alert.runModal() == .alertFirstButtonReturn {
-            startDownloadAndInstall(manifest: manifest, selection: selection)
+            startDownloadAndInstall(manifest: manifest, selection: selection, returningToStable: returningToStable)
         }
     }
 
-    private func startDownloadAndInstall(manifest: UpdateManifest, selection: UpdateSelection) {
+    private func startDownloadAndInstall(manifest: UpdateManifest, selection: UpdateSelection, returningToStable: Bool) {
         guard !isDownloading, updatePreferences.selection == selection else { return }
         isDownloading = true
         let id = UUID()
@@ -2629,15 +2694,20 @@ class UpdateService: NSObject {
                 }
                 logger.info("Native PKG installer launched for version \(manifest.latestVersion, privacy: .public)")
                 // Normal termination restores automatic fan control before installation.
-                UserDefaults.standard.set(manifest.latestBuild, forKey: "ifancontrol.update.pending_build")
+                if returningToStable {
+                    activeSelection = nil
+                    updatePreferences.setBetaEnabled(false)
+                } else {
+                    UserDefaults.standard.set(manifest.latestBuild, forKey: "ifancontrol.update.pending_build")
+                }
                 NSApp.terminate(nil)
             } catch {
                 guard !Task.isCancelled, updatePreferences.selection == selection else { return }
                 logger.error("Update download/install failed: \(error.localizedDescription, privacy: .public)")
                 let releaseURL = selection.channel == .beta ? (manifest.betaReleaseURL ?? releasesHomeURL) : githubReleaseURL(for: manifest.latestVersion)
                 progressWindow.present(title: appL10n("更新未完成", "Update Not Completed"), detail: error.localizedDescription,
-                    retry: { [weak self] in self?.checkForUpdates(triggeredByUser: true) },
-                    manual: { NSWorkspace.shared.open(releaseURL) })
+                    retry: { [weak self] in self?.checkAvailableVersion(triggeredByUser: true, returningToStable: returningToStable) },
+                    manual: returningToStable ? nil : { NSWorkspace.shared.open(releaseURL) })
             }
         }
     }
@@ -5671,6 +5741,11 @@ class HelpWindowController: NSWindowController {
         websiteButton.toolTip = "https://ifancontrol.puremilkchun.top"
         let githubButton = NativeInterface.button("GitHub", target: self, action: #selector(openGitHub))
         let actions = NSStackView(views: [updateButton, websiteButton, githubButton])
+        if UpdateService.shared.isBetaBuild {
+            let restoreButton = NativeInterface.button(appL10n("返回正式版…", "Return to Stable…"), target: self, action: #selector(returnToStable))
+            restoreButton.identifier = NSUserInterfaceItemIdentifier("return-to-stable")
+            actions.insertArrangedSubview(restoreButton, at: 1)
+        }
         actions.spacing = 10
         actions.alignment = .centerY
         stack.addArrangedSubview(actions)
@@ -5764,8 +5839,8 @@ class HelpWindowController: NSWindowController {
         updateRouteLabel = routeLabel
 
         let hint = makeBodyLabel(appL10n(
-            "启用后，自动与手动检查都会使用 Beta 通道。\n切回正式通道只改变后续更新路线，当前安装版本不会改变。",
-            "When enabled, automatic and manual checks use the Beta channel.\nSwitching to Stable changes future updates; your installed version stays the same."
+            "启用后，自动与手动检查都会使用 Beta 通道。\n已安装 Beta 时，可在「关于」页选择返回正式版。",
+            "When enabled, automatic and manual checks use the Beta channel.\nWhen running a Beta, you can return to Stable from About."
         ))
         hint.alignment = .center
         hint.preferredMaxLayoutWidth = 360
@@ -6057,6 +6132,10 @@ class HelpWindowController: NSWindowController {
 
     @objc private func checkUpdates() {
         UpdateService.shared.checkForUpdates(triggeredByUser: true)
+    }
+
+    @objc private func returnToStable() {
+        UpdateService.shared.returnToStable()
     }
 
     @objc private func openGitHub() {
