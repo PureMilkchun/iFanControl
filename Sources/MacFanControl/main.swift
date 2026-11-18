@@ -1474,6 +1474,7 @@ private func applyWindowMaterialStyle(_ window: NSWindow?) {
 // MARK: - CommandExecutor (使用 sudo 执行特权命令)
 final class CommandExecutor: @unchecked Sendable {
     static let shared = CommandExecutor()
+    let fanPower = FanPowerLifecycle()
     private let kentsmcPath = "/usr/local/bin/kentsmc"
     private let commandQueue = DispatchQueue(label: "com.ifancontrol.command-executor")
     private let logger = Logger(subsystem: appSubsystem, category: "CommandExecutor")
@@ -1529,7 +1530,7 @@ final class CommandExecutor: @unchecked Sendable {
     }
     
     // 设置风扇转速
-    func setFanRPM(rpm: Int) -> (success: Bool, error: String?) {
+    private func setFanRPM(rpm: Int) -> (success: Bool, error: String?) {
         let result = executeCommand(args: ["--fan-rpm", "\(rpm)"])
         if result.success {
             AppLog.shared.info("setFanRPM succeeded rpm=\(rpm)")
@@ -1541,9 +1542,14 @@ final class CommandExecutor: @unchecked Sendable {
 
     func setFanRPMAsync(
         rpm: Int,
+        generation: UInt64,
         completion: @MainActor @escaping (_ success: Bool, _ error: String?) -> Void
     ) {
         commandQueue.async {
+            guard self.fanPower.permitsWrite(generation: generation) else {
+                Task { @MainActor in completion(false, nil) }
+                return
+            }
             let result = self.setFanRPM(rpm: rpm)
             Task { @MainActor in
                 completion(result.success, result.error)
@@ -1552,7 +1558,7 @@ final class CommandExecutor: @unchecked Sendable {
     }
     
     // 设置自动模式
-    func setFanAuto() -> (success: Bool, error: String?) {
+    private func setFanAuto() -> (success: Bool, error: String?) {
         let result = executeCommand(args: ["--fan-auto"])
         if result.success {
             AppLog.shared.info("setFanAuto succeeded")
@@ -1565,7 +1571,9 @@ final class CommandExecutor: @unchecked Sendable {
     func setFanAutoAsync(
         completion: (@MainActor (_ success: Bool, _ error: String?) -> Void)? = nil
     ) {
+        let generation = fanPower.snapshot.generation
         commandQueue.async {
+            guard self.fanPower.permitsWrite(generation: generation) else { return }
             let result = self.setFanAuto()
             guard let completion else { return }
             Task { @MainActor in
@@ -1574,8 +1582,29 @@ final class CommandExecutor: @unchecked Sendable {
         }
     }
     
+    func handoffForSleep(generation: UInt64, completion: @escaping @Sendable (Bool) -> Void) {
+        commandQueue.async {
+            guard self.fanPower.snapshot.generation == generation else {
+                completion(false)
+                return
+            }
+            completion(self.setFanAuto().success)
+        }
+    }
+
+    func handoffForQuit() {
+        commandQueue.sync { _ = setFanAuto() }
+    }
+
     // 解锁风扇
     func unlockFans() -> (success: Bool, error: String?) {
+        commandQueue.sync {
+            guard fanPower.permitsWrite(generation: 0) else { return (false, "system power transition") }
+            return unlockFansOnCommandQueue()
+        }
+    }
+
+    private func unlockFansOnCommandQueue() -> (success: Bool, error: String?) {
         let result = executeCommand(args: ["--unlock-fans"])
         if result.success {
             AppLog.shared.info("unlockFans succeeded")
@@ -1600,6 +1629,8 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
     private var _lastSuccessfulFanRPMRefresh: Date?
     private var _consecutiveTemperatureFailures: Int = 0
     private var _refreshInFlight = false
+    private var _temperatureSampleStart: DispatchTime?
+    private var _fanRPMSampleStart: DispatchTime?
 
     struct Snapshot {
         let temperatures: [String: Double]
@@ -1607,6 +1638,8 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
         let consecutiveTemperatureFailures: Int
         let secondsSinceTemperatureSuccess: TimeInterval?
         let secondsSinceFanRPMSuccess: TimeInterval?
+        let temperatureSampleStart: DispatchTime?
+        let fanRPMSampleStart: DispatchTime?
     }
 
     var temperatures: [String: Double] {
@@ -1624,7 +1657,9 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
             fanRPMs: _fanRPMs,
             consecutiveTemperatureFailures: _consecutiveTemperatureFailures,
             secondsSinceTemperatureSuccess: _lastSuccessfulTemperatureRefresh.map { Date().timeIntervalSince($0) },
-            secondsSinceFanRPMSuccess: _lastSuccessfulFanRPMRefresh.map { Date().timeIntervalSince($0) }
+            secondsSinceFanRPMSuccess: _lastSuccessfulFanRPMRefresh.map { Date().timeIntervalSince($0) },
+            temperatureSampleStart: _temperatureSampleStart,
+            fanRPMSampleStart: _fanRPMSampleStart
         )
     }
 
@@ -1672,6 +1707,7 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
                 lock.unlock()
             }
 
+            let sampleStart = DispatchTime.now()
             var temps: [String: Double] = [:]
             for sensor in sensors {
                 if let val = readNumeric(forKey: sensor.key), val >= 0, val <= 120 {
@@ -1689,6 +1725,7 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
             if !temps.isEmpty {
                 _temperatures = temps
                 _lastSuccessfulTemperatureRefresh = finishedAt
+                _temperatureSampleStart = sampleStart
                 _consecutiveTemperatureFailures = 0
             } else if !sensors.isEmpty {
                 _consecutiveTemperatureFailures += 1
@@ -1696,6 +1733,7 @@ private final class BackgroundHardwareReader: @unchecked Sendable {
             if !rpms.isEmpty {
                 _fanRPMs = rpms
                 _lastSuccessfulFanRPMRefresh = finishedAt
+                _fanRPMSampleStart = sampleStart
             }
             let gotTemps = !temps.isEmpty
             let consecutiveFailures = _consecutiveTemperatureFailures
@@ -1763,6 +1801,8 @@ class FanManager {
     private var lastExecutionTime: Date?
     private let minExecutionInterval: TimeInterval = 2.0
     private var fanCommandInFlight = false
+    private var needsWakeWrite = false
+    private(set) var controlGeneration: UInt64 = 0
     private let criticalTemp: Double = 110.0
     
     
@@ -2101,7 +2141,16 @@ class FanManager {
         (cachedTemperatures, cachedFanRPMs)
     }
 
+    func prepareToResumeControl(generation: UInt64, actualRPM: Int) {
+        controlGeneration = generation
+        needsWakeWrite = true
+        lastSetRPM = actualRPM
+        lastExecutionTime = nil
+    }
+
     func setFanRPM(rpm: Int) {
+        let generation = controlGeneration
+        guard CommandExecutor.shared.fanPower.permitsWrite(generation: generation) else { return }
         if fanCommandInFlight {
             AppLog.shared.debug("setFanRPM skipped reason=in_flight requested=\(rpm)")
             return
@@ -2119,7 +2168,7 @@ class FanManager {
         // 动态滞后控制
         let minChange = getMinRPMChange(currentRPM: lastSetRPM)
         let absChange = abs(boundedTarget - lastSetRPM)
-        guard absChange >= minChange else {
+        guard needsWakeWrite || absChange >= minChange else {
             AppLog.shared.debug("setFanRPM skipped reason=below_threshold requested=\(rpm) bounded=\(boundedTarget) last=\(lastSetRPM) minChange=\(minChange)")
             return
         }
@@ -2130,11 +2179,16 @@ class FanManager {
         fanCommandInFlight = true
         AppLog.shared.info("setFanRPM dispatch requested=\(rpm) bounded=\(boundedTarget) smoothed=\(smoothedRPM) last=\(lastSetRPM)")
 
-        CommandExecutor.shared.setFanRPMAsync(rpm: smoothedRPM) { [weak self] success, error in
+        CommandExecutor.shared.setFanRPMAsync(rpm: smoothedRPM, generation: generation) { [weak self] success, error in
             guard let self else { return }
             self.fanCommandInFlight = false
+            guard CommandExecutor.shared.fanPower.permitsWrite(generation: generation) else { return }
 
             if success {
+                if self.needsWakeWrite {
+                    AppLog.shared.info("fan sleep: control resumed generation=\(generation) rpm=\(smoothedRPM)")
+                    self.needsWakeWrite = false
+                }
                 self.lastSetRPM = smoothedRPM
                 self.lastExecutionTime = Date()
                 AppLog.shared.info("setFanRPM applied smoothed=\(smoothedRPM)")
@@ -3799,6 +3853,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let missingTelemetryTriggerCount = 5
     private var statsHeartbeatTimer: DispatchSourceTimer?
     private var controlLoopTimer: DispatchSourceTimer?
+    private let sleepMonitor = SystemSleepMonitor(lifecycle: CommandExecutor.shared.fanPower) { generation, completion in
+        CommandExecutor.shared.handoffForSleep(generation: generation, completion: completion)
+    }
     private var lastDiagLogTime: TimeInterval = 0
     private var lastSystemAutoFallbackAt: Date?
     private var activeSafetyAlertState: String?
@@ -3821,6 +3878,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func finishLaunching() {
         AppLog.shared.bootstrapSession()
         AppLog.shared.info("application did finish launching")
+        sleepMonitor.start()
         updateControlStatus(mode: "normal", detail: appL10n("启动完成", "Startup complete"), force: true)
 
         FanManager.shared.refreshHardwareProfile()
@@ -3870,7 +3928,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         AppLog.shared.info("application will terminate")
         statsHeartbeatTimer?.cancel()
         PrivacyStatsService.shared.shutdown()
-        _ = CommandExecutor.shared.setFanAuto()
+        controlLoopTimer?.cancel()
+        sleepMonitor.stop()
+        CommandExecutor.shared.handoffForQuit()
     }
 
     func beginUninstallFlow() {
@@ -3913,6 +3973,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         timer.schedule(deadline: .now() + 2.0, repeating: 2.0)
         timer.setEventHandler { [weak self] in
             guard let self else { return }
+            let fanPower = CommandExecutor.shared.fanPower.snapshot
+            guard fanPower.permitsWrites else { return }
             let config = ConfigManager.shared.loadConfig()
             let curve = MenuBarManager.shared.currentFanCurve
             let isAutoMode = config.mode == "auto"
@@ -3940,6 +4002,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return TemperatureReading(sensor: sensor, value: value)
             }
             let reading = selectedTemperatureReading(from: readings, config: config)
+
+            let fanManager = FanManager.shared
+            if fanManager.controlGeneration != fanPower.generation {
+                let expectedFans = fanManager.fans
+                guard fanPower.acceptsSamples(temperature: bgSnapshot.temperatureSampleStart, fanRPM: bgSnapshot.fanRPMSampleStart),
+                      telemetryState == .fresh, reading != nil,
+                      fanRPMAge <= backgroundTelemetryStaleThreshold,
+                      !expectedFans.isEmpty, expectedFans.allSatisfy({ bgRPMs[$0.index] != nil }),
+                      let actualRPM = bgRPMs.values.max() else {
+                    BackgroundHardwareReader.shared.refresh(sensors: fanManager.availableTemperatureSensors, fans: expectedFans)
+                    return
+                }
+                self.consecutiveMissingTelemetryCount = 0
+                fanManager.prepareToResumeControl(generation: fanPower.generation, actualRPM: actualRPM)
+                AppLog.shared.info("fan sleep: fresh telemetry generation=\(fanPower.generation) mode=\(config.mode) actualRPM=\(actualRPM)")
+            }
 
             ThermalAnomalyAlertService.shared.recordSample(
                 timestamp: Date().timeIntervalSince1970,

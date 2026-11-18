@@ -1,3 +1,4 @@
+#include "power_notifications.h"
 #include <CoreFoundation/CoreFoundation.h>
 
 typedef struct IOReportSubscriptionRef* IOReportSubscriptionRef;
