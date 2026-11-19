@@ -3354,13 +3354,13 @@ class MenuBarManager: NSObject {
         feedbackSurface.borderWidth = 1
         feedbackSurface.cornerRadius = 9
         feedbackSurface.borderColor = .separatorColor
-        feedbackSurface.fillColor = NSColor.labelColor.withAlphaComponent(0.045)
+        feedbackSurface.fillColor = NativeInterface.labelColor(alpha: 0.045)
         feedbackSurface.setAccessibilityElement(false)
         feedbackContainer.addSubview(feedbackSurface)
 
         let feedbackField = NativeInterface.label(
             appL10n("找作者聊聊，随便说两句...", "Just say anything..."),
-            color: NSColor.labelColor.withAlphaComponent(0.72),
+            color: NativeInterface.labelColor(alpha: 0.72),
             wrapping: true
         )
         feedbackField.identifier = NSUserInterfaceItemIdentifier("feedback-invitation")

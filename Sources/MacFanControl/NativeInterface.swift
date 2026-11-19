@@ -3,6 +3,18 @@ import AppKit
 /// A shared scale for this menu-bar utility. Navigation inherits native materials;
 /// content uses quiet system colors and compact, readable controls.
 @MainActor enum NativeInterface {
+    static func labelColor(alpha: CGFloat) -> NSColor {
+        // Applying opacity to a system color resolves it in the current appearance.
+        // Defer that step until AppKit draws the control in its own appearance.
+        NSColor(name: nil) { appearance in
+            var color: NSColor = .labelColor
+            appearance.performAsCurrentDrawingAppearance {
+                color = NSColor.labelColor.withAlphaComponent(alpha)
+            }
+            return color
+        }
+    }
+
     static func label(_ text: String, size: CGFloat = 13, weight: NSFont.Weight = .regular,
                       color: NSColor = .labelColor, wrapping: Bool = false) -> NSTextField {
         let field = wrapping ? NSTextField(wrappingLabelWithString: text) : NSTextField(labelWithString: text)
