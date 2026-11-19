@@ -1,0 +1,91 @@
+{
+  "staged_at": "2026-11-19T01:40:15.485Z",
+  "previous_deployment": "779429c7-8c72-4c20-ae7b-58cc4ad08e08",
+  "stable_build": 87,
+  "beta_feed_build": 87,
+  "legacy_build": 52,
+  "changed_existing_assets": [
+    "/update-manifest-pkg.json",
+    "/iFanControl-macOS.pkg",
+    "/update-manifest-beta.json",
+    "/update-manifest-stable-restore.json",
+    "/timeline.json"
+  ],
+  "added_assets": [
+    "/iFanControl-3.0.2-87.pkg",
+    "/iFanControl-stable-restore-3.0.2-87-b77f894c55dc.pkg"
+  ],
+  "preserved_existing_assets": 91,
+  "package_sha256": "b77f894c55dcf5d61edecc2bfefd82c5de1589e666e97036c80d63f920cf4857",
+  "restore_manifest": {
+    "latest_version": "3.0.2",
+    "latest_build": 87,
+    "release_channel": "stable",
+    "published_at": "2026-11-19T01:40:15.836489+00:00",
+    "stable_package_sha256": "b77f894c55dcf5d61edecc2bfefd82c5de1589e666e97036c80d63f920cf4857",
+    "assets": {
+      "macos_arm64_pkg_url": "https://ifan-59w.pages.dev/iFanControl-stable-restore-3.0.2-87-b77f894c55dc.pkg",
+      "pkg_sha256": "b1ae145fc1d967091ff1f57d96e2f6a35fbff63bc2a4a3c9d801d719863b0772"
+    }
+  },
+  "worker_change": "Only the /download redirect target changed from build 74 to build 87",
+  "version": "3.0.2",
+  "build": 87,
+  "channel": "stable",
+  "from_build": 86,
+  "from_tag": "v3.0.2-beta.86",
+  "source_commit": "058126f33728fac44c2be15fc59632837811ea13",
+  "beta_source_commit": "6d6acc18d039dbeec39507fccbfc183b12343163",
+  "beta_pkg_sha256": "93ff958bbb43fe4be7955a28e04240839c4c30c3f3a7a72387ccf0c0de1dfe8e",
+  "unsigned_executable_sha256": "b8acd32c7bd278a346a3601cc694608b5afe957302a03237dfc1d4490f9cf061",
+  "executable_sha256": "b11ba9e27fa3aaced2ab3704d09d2bb22fe778f2a6a4096132ffde521aee16d3",
+  "kentsmc_sha256": "56b9b4f7239b4b043b8b69c92ed23f184eaf55a6b7d67c419d899da3a7254605",
+  "application_recompiled": false,
+  "changed_bundle_files": [
+    "Contents/Info.plist",
+    "Contents/MacOS/iFanControl"
+  ],
+  "minimum_os": "15.0",
+  "deployment": "984c75f8-d703-41e3-bd7f-7d2046c780c5",
+  "deployed_at": "2026-11-19T01:42:31.753207Z",
+  "github_release": "https://github.com/PureMilkchun/iFanControl/releases/tag/v3.0.2",
+  "github_published_at": "2026-11-19T01:42:23Z",
+  "source_tag": "v3.0.2",
+  "origins": [
+    {
+      "origin": "https://ifan-59w.pages.dev",
+      "stable_build": 87,
+      "beta_feed_build": 87,
+      "beta_feed_channel": "stable",
+      "download_build": 87,
+      "package_sha256": "b77f894c55dcf5d61edecc2bfefd82c5de1589e666e97036c80d63f920cf4857",
+      "stable_restore_build": 87,
+      "legacy_protection_verified": true
+    },
+    {
+      "origin": "https://ifancontrol.puremilkchun.top",
+      "stable_build": 87,
+      "beta_feed_build": 87,
+      "beta_feed_channel": "stable",
+      "download_build": 87,
+      "package_sha256": "b77f894c55dcf5d61edecc2bfefd82c5de1589e666e97036c80d63f920cf4857",
+      "stable_restore_build": 87,
+      "legacy_protection_verified": true
+    }
+  ],
+  "legacy_zip_hashes_preserved": true,
+  "actual_installation_performed": false,
+  "github_attachments_match_package": true,
+  "runtime_bindings_preserved": true,
+  "timeline_visually_verified_on_desktop_and_mobile": true,
+  "beta86_hardware_validation": {
+    "model": "Mac mini M4",
+    "macos": "27.0.1",
+    "manual_sleep_passed": true,
+    "idle_sleep_passed": true
+  },
+  "timeline_preview_sha256": {
+    "timeline-desktop.png": "540b40f9c9aeb0d18d6b658a57d533d6be0f1cfda67ff20ab43047ba838fb775",
+    "timeline-mobile.png": "4d44606e7e8a0cef2bdd8fd49dd4bf3e40ba4aca702656122cdbb032188d1abe"
+  }
+}
