@@ -835,6 +835,58 @@ final class AppLog: @unchecked Sendable {
         return zipURL
     }
 
+    enum FeedbackArchiveError: Error {
+        case noLogs, compressionFailed, tooLarge
+    }
+
+    // This attachment is narrower than the manual diagnostic export.
+    func createFeedbackArchive() throws -> Data {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fm.createDirectory(at: root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        defer { try? fm.removeItem(at: root) }
+
+        let snapshots = try queue.sync {
+            try [archivedLogFileURL, logFileURL].compactMap { url -> (name: String, data: Data)? in
+                guard fm.fileExists(atPath: url.path) else { return nil }
+                let attributes = try fm.attributesOfItem(atPath: url.path)
+                guard attributes[.type] as? FileAttributeType == .typeRegular,
+                      let size = attributes[.size] as? NSNumber, size.intValue > 0 else { return nil }
+                guard size.intValue <= maxLogSizeBytes + 64 * 1024 else { throw FeedbackArchiveError.tooLarge }
+                return (url.lastPathComponent, try Data(contentsOf: url))
+            }
+        }
+        guard !snapshots.isEmpty else { throw FeedbackArchiveError.noLogs }
+        let home = fm.homeDirectoryForCurrentUser.path
+        for snapshot in snapshots {
+            let contents = String(decoding: snapshot.data, as: UTF8.self)
+                .replacingOccurrences(of: home + "/", with: "~/")
+            try contents.write(to: root.appendingPathComponent(snapshot.name), atomically: true, encoding: .utf8)
+        }
+
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+        let summary = """
+        app_version=\(shortVersion) (\(buildVersion))
+        os=\(ProcessInfo.processInfo.operatingSystemVersionString)
+        model=\(systemModelIdentifier)
+        """
+        try summary.write(to: root.appendingPathComponent("summary.txt"), atomically: true, encoding: .utf8)
+
+        let archive = root.appendingPathComponent("diagnostics.zip")
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        process.currentDirectoryURL = root
+        process.arguments = ["-q", "-X", archive.lastPathComponent, "summary.txt"] + snapshots.map(\.name)
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { throw FeedbackArchiveError.compressionFailed }
+        let size = try archive.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        guard size > 0 else { throw FeedbackArchiveError.compressionFailed }
+        guard size <= 2 * 1024 * 1024 else { throw FeedbackArchiveError.tooLarge }
+        return try Data(contentsOf: archive)
+    }
+
     private func preferredExportDirectory() -> URL {
         let desktop = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop", isDirectory: true)
         if (try? FileManager.default.createDirectory(at: desktop, withIntermediateDirectories: true)) != nil {
@@ -4993,12 +5045,13 @@ class FeedbackWindowController: NSWindowController {
     private var closeAfterSuccess: DispatchWorkItem?
     private var contentTextView: NSTextView?
     private var emailField: NSTextField?
+    private var diagnosticsCheckbox: NSButton?
     private var sendButton: NSButton?
     private var statusLabel: NSTextField?
 
     init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 320),
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 370),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -5021,6 +5074,8 @@ class FeedbackWindowController: NSWindowController {
             closeAfterSuccess?.cancel()
             closeAfterSuccess = nil
             contentTextView?.string = ""
+            diagnosticsCheckbox?.state = .off
+            diagnosticsCheckbox?.isEnabled = true
             sendButton?.isEnabled = true
             sendButton?.title = appL10n("发送", "Send")
             statusLabel?.alphaValue = 0
@@ -5070,6 +5125,22 @@ class FeedbackWindowController: NSWindowController {
         contentView.addSubview(emailField)
         self.emailField = emailField
 
+        let diagnosticsCheckbox = NSButton(checkboxWithTitle: appL10n("附带诊断日志", "Attach diagnostic logs"), target: nil, action: nil)
+        diagnosticsCheckbox.state = .off
+        diagnosticsCheckbox.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(diagnosticsCheckbox)
+        self.diagnosticsCheckbox = diagnosticsCheckbox
+
+        let diagnosticsHint = NSTextField(wrappingLabelWithString: appL10n(
+            "会发送近期应用日志、机型和 macOS 版本，帮助排查问题。",
+            "Shares recent app logs, your Mac model and macOS version to help diagnose the issue."
+        ))
+        diagnosticsHint.font = .systemFont(ofSize: 12)
+        diagnosticsHint.textColor = .secondaryLabelColor
+        diagnosticsHint.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(diagnosticsHint)
+        diagnosticsCheckbox.setAccessibilityHelp(diagnosticsHint.stringValue)
+
         // 发送按钮
         let sendButton = NSButton(title: appL10n("发送", "Send"), target: self, action: #selector(sendFeedback))
         sendButton.bezelStyle = .rounded
@@ -5095,6 +5166,13 @@ class FeedbackWindowController: NSWindowController {
         contentView.addSubview(statusLabel)
         self.statusLabel = statusLabel
 
+        window?.initialFirstResponder = textView
+        textView.nextKeyView = emailField
+        emailField.nextKeyView = diagnosticsCheckbox
+        diagnosticsCheckbox.nextKeyView = cancelButton
+        cancelButton.nextKeyView = sendButton
+        sendButton.nextKeyView = textView
+
         NSLayoutConstraint.activate([
             hintLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 16),
             hintLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
@@ -5105,7 +5183,7 @@ class FeedbackWindowController: NSWindowController {
             scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             scrollView.heightAnchor.constraint(equalToConstant: 120),
 
-            emailLabel.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 12),
+            emailLabel.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 14),
             emailLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
 
             emailField.topAnchor.constraint(equalTo: emailLabel.bottomAnchor, constant: 4),
@@ -5113,23 +5191,30 @@ class FeedbackWindowController: NSWindowController {
             emailField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             emailField.heightAnchor.constraint(equalToConstant: 24),
 
-            statusLabel.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 6),
-            statusLabel.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-            statusLabel.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            diagnosticsCheckbox.topAnchor.constraint(equalTo: emailField.bottomAnchor, constant: 14),
+            diagnosticsCheckbox.leadingAnchor.constraint(equalTo: emailField.leadingAnchor),
+            diagnosticsHint.topAnchor.constraint(equalTo: diagnosticsCheckbox.bottomAnchor, constant: 4),
+            diagnosticsHint.leadingAnchor.constraint(equalTo: diagnosticsCheckbox.leadingAnchor, constant: 20),
+            diagnosticsHint.trailingAnchor.constraint(equalTo: emailField.trailingAnchor),
 
-            sendButton.topAnchor.constraint(equalTo: emailField.bottomAnchor, constant: 16),
+            statusLabel.topAnchor.constraint(equalTo: diagnosticsHint.bottomAnchor, constant: 9),
+            statusLabel.leadingAnchor.constraint(equalTo: emailField.leadingAnchor),
+            statusLabel.trailingAnchor.constraint(equalTo: emailField.trailingAnchor),
+
+            sendButton.topAnchor.constraint(greaterThanOrEqualTo: statusLabel.bottomAnchor, constant: 8),
             sendButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             cancelButton.trailingAnchor.constraint(equalTo: sendButton.leadingAnchor, constant: -8),
             cancelButton.centerYAnchor.constraint(equalTo: sendButton.centerYAnchor),
             shortcut.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             shortcut.centerYAnchor.constraint(equalTo: sendButton.centerYAnchor),
-            sendButton.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -16),
+            sendButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -16),
         ])
     }
 
     @objc private func closeFeedbackWindow() { window?.close() }
 
     @objc private func sendFeedback() {
+        guard sendButton?.isEnabled == true else { return }
         let content = contentTextView?.string.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !content.isEmpty else {
             showStatus(appL10n("请输入内容", "Please enter something"), isError: true)
@@ -5142,14 +5227,16 @@ class FeedbackWindowController: NSWindowController {
         }
 
         let email = emailField?.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let attachDiagnostics = diagnosticsCheckbox?.state == .on
 
         sendButton?.isEnabled = false
+        diagnosticsCheckbox?.isEnabled = false
         sendButton?.title = appL10n("发送中...", "Sending...")
         statusLabel?.alphaValue = 0
 
         Task { [self] in
-            let success = await FeedbackService.shared.sendFeedback(content: content, email: email)
-            if success {
+            let outcome = await FeedbackService.shared.sendFeedback(content: content, email: email, attachDiagnostics: attachDiagnostics)
+            if outcome == .sent {
                 submittedSuccessfully = true
                 sendButton?.title = appL10n("已送达", "Delivered")
                 showStatus(email.isEmpty ? appL10n("✓ 收到啦，感谢你的反馈！", "✓ Received. Thanks for your feedback!") : appL10n("✓ 收到啦，我会通过邮箱回复你。", "✓ Received. I'll reply by email."), isError: false)
@@ -5159,8 +5246,18 @@ class FeedbackWindowController: NSWindowController {
                 closeAfterSuccess = close
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: close)
             } else {
-                showStatus(appL10n("发送失败，请稍后再试", "Failed, please try later"), isError: true)
+                let message: String
+                switch outcome {
+                case .archiveFailed:
+                    message = appL10n("无法打包日志。可取消勾选后仅发送反馈。", "Couldn’t prepare logs. Uncheck the option to send feedback alone.")
+                case .notSent where attachDiagnostics:
+                    message = appL10n("未确认日志送达，请稍后重试。", "Couldn’t confirm log delivery. Please try again later.")
+                default:
+                    message = appL10n("发送失败，请稍后再试", "Failed, please try later")
+                }
+                showStatus(message, isError: true)
                 sendButton?.isEnabled = true
+                diagnosticsCheckbox?.isEnabled = true
                 sendButton?.title = appL10n("发送", "Send")
             }
         }
@@ -5177,6 +5274,7 @@ final class FeedbackService: @unchecked Sendable {
     static let shared = FeedbackService()
 
     private let endpointURL = URL(string: "https://ifan-59w.pages.dev/api/feedback")!
+    private let diagnosticsEndpointURL = URL(string: "https://ifan-59w.pages.dev/api/feedback-with-diagnostics")!
     private let timestampsKey = "ifancontrol.feedback.send_timestamps"
     private let maxPerHour = 5
 
@@ -5199,37 +5297,55 @@ final class FeedbackService: @unchecked Sendable {
         UserDefaults.standard.set(timestamps, forKey: timestampsKey)
     }
 
-    func sendFeedback(content: String, email: String) async -> Bool {
-        guard canSend() else { return false }
+    enum Outcome { case sent, notSent, archiveFailed }
+
+    func sendFeedback(content: String, email: String, attachDiagnostics: Bool) async -> Outcome {
+        guard canSend() else { return .notSent }
 
         let installID = PrivacyStatsService.shared.currentInstallID()
         let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
         let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
 
-        let payload: [String: Any] = [
+        var payload: [String: Any] = [
             "install_id": installID,
             "content": content,
             "email": email,
             "version": shortVersion,
             "build": buildVersion,
         ]
+        if attachDiagnostics {
+            do {
+                let archive = try await Task.detached(priority: .utility) {
+                    try AppLog.shared.createFeedbackArchive()
+                }.value
+                payload["diagnostic_zip"] = archive.base64EncodedString()
+            } catch {
+                return .archiveFailed
+            }
+        }
 
         do {
-            var request = URLRequest(url: endpointURL)
+            var request = URLRequest(url: attachDiagnostics ? diagnosticsEndpointURL : endpointURL)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.timeoutInterval = 8
+            request.timeoutInterval = attachDiagnostics ? 30 : 8
 
-            let body = try JSONSerialization.data(withJSONObject: payload)
-            let (_, response) = try await URLSession.shared.upload(for: request, from: body)
+            let body = try JSONSerialization.data(withJSONObject: payload, options: .withoutEscapingSlashes)
+            let (data, response) = try await URLSession.shared.upload(for: request, from: body)
 
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                return false
+                return .notSent
+            }
+            if attachDiagnostics {
+                guard let receipt = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      receipt["ok"] as? Bool == true, receipt["diagnostic_attached"] as? Bool == true else {
+                    return .notSent
+                }
             }
             recordSend()
-            return true
+            return .sent
         } catch {
-            return false
+            return .notSent
         }
     }
 }
