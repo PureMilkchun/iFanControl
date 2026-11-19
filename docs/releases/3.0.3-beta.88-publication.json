@@ -1,0 +1,65 @@
+{
+  "version": "3.0.3",
+  "build": 88,
+  "release_channel": "beta",
+  "stable_build": 87,
+  "legacy_build": 52,
+  "package_sha256": "fab7efb24dd8648861401e007c267d4eafa5519e543c5762b5e9cf5402960f15",
+  "deployment": "22474069-5ad7-4439-96eb-753cbe8d841b",
+  "deployed_at": "2026-11-19T15:42:21.997998Z",
+  "previous_site_deployment": "984c75f8-d703-41e3-bd7f-7d2046c780c5",
+  "beta_only": true,
+  "unchanged_assets": 97,
+  "runtime_preserved": true,
+  "stable_restore": {
+    "latest_version": "3.0.2",
+    "latest_build": 87,
+    "release_channel": "stable",
+    "published_at": "2026-11-19T01:40:15.836489+00:00",
+    "stable_package_sha256": "b77f894c55dcf5d61edecc2bfefd82c5de1589e666e97036c80d63f920cf4857",
+    "assets": {
+      "macos_arm64_pkg_url": "https://ifan-59w.pages.dev/iFanControl-stable-restore-3.0.2-87-b77f894c55dc.pkg",
+      "pkg_sha256": "b1ae145fc1d967091ff1f57d96e2f6a35fbff63bc2a4a3c9d801d719863b0772"
+    }
+  },
+  "installer_preflight_passed": true,
+  "stable_restore_assets_unchanged": true,
+  "native_feedback_invitation_verified": true,
+  "agent_installed_app": false,
+  "actual_downgrade_tested": false,
+  "origins": [
+    {
+      "origin": "https://ifan-59w.pages.dev",
+      "stable_build": 87,
+      "beta_build": 88,
+      "sha256": "fab7efb24dd8648861401e007c267d4eafa5519e543c5762b5e9cf5402960f15",
+      "legacy_protection_verified": true
+    },
+    {
+      "origin": "https://ifancontrol.puremilkchun.top",
+      "stable_build": 87,
+      "beta_build": 88,
+      "sha256": "fab7efb24dd8648861401e007c267d4eafa5519e543c5762b5e9cf5402960f15",
+      "legacy_protection_verified": true
+    }
+  ],
+  "source_commit": "ea905c2f298024d3283b1153e563de42e207358f",
+  "source_branch": "codex/beta-88",
+  "stable_base_commit": "568685e72a304da470a19363bfa9b043fbcad224",
+  "changed_source_files": [
+    "Sources/MacFanControl/main.swift",
+    "Sources/MacFanControl/NativeInterface.swift"
+  ],
+  "app_source_sha256": {
+    "Sources/MacFanControl/main.swift": "d5d810398de82f3f873cc17c9a61d3fb79432445c5fdf2a61558d2cde24dbbc7",
+    "Sources/MacFanControl/NativeInterface.swift": "03b80d0e66010ee11b942f0a15af4e8dfddc44647efd89359489b42af0b357b5"
+  },
+  "executable_sha256": "6502b8ee0e93f6015a4bc0fe63d21717633d202f7c5bd250127575f3b296d6fb",
+  "source_tag": "v3.0.3-beta.88",
+  "update_regressions_passed": true,
+  "menu_appearance_switch_verified": true,
+  "feedback_preview_sha256": {
+    "feedback-dark.png": "a609b552f4ec88298df47e2454366b501880038aeee5b5047821e5c02a00075c",
+    "feedback-light.png": "0fb31262943f9be18bf7dc3e8af132f640078359b228f515dd248d44a2aa2a57"
+  }
+}
