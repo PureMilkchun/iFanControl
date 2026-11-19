@@ -1,0 +1,64 @@
+{
+  "version": "3.0.2",
+  "build": 86,
+  "release_channel": "beta",
+  "stable_build": 74,
+  "legacy_build": 52,
+  "package_sha256": "93ff958bbb43fe4be7955a28e04240839c4c30c3f3a7a72387ccf0c0de1dfe8e",
+  "deployment": "779429c7-8c72-4c20-ae7b-58cc4ad08e08",
+  "deployed_at": "2026-11-19T01:17:57.214112Z",
+  "previous_site_deployment": "5042942c-aa22-4b2d-92fd-752c565f6808",
+  "beta_only": true,
+  "unchanged_assets": 94,
+  "runtime_preserved": true,
+  "stable_restore": {
+    "latest_version": "3.0.1",
+    "latest_build": 74,
+    "release_channel": "stable",
+    "published_at": "2026-11-18T02:12:05.071597+00:00",
+    "stable_package_sha256": "0e40df3e73569afdce2f44522000e84b98968f31080e2d5e6fda2b297d7de085",
+    "assets": {
+      "macos_arm64_pkg_url": "https://ifan-59w.pages.dev/iFanControl-stable-restore-3.0.1-74-0e40df3e7356.pkg",
+      "pkg_sha256": "0efe33bba1367b287d35bdc758a3b1c69b485ba059d87230e3e8ba126e73f798"
+    }
+  },
+  "installer_preflight_passed": true,
+  "stable_restore_assets_unchanged": true,
+  "native_feedback_invitation_verified": true,
+  "agent_installed_app": false,
+  "actual_downgrade_tested": false,
+  "origins": [
+    {
+      "origin": "https://ifan-59w.pages.dev",
+      "stable_build": 74,
+      "beta_build": 86,
+      "sha256": "93ff958bbb43fe4be7955a28e04240839c4c30c3f3a7a72387ccf0c0de1dfe8e",
+      "legacy_protection_verified": true
+    },
+    {
+      "origin": "https://ifancontrol.puremilkchun.top",
+      "stable_build": 74,
+      "beta_build": 86,
+      "sha256": "93ff958bbb43fe4be7955a28e04240839c4c30c3f3a7a72387ccf0c0de1dfe8e",
+      "legacy_protection_verified": true
+    }
+  ],
+  "prior_beta_source_commit": "c209900632b7d8c2bab7e9f267c439725e35e9ec",
+  "source_commit": "6d6acc18d039dbeec39507fccbfc183b12343163",
+  "source_branch": "codex/beta-86",
+  "prior_beta_main_sha256": "af4104f276d73e8414678994cae1b193e19fd0f295a3e34cd9f662a5e57b087c",
+  "changed_source_files": [
+    "Sources/MacFanControl/main.swift"
+  ],
+  "app_source_sha256": {
+    "Sources/MacFanControl/main.swift": "a6b64dcb7ab71327592b0fec16470e72567f35cc4b3481fdb8979076276b7059",
+    "Sources/MacFanControl/UpdateManifest.swift": "398dbc4c7c841c8ca3c8ccba58f9a761f21468ca37e0393597f0e87299ce38cd",
+    "Sources/MacFanControl/UpdatePreferences.swift": "dc2ca7248821b63b8062b2dbb3749b42f897f5c53e22ee1ed8c1defa3d6027f3",
+    "Sources/MacFanControl/SystemSleepMonitor.swift": "c29d46d9a7bcb73caa2e4e56c98f0f6dfcd97003c8ed322ca3cbd4b18b5cb525",
+    "packaging/pkg/build_stable_restore.py": "0ef02b4459470632466dca3686bc04fed128606b4380de2ee0c99a4feacf4a63"
+  },
+  "source_tag": "v3.0.2-beta.86",
+  "executable_sha256": "74f2aa7e06c7dda43b4b59c8b2518817dad915c014da8daec5c736ccaacfd0b0",
+  "update_regressions_passed": true,
+  "manual_and_idle_sleep_tested_on_previous_beta_with_same_sleep_code": true
+}
