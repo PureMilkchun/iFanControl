@@ -3346,29 +3346,42 @@ class MenuBarManager: NSObject {
         // Intentional invitation: it looks like a text field to encourage feedback,
         // and opens the dedicated composer rather than editing inside NSMenu.
         let feedbackItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-        let feedbackContainer = NSView(frame: NSRect(x: 0, y: 0, width: 250, height: 76))
-        let feedbackField = NSTextField(frame: NSRect(x: 20, y: 6, width: 210, height: 64))
+        let feedbackContainer = NSView(frame: NSRect(x: 0, y: 0, width: 250, height: 62))
+        let feedbackFrame = NSRect(x: 20, y: 6, width: 210, height: 50)
+        let feedbackSurface = NSBox(frame: feedbackFrame)
+        feedbackSurface.boxType = .custom
+        feedbackSurface.titlePosition = .noTitle
+        feedbackSurface.borderWidth = 1
+        feedbackSurface.cornerRadius = 9
+        feedbackSurface.borderColor = .separatorColor
+        feedbackSurface.fillColor = NSColor.labelColor.withAlphaComponent(0.045)
+        feedbackSurface.setAccessibilityElement(false)
+        feedbackContainer.addSubview(feedbackSurface)
+
+        let feedbackField = NativeInterface.label(
+            appL10n("找作者聊聊，随便说两句...", "Just say anything..."),
+            color: NSColor.labelColor.withAlphaComponent(0.72),
+            wrapping: true
+        )
         feedbackField.identifier = NSUserInterfaceItemIdentifier("feedback-invitation")
-        feedbackField.isEditable = false
         feedbackField.isSelectable = false
-        feedbackField.isBezeled = true
-        feedbackField.bezelStyle = .roundedBezel
-        feedbackField.font = NSFontManager.shared.convert(.systemFont(ofSize: 13), toHaveTrait: .italicFontMask)
-        feedbackField.textColor = .placeholderTextColor
-        feedbackField.stringValue = appL10n("找作者聊聊，随便说两句...", "Just say anything...")
-        feedbackField.alignment = .left
-        feedbackField.lineBreakMode = .byWordWrapping
+        feedbackField.translatesAutoresizingMaskIntoConstraints = false
         feedbackField.maximumNumberOfLines = 2
+        feedbackField.setAccessibilityElement(false)
         feedbackContainer.addSubview(feedbackField)
+        NSLayoutConstraint.activate([
+            feedbackField.leadingAnchor.constraint(equalTo: feedbackSurface.leadingAnchor, constant: 10),
+            feedbackField.trailingAnchor.constraint(equalTo: feedbackSurface.trailingAnchor, constant: -10),
+            feedbackField.centerYAnchor.constraint(equalTo: feedbackSurface.centerYAnchor)
+        ])
         // Native button hit testing also works during NSMenu tracking. Keep the
         // inviting text-field appearance while making its entire area clickable.
         let feedbackButton = NSButton(title: "", target: self, action: #selector(showFeedback))
-        feedbackButton.frame = feedbackField.frame
+        feedbackButton.frame = feedbackFrame
         feedbackButton.isTransparent = true
         feedbackButton.identifier = NSUserInterfaceItemIdentifier("feedback-invitation-button")
         feedbackButton.setAccessibilityLabel(feedbackField.stringValue)
         feedbackButton.toolTip = appL10n("打开反馈窗口", "Open the feedback window")
-        feedbackField.setAccessibilityElement(false)
         feedbackContainer.addSubview(feedbackButton)
         feedbackItem.view = feedbackContainer
         menu.addItem(feedbackItem)
