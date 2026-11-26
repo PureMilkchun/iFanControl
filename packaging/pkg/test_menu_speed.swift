@@ -44,6 +44,7 @@ extension BackgroundHardwareReader {
 
 @MainActor final class MenuSpeedTest: NSObject, NSMenuDelegate {
     let menu: NSMenu
+    let productionDelegate: (any NSMenuDelegate)?
     let control: MenuSpeedControl
     let slider: NSSlider
     let modes: NSSegmentedControl
@@ -69,6 +70,7 @@ extension BackgroundHardwareReader {
         ControlStatusStore.save(mode: "normal", detail: "Auto / CPU")
         let (menu, control) = MenuBarManager.shared.prepareMenuTest()
         self.menu = menu
+        productionDelegate = menu.delegate
         self.control = control
         slider = control.subviews.compactMap { $0 as? NSSlider }.first!
         modes = control.subviews.first { $0.identifier?.rawValue == "menu-control-mode" } as! NSSegmentedControl
@@ -79,7 +81,12 @@ extension BackgroundHardwareReader {
         menu.appearance = NSAppearance(named: prefix.hasSuffix("dark") ? .darkAqua : .aqua)
     }
 
-    func menuDidClose(_ menu: NSMenu) { closed = true }
+    func menuWillOpen(_ menu: NSMenu) { productionDelegate?.menuWillOpen?(menu) }
+
+    func menuDidClose(_ menu: NSMenu) {
+        productionDelegate?.menuDidClose?(menu)
+        closed = true
+    }
 
     func post(_ type: NSEvent.EventType, view: NSView, fraction: CGFloat) {
         let window = view.window!
@@ -113,6 +120,9 @@ extension BackgroundHardwareReader {
         menuCheck(surface.frame == button.frame, "Feedback hit area must match the box")
         let layout: [String: CGFloat] = ["window_width": window.frame.width, "control_width": control.frame.width, "visible_width": control.visibleRect.width, "menu_width": menu.size.width, "feedback_left": left, "feedback_right": right]
         results["layout_\(scene)"] = layout
+        results["active_\(scene)"] = NSApp.isActive
+        results["accent_\(scene)"] = NSColor.controlAccentColor.usingColorSpace(.sRGB)!.description
+        menuCheck(NSApp.isActive, "Embedded controls need an active native drawing context")
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
         process.arguments = ["-x", "-o", "-l", String(window.windowNumber), output.appendingPathComponent("\(prefix)-\(scene).png").path]
@@ -254,6 +264,9 @@ extension BackgroundHardwareReader {
     }
 
     @objc func run() {
+        let returnToApplication = NSWorkspace.shared.frontmostApplication
+        let startsInactive = ProcessInfo.processInfo.environment["IFAN_MENU_TEST_INACTIVE"] == "1"
+        if startsInactive { menuCheck(!NSApp.isActive, "Inactive test must start in the background") }
         let poll = DispatchSource.makeTimerSource(queue: .main)
         poll.schedule(deadline: .now() + 0.05, repeating: 0.1)
         poll.setEventHandler { [weak self] in
@@ -269,7 +282,11 @@ extension BackgroundHardwareReader {
         menu.popUp(positioning: nil, at: NSPoint(x: screen.midX, y: screen.maxY - 60), in: nil)
         timer.invalidate()
         poll.cancel()
-        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.3))
+        if startsInactive, let returnToApplication {
+            menuCheck(NSWorkspace.shared.frontmostApplication == returnToApplication, "Dismissing the menu must restore the previous app")
+            results["previous_app_focus_restored"] = true
+        }
         menuCheck(phase >= 22 && closed, "End of tracking: phase=\(phase), closed=\(closed)")
         menuCheck(mainQueueTicks > 0, "Main-queue polling must continue during menu tracking")
         results["main_queue_timer_ticks_while_menu_open"] = mainQueueTicks
@@ -287,7 +304,11 @@ extension BackgroundHardwareReader {
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 let test = MenuSpeedTest()
-NSApp.activate(ignoringOtherApps: true)
+if ProcessInfo.processInfo.environment["IFAN_MENU_TEST_INACTIVE"] == "1" {
+    NSApp.deactivate()
+} else {
+    NSApp.activate(ignoringOtherApps: true)
+}
 // AppKit opens status menus from event dispatch, not inside a main-queue block.
 // A nested menu inside DispatchQueue.main.async would itself block main-queue
 // polling and give a false result for the production presentation path.

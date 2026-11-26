@@ -23,6 +23,8 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--output', type=Path, required=True)
 parser.add_argument('--case', choices=['zh-light', 'zh-dark', 'en-light', 'en-dark'])
 parser.add_argument('--built-app', type=Path, help='Require matching SDK and deployment target with the packaged App')
+parser.add_argument('--inactive', action='store_true', help='Open from a background app and verify focus restoration')
+parser.add_argument('--accent', type=int, choices=[-1, 0, 4, 5], help='Isolated process accent override: graphite, red, blue or purple')
 args = parser.parse_args()
 target = None
 compiler_flags = []
@@ -71,7 +73,8 @@ with tempfile.TemporaryDirectory(prefix='ifan-menu-speed-') as temp:
     fixture_version = verify_linked_sdk(app / 'Contents/MacOS/MenuSpeedTests', sdk_version)
     cases = [tuple(args.case.split('-'))] if args.case else [('zh', 'light'), ('zh', 'dark'), ('en', 'light'), ('en', 'dark')]
     for language, theme in cases:
-        subprocess.run([str(app / 'Contents/MacOS/MenuSpeedTests'), '-ifancontrol.ui.language', language], env={**os.environ, 'IFAN_MENU_TEST_OUTPUT': str(output), 'IFAN_MENU_TEST_THEME': theme}, check=True, timeout=20)
+        accent_flags = ['-AppleAccentColor', str(args.accent)] if args.accent is not None else []
+        subprocess.run([str(app / 'Contents/MacOS/MenuSpeedTests'), '-ifancontrol.ui.language', language, *accent_flags], env={**os.environ, 'IFAN_MENU_TEST_OUTPUT': str(output), 'IFAN_MENU_TEST_THEME': theme, 'IFAN_MENU_TEST_INACTIVE': '1' if args.inactive else '0'}, check=True, timeout=20)
         result_path = output / f'{language}-{theme}-results.json'
         result = json.loads(result_path.read_text())
         result['fixture_build_version'] = fixture_version

@@ -2908,6 +2908,7 @@ class MenuBarManager: NSObject {
 
     // 菜单项引用（用于原地更新，避免每 2 秒重建整个菜单）
     private var menu: NSMenu?
+    private let menuActivation = MenuActivation()
     private var hardwareItem: NSMenuItem?
     private var currentSensorItem: NSMenuItem?
     private var controlStatusItem: NSMenuItem?
@@ -3176,6 +3177,7 @@ class MenuBarManager: NSObject {
         let readings = FanManager.shared.availableTemperatureReadings()
 
         let menu = NSMenu()
+        menu.delegate = menuActivation
         menu.minimumWidth = 280
 
         // 硬件信息
