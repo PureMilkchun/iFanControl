@@ -37,7 +37,8 @@
     "packaging/pkg/scripts/preinstall": "40b9a82c8f6d015a47d30616567f71ee920da5ff52ad92ffb2a8fb8d502b31aa",
     "packaging/pkg/test_menu_speed.py": "f5575fd448af2ad12a16857b67cabc4ee651d0add6a0262a2ba38c0e0da8bb40",
     "packaging/pkg/test_menu_speed.swift": "ba13bd951053bdf10944c19801bebe34cf88496ac9c85887c687a5e096e074a1",
-    "scripts/build_app.py": "236d228ecac55e2872ad6a9ddf9c79f80e5f065a8bfd6aa5c97eeaf31ad02f35"
+    "scripts/build_app.py": "236d228ecac55e2872ad6a9ddf9c79f80e5f065a8bfd6aa5c97eeaf31ad02f35",
+    "packaging/pkg/test_packaged_brand.py": "efdb2dcbad83c03d63c866fc6c13fe7b307749e51d4b3ab1f802c01ef0495d05"
   },
   "changes": [
     "Preserve actual linked SDK27.0 in the release executable so native AppKit controls use the same refreshed appearance and glass drag feedback as the preview.",
@@ -53,7 +54,8 @@
     "Native release App build with actual SDK check and ad-hoc signing.",
     "Menu fixture --built-app compiles to matching SDK/deployment target; native interaction and visual verification.",
     "Final PKG payload executable SDK, metadata, hashes/signatures, scripts, config exclusion and Installer preflight.",
-    "Online real updater manifest/PKG validation and stable/legacy/runtime preservation."
+    "Online real updater manifest/PKG validation and stable/legacy/runtime preservation.",
+    "Real packaged brand views load while the SwiftPM development resource fallback is disabled."
   ],
   "provenance": "Inputs hashed from the reviewed isolated worktree. The executable embeds no Git commit; the release tag records exact source inputs. No application installation by assistant.",
   "beta_base_commit": "ee39cc2",
