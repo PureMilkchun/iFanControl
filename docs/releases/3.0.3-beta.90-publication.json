@@ -1,0 +1,74 @@
+{
+  "version": "3.0.3",
+  "build": 90,
+  "release_channel": "beta",
+  "stable_build": 89,
+  "legacy_build": 52,
+  "package_sha256": "97338454d4740a11f703c1f7152d391f41e6cf962c12bb28f02ca3acb6cc1f39",
+  "deployment": "d9034089-5584-47f5-a7b0-6469df85a8c6",
+  "deployed_at": "2026-11-26T15:52:06.791666Z",
+  "previous_site_deployment": "04f51cee-09fd-42f8-ac79-b2c7911e77e2",
+  "beta_only": true,
+  "unchanged_assets": 100,
+  "runtime_preserved": true,
+  "stable_restore": {
+    "latest_version": "3.0.3",
+    "latest_build": 89,
+    "release_channel": "stable",
+    "published_at": "2026-11-19T16:05:00.388986+00:00",
+    "stable_package_sha256": "9e3b33481fc956c6a6ff5fa95ff88c89090ea344cd53c169598badab8778458d",
+    "assets": {
+      "macos_arm64_pkg_url": "https://ifan-59w.pages.dev/iFanControl-stable-restore-3.0.3-89-9e3b33481fc9.pkg",
+      "pkg_sha256": "0acea8decd84b1cdaf3d1fe76f1cb917432b1d888059e671a83841f88a000a80"
+    }
+  },
+  "installer_preflight_passed": true,
+  "stable_restore_assets_unchanged": true,
+  "native_feedback_invitation_verified": true,
+  "agent_installed_app": false,
+  "actual_downgrade_tested": false,
+  "origins": [
+    {
+      "origin": "https://ifan-59w.pages.dev",
+      "stable_build": 89,
+      "beta_build": 90,
+      "sha256": "97338454d4740a11f703c1f7152d391f41e6cf962c12bb28f02ca3acb6cc1f39",
+      "legacy_protection_verified": true
+    },
+    {
+      "origin": "https://ifancontrol.puremilkchun.top",
+      "stable_build": 89,
+      "beta_build": 90,
+      "sha256": "97338454d4740a11f703c1f7152d391f41e6cf962c12bb28f02ca3acb6cc1f39",
+      "legacy_protection_verified": true
+    }
+  ],
+  "source_commit": "ee39cc21fd24230a19477ce5ca777670db0d7bde",
+  "source_branch": "codex/beta-90",
+  "stable_base_commit": "5c66f2d24803e4829f7254a39216344f18677300",
+  "changed_source_files": [
+    "Sources/MacFanControl/main.swift",
+    "Sources/MacFanControl/MenuSpeedControl.swift"
+  ],
+  "app_source_sha256": {
+    "Sources/MacFanControl/main.swift": "2a06855a4b25576dabc3828745f50098414f411717b15cfa5bf511dee832d0d8",
+    "Sources/MacFanControl/MenuSpeedControl.swift": "bb5b282e9c2335029220c748a87ea6ade407e2d86ac8ea084128aca886a3ac04"
+  },
+  "language_behavior_unchanged": true,
+  "source_tag": "v3.0.3-beta.90",
+  "update_regressions_passed": true,
+  "native_menu_cases": [
+    "zh-light",
+    "zh-dark",
+    "en-light",
+    "en-dark"
+  ],
+  "language_improvement_deferred": true,
+  "lower_adjustment_control": "Native Use steps / 按档位调节 checkbox",
+  "actual_installation_performed": false,
+  "source_inputs_verified": true,
+  "preview_sha256": {
+    "zh-dark-stepped-confirmed.png": "c3dcd195e61824d76a8ab787d148b2051533fc21a6c702f7dd5272ff2640ca75",
+    "en-light-auto-2800.png": "80e9c763e938395b33b7b487d4c085cdf4a125f60a6d589cd5e9006e97a4d02e"
+  }
+}
