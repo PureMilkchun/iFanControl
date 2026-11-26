@@ -2915,6 +2915,7 @@ class MenuBarManager: NSObject {
     private var controlStatusBottomLeftField: NSTextField?
     private var controlModeField: NSTextField?
     private var modeItem: NSMenuItem?
+    private var menuSpeedControl: MenuSpeedControl?
     private var speedItem: NSMenuItem?
     private var autoStartItem: NSMenuItem?
     private var hottestItem: NSMenuItem?
@@ -3175,6 +3176,7 @@ class MenuBarManager: NSObject {
         let readings = FanManager.shared.availableTemperatureReadings()
 
         let menu = NSMenu()
+        menu.minimumWidth = 280
 
         // 硬件信息
         let hwItem = NSMenuItem(
@@ -3214,6 +3216,12 @@ class MenuBarManager: NSObject {
         // 模式切换
         let modeItem = NSMenuItem(title: "", action: #selector(toggleMode), keyEquivalent: "m")
         modeItem.target = self
+        let speedControl = MenuSpeedControl(language: currentLanguage)
+        speedControl.onModeChanged = { [weak self] automatic in self?.setControlMode(automatic: automatic) }
+        speedControl.onAdjustmentChanged = { [weak self] stepped in self?.setMenuAdjustment(stepped: stepped) }
+        speedControl.onTargetCommitted = { [weak self] rpm in self?.applyMenuSpeed(rpm) ?? false }
+        modeItem.view = speedControl
+        self.menuSpeedControl = speedControl
         menu.addItem(modeItem)
         self.modeItem = modeItem
 
@@ -3221,7 +3229,6 @@ class MenuBarManager: NSObject {
         let spdItem = NSMenuItem(title: appL10n("设置转速...", "Set Speed..."), action: #selector(showSpeedSetting), keyEquivalent: "")
         spdItem.target = self
         spdItem.isHidden = true
-        menu.addItem(spdItem)
         self.speedItem = spdItem
 
         // 温度源子菜单
@@ -3296,10 +3303,12 @@ class MenuBarManager: NSObject {
         powerItem.target = self; menu.addItem(powerItem)
         menu.addItem(NSMenuItem.separator())
 
-        let settingsItem = NSMenuItem(title: appL10n("设置", "Settings"), action: nil, keyEquivalent: "")
+        let settingsItem = NSMenuItem(title: appL10n("更多", "More"), action: nil, keyEquivalent: "")
         let settingsMenu = NSMenu()
         settingsMenu.addItem(hwItem)
         settingsMenu.addItem(NSMenuItem.separator())
+        // Preserve continuous/stepped adjustment options in the existing window.
+        settingsMenu.addItem(spdItem)
         // 安全兜底转速
         let safetyItem = NSMenuItem(title: appL10n("安全兜底转速...", "Safety Floor RPM..."), action: #selector(showSafetyFloorSetting), keyEquivalent: "")
         safetyItem.target = self
@@ -3346,9 +3355,12 @@ class MenuBarManager: NSObject {
         // Intentional invitation: it looks like a text field to encourage feedback,
         // and opens the dedicated composer rather than editing inside NSMenu.
         let feedbackItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-        let feedbackContainer = NSView(frame: NSRect(x: 0, y: 0, width: 250, height: 62))
-        let feedbackFrame = NSRect(x: 20, y: 6, width: 210, height: 50)
+        let feedbackContainer = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 62))
+        feedbackContainer.autoresizingMask = [.width]
+        let feedbackFrame = NSRect(x: 20, y: 6, width: 240, height: 50)
         let feedbackSurface = NSBox(frame: feedbackFrame)
+        feedbackSurface.identifier = NSUserInterfaceItemIdentifier("feedback-invitation-surface")
+        feedbackSurface.translatesAutoresizingMaskIntoConstraints = false
         feedbackSurface.boxType = .custom
         feedbackSurface.titlePosition = .noTitle
         feedbackSurface.borderWidth = 1
@@ -3370,6 +3382,10 @@ class MenuBarManager: NSObject {
         feedbackField.setAccessibilityElement(false)
         feedbackContainer.addSubview(feedbackField)
         NSLayoutConstraint.activate([
+            feedbackSurface.leadingAnchor.constraint(equalTo: feedbackContainer.leadingAnchor, constant: 20),
+            feedbackSurface.trailingAnchor.constraint(equalTo: feedbackContainer.trailingAnchor, constant: -20),
+            feedbackSurface.topAnchor.constraint(equalTo: feedbackContainer.topAnchor, constant: 6),
+            feedbackSurface.bottomAnchor.constraint(equalTo: feedbackContainer.bottomAnchor, constant: -6),
             feedbackField.leadingAnchor.constraint(equalTo: feedbackSurface.leadingAnchor, constant: 10),
             feedbackField.trailingAnchor.constraint(equalTo: feedbackSurface.trailingAnchor, constant: -10),
             feedbackField.centerYAnchor.constraint(equalTo: feedbackSurface.centerYAnchor)
@@ -3378,11 +3394,18 @@ class MenuBarManager: NSObject {
         // inviting text-field appearance while making its entire area clickable.
         let feedbackButton = NSButton(title: "", target: self, action: #selector(showFeedback))
         feedbackButton.frame = feedbackFrame
+        feedbackButton.translatesAutoresizingMaskIntoConstraints = false
         feedbackButton.isTransparent = true
         feedbackButton.identifier = NSUserInterfaceItemIdentifier("feedback-invitation-button")
         feedbackButton.setAccessibilityLabel(feedbackField.stringValue)
         feedbackButton.toolTip = appL10n("打开反馈窗口", "Open the feedback window")
         feedbackContainer.addSubview(feedbackButton)
+        NSLayoutConstraint.activate([
+            feedbackButton.leadingAnchor.constraint(equalTo: feedbackSurface.leadingAnchor),
+            feedbackButton.trailingAnchor.constraint(equalTo: feedbackSurface.trailingAnchor),
+            feedbackButton.topAnchor.constraint(equalTo: feedbackSurface.topAnchor),
+            feedbackButton.bottomAnchor.constraint(equalTo: feedbackSurface.bottomAnchor)
+        ])
         feedbackItem.view = feedbackContainer
         menu.addItem(feedbackItem)
 
@@ -3527,6 +3550,15 @@ class MenuBarManager: NSObject {
 
         // 模式切换
         modeItem?.title = isAutoMode ? appL10n("切换至手动控制", "Switch to Manual Control") : appL10n("切换至自动控制", "Switch to Auto Control")
+        menuSpeedControl?.update(
+            automatic: isAutoMode,
+            actualRPM: displayData.isRPMAvailable ? latestRPM : nil,
+            manualRPM: config.manualRPM,
+            maximumRPM: FanManager.shared.currentMaxRPM,
+            steppedBy: ManualRPMControlMode(storedValue: config.manualRPMControlMode) == .stepped
+                ? max(config.manualRPMStep ?? defaultManualRPMStep, 1) : nil,
+            hasFan: FanManager.shared.fanCount > 0
+        )
 
         // 手动转速项（仅手动模式可见）
         speedItem?.isHidden = isAutoMode
@@ -3631,13 +3663,40 @@ class MenuBarManager: NSObject {
     }
     
     @objc func toggleMode() {
-        isAutoMode = !isAutoMode
+        setControlMode(automatic: !isAutoMode)
+    }
+
+    private func setControlMode(automatic: Bool) {
         let config = ConfigManager.shared.loadConfig()
         var newConfig = config
-        newConfig.mode = isAutoMode ? "auto" : "manual"
-        ConfigManager.shared.saveConfig(newConfig)
+        newConfig.mode = automatic ? "auto" : "manual"
+        guard ConfigManager.shared.saveConfig(newConfig) else {
+            updateDynamicMenuItems()
+            menuSpeedControl?.showSaveFailure()
+            return
+        }
+        isAutoMode = automatic
         logger.info("Control mode switched to \(newConfig.mode, privacy: .public)")
         updateDynamicMenuItems()
+    }
+
+    private func setMenuAdjustment(stepped: Bool) {
+        var config = ConfigManager.shared.loadConfig()
+        guard config.mode == "manual" else { updateDynamicMenuItems(); return }
+        config.manualRPMControlMode = stepped ? ManualRPMControlMode.stepped.rawValue : ManualRPMControlMode.continuous.rawValue
+        config.manualRPMStep = max(config.manualRPMStep ?? defaultManualRPMStep, 1)
+        let saved = ConfigManager.shared.saveConfig(config)
+        updateDynamicMenuItems()
+        if !saved { menuSpeedControl?.showSaveFailure() }
+    }
+
+    private func applyMenuSpeed(_ rpm: Int) -> Bool {
+        var config = ConfigManager.shared.loadConfig()
+        guard config.mode == "manual" else { updateDynamicMenuItems(); return false }
+        config.manualRPM = max(0, min(FanManager.shared.currentMaxRPM, rpm))
+        let saved = ConfigManager.shared.saveConfig(config)
+        updateDynamicMenuItems()
+        return saved
     }
     
     @objc func toggleAutoStart() {

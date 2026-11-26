@@ -1,0 +1,58 @@
+{
+  "version": "3.0.3",
+  "build": 90,
+  "release_channel": "beta",
+  "tag": "v3.0.3-beta.90",
+  "stable_base_commit": "5c66f2d24803e4829f7254a39216344f18677300",
+  "source_hashes": {
+    "Package.swift": "67789c6f7a1f9928dedeeb190ae8adadb03f8f9034d59dd7fc16e6e4d37bac4a",
+    "Sources/FanCurveEditor/FanCurveView.swift": "152d2535b91301b994f900ad39f39395dba5f02ed82a7a478e5590432f4fc628",
+    "Sources/FanCurveEditor/FanCurveWindow.swift": "88531c31050719d848befd9afbfdc39bd0bd04f9e178af1204f458f19035003c",
+    "Sources/IOReportBridge/bridge.c": "8a06e4da0d02bccd33220b67fceb05bd3cb6c5606c224308a9a8e3beea30f98d",
+    "Sources/IOReportBridge/include/bridge.h": "d4ece3c32020bf3ee9bc966cd05555ddd0b3326b1ba98fb2a08e1dda5df3ff71",
+    "Sources/IOReportBridge/include/power_notifications.h": "823abee2994540f3a5879703684675b4df06dc87fc77b3a9928a85d84db17a42",
+    "Sources/MacFanControl/BrandIdentity.swift": "dd4fdd448106f57ceb055107b1ded86608389b738c7496c55a548f1a42e287b2",
+    "Sources/MacFanControl/InteractionNotice.swift": "82865a5ab883fe68e02f28bcc3d896bccebb772321a9975ed2b1d9cff1e85c60",
+    "Sources/MacFanControl/MenuSpeedControl.swift": "bb5b282e9c2335029220c748a87ea6ade407e2d86ac8ea084128aca886a3ac04",
+    "Sources/MacFanControl/MiniDisplayFormatter.swift": "5e63e8f67996a61c4bbfce06426ad9842939daf254bfa68f22522619770d22ef",
+    "Sources/MacFanControl/NativeInterface.swift": "03b80d0e66010ee11b942f0a15af4e8dfddc44647efd89359489b42af0b357b5",
+    "Sources/MacFanControl/Resources/Brand/WordmarkHorizontal.pdf": "1e358b9915b70279bdc851821632a36ac214a49963b8213514f4d584955ad197",
+    "Sources/MacFanControl/Resources/Brand/WordmarkStacked.pdf": "6e6b714ee66e0b2fc29e52716ed156cbd451c038d1622075edce8e45665c2d07",
+    "Sources/MacFanControl/SensorCatalog.swift": "cc56f4afb4c92d5dcb9b5b68fd59bee8641b5c1717a993028997ab3b919aeee8",
+    "Sources/MacFanControl/StartupProgressWindow.swift": "044e674fbc93ed5b337c2b8aa1c854d3bbc8108e18f5e17d089f47d07f86c781",
+    "Sources/MacFanControl/SystemSleepMonitor.swift": "c29d46d9a7bcb73caa2e4e56c98f0f6dfcd97003c8ed322ca3cbd4b18b5cb525",
+    "Sources/MacFanControl/UpdateManifest.swift": "398dbc4c7c841c8ca3c8ccba58f9a761f21468ca37e0393597f0e87299ce38cd",
+    "Sources/MacFanControl/UpdatePackageDownloader.swift": "a17b6c5465311ad4a3a87490c57e1c5a67ce89e1e335b404e023258c93b0ee8f",
+    "Sources/MacFanControl/UpdatePreferences.swift": "dc2ca7248821b63b8062b2dbb3749b42f897f5c53e22ee1ed8c1defa3d6027f3",
+    "Sources/MacFanControl/UpdateProgressWindow.swift": "25bb00e169fb369524118ec5146ecd2ac21eb0cd4169237a531ea57b9e9af501",
+    "Sources/MacFanControl/main.swift": "2a06855a4b25576dabc3828745f50098414f411717b15cfa5bf511dee832d0d8",
+    "icon.png": "b460e15c3834479a771bcc200a7a7622c53a5fd84dd62392bb179cc646b52324",
+    "packaging/app/Info.plist": "370c5fca270eb12558b82c1e0b5f635188dbe27d481da02b38525e95e836b2e2",
+    "packaging/pkg/build.py": "3b8de30bcb554d5ccd54352295991f57d96589dca42aa2da926ede4e7fc8555d",
+    "packaging/pkg/render_open_hint.swift": "77de307946bbbfb608d0d26fedcf94d074271599b8df47aac4419995c3d3d912",
+    "packaging/pkg/render_welcome.swift": "825fdbc16546363db5e0f912b59b35948ee1b3e26ee17e4ec42f930d20e39198",
+    "packaging/pkg/resources/Welcome.json": "ea4b524e0a57a62a28cb5ca374b5d847ba2ed49ac6af38a694fe5f4f3bd725bc",
+    "packaging/pkg/scripts/postinstall": "d254053b6341f7fce5b24816462ba92611cf7bd40ec18b4a019e64cb64934bfa",
+    "packaging/pkg/scripts/preinstall": "40b9a82c8f6d015a47d30616567f71ee920da5ff52ad92ffb2a8fb8d502b31aa",
+    "packaging/pkg/test_menu_speed.py": "67a2ebd5e66091a31c3ce70a2b15631d7de4e524beaecf3c17462a5cdac754da",
+    "packaging/pkg/test_menu_speed.swift": "ba13bd951053bdf10944c19801bebe34cf88496ac9c85887c687a5e096e074a1",
+    "scripts/build_app.py": "0376c2e9d481cb108d8a1028c0512b796f1f1eb125232281d066accde321ea43"
+  },
+  "changes": [
+    "Persistent native menu speed slider; Auto observes actual RPM, Manual previews and commits on release.",
+    "Use steps checkbox shares existing saved continuous/stepped preferences; successful saving shows a small green check next to RPM.",
+    "Centered feedback invitation and More submenu label."
+  ],
+  "language_behavior": "Unchanged; follow-system improvement deferred by explicit user request.",
+  "boundaries": [
+    "Control loop, telemetry, sleep handoff, updater and kentsmc unchanged from stable89.",
+    "Beta-only distribution; stable89 and frozen legacy52 preserved."
+  ],
+  "verification": [
+    "Release App builds and ad-hoc signature verifies.",
+    "Native menu interaction suite and screenshot review; isolated synthetic telemetry, no actual fan control.",
+    "Existing updater regressions pass.",
+    "Native PKG payload hashes, signatures, scripts, minimumOS and config exclusion validated by packager."
+  ],
+  "provenance": "Inputs hashed from the reviewed isolated worktree. The executable embeds no Git commit; the release tag records exact source inputs. No application installation by assistant."
+}
