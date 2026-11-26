@@ -16,6 +16,22 @@ def run(*args):
     subprocess.run([str(a) for a in args], cwd=ROOT, check=True)
 
 
+def macho_build_version(executable):
+    output = subprocess.check_output(['otool', '-l', str(executable)], text=True)
+    match = re.search(r'cmd LC_BUILD_VERSION\s+cmdsize \d+\s+platform \d+\s+minos ([\d.]+)\s+sdk ([\d.]+)', output)
+    if not match:
+        raise SystemExit(f'Missing Mach-O build version: {executable}')
+    return {'minimum_os': match[1], 'sdk': match[2]}
+
+
+def verify_linked_sdk(executable, expected_sdk):
+    version = macho_build_version(executable)
+    components = lambda value: tuple(int(part) for part in (value.split('.') + ['0', '0'])[:3])
+    if components(version['sdk']) != components(expected_sdk):
+        raise SystemExit(f"Refusing mismatched linked SDK {version['sdk']} (expected {expected_sdk}): {executable}")
+    return version
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=ROOT / 'build/iFanControl.app')
@@ -40,8 +56,15 @@ def main():
         info['IFanControlReleaseChannel'] = 'beta'
     elif args.channel == 'stable':
         info.pop('IFanControlReleaseChannel', None)
-    run('swift', 'build', '-c', 'release')
-    bin_path = Path(subprocess.check_output(['swift', 'build', '-c', 'release', '--show-bin-path'], cwd=ROOT, text=True).strip())
+    sdk_path = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path'], text=True).strip()
+    sdk_version = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-version'], text=True).strip()
+    # Swift 6.4's swiftbuild engine records the deployment target as the linked
+    # SDK (13.0 here), which makes AppKit use its pre-Liquid Glass controls.
+    # The native engine preserves the real SDK; check the executable as well.
+    build_command = ['swift', 'build', '-c', 'release', '--build-system', 'native', '--sdk', sdk_path]
+    run(*build_command)
+    bin_path = Path(subprocess.check_output([*build_command, '--show-bin-path'], cwd=ROOT, text=True).strip())
+    build_version = verify_linked_sdk(bin_path / 'MacFanControl', sdk_version)
     if output.exists():
         shutil.rmtree(output)  # Only this generated bundle under build/ is replaced.
     (output / 'Contents/MacOS').mkdir(parents=True)
@@ -56,12 +79,17 @@ def main():
         (output / 'Contents/Info.plist').write_bytes(plistlib.dumps(info))
     run('codesign', '--force', '--sign', '-', output)
     run('codesign', '--verify', '--strict', output)
+    verify_linked_sdk(output / 'Contents/MacOS/iFanControl', sdk_version)
     record = {
         'source_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
         'source_dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True)),
         'version': info['CFBundleShortVersionString'],
         'build': int(info['CFBundleVersion']),
         'channel': info.get('IFanControlReleaseChannel', 'stable'),
+        'build_system': 'native',
+        'sdk_path': sdk_path,
+        'sdk_version': sdk_version,
+        'macho_build_version': build_version,
         'app': str(output.relative_to(ROOT)),
         'executable_sha256': hashlib.sha256((output / 'Contents/MacOS/iFanControl').read_bytes()).hexdigest(),
         'info_plist_sha256': hashlib.sha256((output / 'Contents/Info.plist').read_bytes()).hexdigest(),

@@ -5,10 +5,11 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def compile_test_bridge(out):
+def compile_test_bridge(out, target=None):
     module = out / 'IOReportBridge.modulemap'
     header = ROOT / 'Sources/IOReportBridge/include/bridge.h'
     module.write_text(f'module IOReportBridge {{ header "{header}" export * }}\n')
     obj = out / 'IOReportBridge.o'
-    subprocess.run(['xcrun', 'clang', '-I', str(header.parent), '-c', str(ROOT / 'Sources/IOReportBridge/bridge.c'), '-o', str(obj)], check=True)
+    target_flags = ['-target', target] if target else []
+    subprocess.run(['xcrun', 'clang', *target_flags, '-I', str(header.parent), '-c', str(ROOT / 'Sources/IOReportBridge/bridge.c'), '-o', str(obj)], check=True)
     return module, obj
