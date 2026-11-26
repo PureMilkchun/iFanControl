@@ -77,7 +77,10 @@ import AppKit
 
     private static func url(for style: Wordmark) -> URL? {
         #if SWIFT_PACKAGE
-        let bundle = Bundle.module
+        // Native SwiftPM's generated accessor checks beside the executable's
+        // main bundle, while the distributable App stores resources inside it.
+        let packaged = Bundle.main.resourceURL?.appendingPathComponent("MacFanControl_MacFanControl.bundle")
+        let bundle = packaged.flatMap { Bundle(url: $0) } ?? Bundle.module
         #else
         let bundle = Bundle.main
         #endif

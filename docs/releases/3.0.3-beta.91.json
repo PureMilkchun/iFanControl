@@ -11,7 +11,7 @@
     "Sources/IOReportBridge/bridge.c": "8a06e4da0d02bccd33220b67fceb05bd3cb6c5606c224308a9a8e3beea30f98d",
     "Sources/IOReportBridge/include/bridge.h": "d4ece3c32020bf3ee9bc966cd05555ddd0b3326b1ba98fb2a08e1dda5df3ff71",
     "Sources/IOReportBridge/include/power_notifications.h": "823abee2994540f3a5879703684675b4df06dc87fc77b3a9928a85d84db17a42",
-    "Sources/MacFanControl/BrandIdentity.swift": "dd4fdd448106f57ceb055107b1ded86608389b738c7496c55a548f1a42e287b2",
+    "Sources/MacFanControl/BrandIdentity.swift": "103f2bdf07b5ad1421f6c2e43af786f7df98852178f4f06d40fcbb6d6ba3a16a",
     "Sources/MacFanControl/InteractionNotice.swift": "82865a5ab883fe68e02f28bcc3d896bccebb772321a9975ed2b1d9cff1e85c60",
     "Sources/MacFanControl/MenuSpeedControl.swift": "bb5b282e9c2335029220c748a87ea6ade407e2d86ac8ea084128aca886a3ac04",
     "Sources/MacFanControl/MiniDisplayFormatter.swift": "5e63e8f67996a61c4bbfce06426ad9842939daf254bfa68f22522619770d22ef",
@@ -41,7 +41,8 @@
   },
   "changes": [
     "Preserve actual linked SDK27.0 in the release executable so native AppKit controls use the same refreshed appearance and glass drag feedback as the preview.",
-    "Fail a build if the linked SDK differs from the active compiler SDK; verify menu previews against the built App deployment target and SDK."
+    "Fail a build if the linked SDK differs from the active compiler SDK; verify menu previews against the built App deployment target and SDK.",
+    "Resolve the packaged brand bundle before SwiftPM development fallback, keeping resources available on installed copies with the native engine."
   ],
   "language_behavior": "Unchanged; follow-system improvement deferred by explicit user request.",
   "boundaries": [
