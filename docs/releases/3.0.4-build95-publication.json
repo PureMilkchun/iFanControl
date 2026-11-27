@@ -1,0 +1,151 @@
+{
+  "staged_at": "2026-11-27T13:56:20.661Z",
+  "previous_deployment": "6e382ed2-cc28-4f4e-8e34-55f7a7dba2af",
+  "stable_build": 95,
+  "beta_feed_build": 95,
+  "legacy_build": 52,
+  "changed_existing_assets": [
+    "/update-manifest-pkg.json",
+    "/iFanControl-macOS.pkg",
+    "/update-manifest-beta.json",
+    "/update-manifest-stable-restore.json",
+    "/timeline.json",
+    "/index.html"
+  ],
+  "added_assets": [
+    "/iFanControl-3.0.4-95.pkg",
+    "/iFanControl-stable-restore-3.0.4-95-f5f23ed1df40.pkg",
+    "/assets/tour-3-0/menu-3.0.4-zh.webp",
+    "/assets/tour-3-0/menu-3.0.4-en.webp",
+    "/assets/tour-3-0/safety-3.0.4-zh.webp",
+    "/assets/tour-3-0/safety-3.0.4-en.webp"
+  ],
+  "preserved_existing_assets": 100,
+  "package_sha256": "f5f23ed1df409289f65840b53c261e7839586f34f1e57fd78caef749bb69445a",
+  "restore_manifest": {
+    "latest_version": "3.0.4",
+    "latest_build": 95,
+    "release_channel": "stable",
+    "published_at": "2026-11-27T13:56:21.123598+00:00",
+    "stable_package_sha256": "f5f23ed1df409289f65840b53c261e7839586f34f1e57fd78caef749bb69445a",
+    "assets": {
+      "macos_arm64_pkg_url": "https://ifan-59w.pages.dev/iFanControl-stable-restore-3.0.4-95-f5f23ed1df40.pkg",
+      "pkg_sha256": "394ff366423c5f823f7a01a4b03058d2866dde335f54dff4df6b3e679156275e"
+    }
+  },
+  "refreshed_website_images": [
+    "/assets/tour-3-0/menu-3.0.4-zh.webp",
+    "/assets/tour-3-0/menu-3.0.4-en.webp",
+    "/assets/tour-3-0/safety-3.0.4-zh.webp",
+    "/assets/tour-3-0/safety-3.0.4-en.webp"
+  ],
+  "worker_change": "Only the /download redirect target changes from build 89 to build 95",
+  "source_commit": "54ad632ae07de5716ac9e518f55a0607d6d06169",
+  "source_branch": "codex/stable-95",
+  "source_tag": "v3.0.4",
+  "source_path": "/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/packaging/pkg/output/stable-95/source",
+  "beta_base_commit": "fb0d938",
+  "changed_app_sources": [],
+  "app_build": {
+    "source_commit": "54ad632ae07de5716ac9e518f55a0607d6d06169",
+    "source_dirty": false,
+    "version": "3.0.4",
+    "build": 95,
+    "channel": "stable",
+    "build_system": "native",
+    "sdk_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+    "sdk_version": "27.0",
+    "macho_build_version": {
+      "minimum_os": "13.0",
+      "sdk": "27.0"
+    },
+    "app": "build/stable-95/iFanControl.app",
+    "executable_sha256": "46601caa54f913e0d6a48ac94a2c02ad7d0eedb834a8e15a4cd524fd6631e32e",
+    "info_plist_sha256": "78d72a12d76286fbc1ef5f64b2ff9712ab69546e7fbbee85e7f04588906b62b4",
+    "icon_sha256": "b460e15c3834479a771bcc200a7a7622c53a5fd84dd62392bb179cc646b52324",
+    "brand_assets_sha256": {
+      "WordmarkHorizontal.pdf": "1e358b9915b70279bdc851821632a36ac214a49963b8213514f4d584955ad197",
+      "WordmarkStacked.pdf": "6e6b714ee66e0b2fc29e52716ed156cbd451c038d1622075edce8e45665c2d07"
+    },
+    "compiled_source_commit": "d3e59a553b0124049ccde1fc73ebf397182d6921",
+    "build_method": "Promote verified Beta94 App; update stable version/build/channel metadata and re-sign; no recompilation"
+  },
+  "baseline_build": 94,
+  "new_build": 95,
+  "recompiled": false,
+  "changed_bundle_files": [
+    "Contents/Info.plist",
+    "Contents/MacOS/iFanControl"
+  ],
+  "unsigned_executable_sha256": "3309e961729905c65fadcdb471f31b054ea1b3b480699f984b82e1a46ca2ed26",
+  "unsigned_executable_identical": true,
+  "resources_identical": true,
+  "metadata_diff_only_version_build_and_channel": true,
+  "cancelled_switch_excluded": true,
+  "version": "3.0.4",
+  "build": 95,
+  "channel": "stable",
+  "from_build": 94,
+  "from_tag": "v3.0.3-beta.94",
+  "application_recompiled": false,
+  "deployment": "50d3e7d5-fb95-4cda-b885-ecf55cfe8729",
+  "deployed_at": "2026-11-27T14:04:51.753739Z",
+  "github_release": "https://github.com/PureMilkchun/iFanControl/releases/tag/v3.0.4",
+  "github_published_at": "2026-11-27T14:04:44Z",
+  "origins": [
+    {
+      "origin": "https://ifan-59w.pages.dev",
+      "stable_build": 95,
+      "beta_feed_build": 95,
+      "beta_feed_channel": "stable",
+      "download_build": 95,
+      "package_sha256": "f5f23ed1df409289f65840b53c261e7839586f34f1e57fd78caef749bb69445a",
+      "stable_restore_build": 95,
+      "legacy_protection_verified": true
+    },
+    {
+      "origin": "https://ifancontrol.puremilkchun.top",
+      "stable_build": 95,
+      "beta_feed_build": 95,
+      "beta_feed_channel": "stable",
+      "download_build": 95,
+      "package_sha256": "f5f23ed1df409289f65840b53c261e7839586f34f1e57fd78caef749bb69445a",
+      "stable_restore_build": 95,
+      "legacy_protection_verified": true
+    }
+  ],
+  "legacy_zip_hashes_preserved": true,
+  "actual_installation_performed": false,
+  "github_attachments_match_package": true,
+  "runtime_bindings_preserved": true,
+  "timeline_visually_verified_on_desktop_and_mobile": true,
+  "refreshed_website_images_verified": true,
+  "website_visual_review": {
+    "checked_at": "2026-11-27T14:04:42.229930+00:00",
+    "all_four_final_image_files_viewed": true,
+    "new_page_sections_reviewed": true,
+    "viewports": [
+      {
+        "width": 1440,
+        "height": 1000
+      },
+      {
+        "width": 390,
+        "height": 844
+      }
+    ],
+    "languages": [
+      "zh",
+      "en"
+    ],
+    "sections": [
+      "app-menu",
+      "daily-use"
+    ],
+    "method": "CUA in-app browser localhost final production candidate; rendered screenshots actually viewed",
+    "findings": "Menu controls, green save check, centered feedback invitation, feedback leader, safety native blue controls and English text wrap display correctly; no horizontal overflow on390px viewport.",
+    "previous_blocker_resolved": "User unlocked Mac; recovered browser by creating a fresh tab. No alternate UI automation used."
+  },
+  "custom_domain_edge_insertion": "Known Cloudflare verification snippets matched exact normalized template; all remaining homepage bytes identical to staged source",
+  "live_browser_navigation": "Timed out after deployment; predeployment final candidate sections visually reviewed through CUA, deployed HTML and four image files downloaded and verified on both domains."
+}

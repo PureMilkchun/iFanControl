@@ -1,0 +1,26 @@
+{
+  "checked_at": "2026-11-27T14:04:42.229930+00:00",
+  "all_four_final_image_files_viewed": true,
+  "new_page_sections_reviewed": true,
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "languages": [
+    "zh",
+    "en"
+  ],
+  "sections": [
+    "app-menu",
+    "daily-use"
+  ],
+  "method": "CUA in-app browser localhost final production candidate; rendered screenshots actually viewed",
+  "findings": "Menu controls, green save check, centered feedback invitation, feedback leader, safety native blue controls and English text wrap display correctly; no horizontal overflow on390px viewport.",
+  "previous_blocker_resolved": "User unlocked Mac; recovered browser by creating a fresh tab. No alternate UI automation used."
+}
