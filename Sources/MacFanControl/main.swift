@@ -3006,7 +3006,10 @@ class MenuBarManager: NSObject {
 
         let isTemperatureAvailable = selectedReading != nil && !temperatureIsStale
         let isRPMAvailable = latestRPM != nil && !rpmIsStale
+        // The menu-bar power source is DC input, not the component energy sum.
+        let dcInWatts = powerSnapshot.dcInWatts
         let isPowerAvailable = powerSnapshot.isSupported && !powerIsStale
+            && dcInWatts.map { $0.isFinite && $0 >= 0 } == true
 
         let temperatureNumberText = isTemperatureAvailable
             ? String(format: "%.0f", selectedReading!.value)
@@ -3015,7 +3018,7 @@ class MenuBarManager: NSObject {
             ? "\(latestRPM!)"
             : "--"
         let powerNumberText = isPowerAvailable
-            ? String(format: "%.1f", max(powerSnapshot.cpuWatts + powerSnapshot.gpuWatts + powerSnapshot.aneWatts + powerSnapshot.ramWatts, 0))
+            ? String(format: "%.1f", dcInWatts!)
             : "--"
 
         return StatusBarDisplayData(

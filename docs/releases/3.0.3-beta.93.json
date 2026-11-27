@@ -1,0 +1,60 @@
+{
+  "version": "3.0.3",
+  "build": 93,
+  "release_channel": "beta",
+  "tag": "v3.0.3-beta.93",
+  "beta_base_commit": "ae36088",
+  "stable_base_commit": "5c66f2d24803e4829f7254a39216344f18677300",
+  "source_hashes": {
+    "Package.swift": "67789c6f7a1f9928dedeeb190ae8adadb03f8f9034d59dd7fc16e6e4d37bac4a",
+    "Sources/FanCurveEditor/FanCurveView.swift": "152d2535b91301b994f900ad39f39395dba5f02ed82a7a478e5590432f4fc628",
+    "Sources/FanCurveEditor/FanCurveWindow.swift": "88531c31050719d848befd9afbfdc39bd0bd04f9e178af1204f458f19035003c",
+    "Sources/IOReportBridge/bridge.c": "8a06e4da0d02bccd33220b67fceb05bd3cb6c5606c224308a9a8e3beea30f98d",
+    "Sources/IOReportBridge/include/bridge.h": "d4ece3c32020bf3ee9bc966cd05555ddd0b3326b1ba98fb2a08e1dda5df3ff71",
+    "Sources/IOReportBridge/include/power_notifications.h": "823abee2994540f3a5879703684675b4df06dc87fc77b3a9928a85d84db17a42",
+    "Sources/MacFanControl/BrandIdentity.swift": "103f2bdf07b5ad1421f6c2e43af786f7df98852178f4f06d40fcbb6d6ba3a16a",
+    "Sources/MacFanControl/InteractionNotice.swift": "82865a5ab883fe68e02f28bcc3d896bccebb772321a9975ed2b1d9cff1e85c60",
+    "Sources/MacFanControl/MenuActivation.swift": "c549baf0c8dfbeb48dfabe095ed2b514468251ff37e184c029a0e256f14b7894",
+    "Sources/MacFanControl/MenuSpeedControl.swift": "bb5b282e9c2335029220c748a87ea6ade407e2d86ac8ea084128aca886a3ac04",
+    "Sources/MacFanControl/MiniDisplayFormatter.swift": "5e63e8f67996a61c4bbfce06426ad9842939daf254bfa68f22522619770d22ef",
+    "Sources/MacFanControl/NativeInterface.swift": "03b80d0e66010ee11b942f0a15af4e8dfddc44647efd89359489b42af0b357b5",
+    "Sources/MacFanControl/Resources/Brand/WordmarkHorizontal.pdf": "1e358b9915b70279bdc851821632a36ac214a49963b8213514f4d584955ad197",
+    "Sources/MacFanControl/Resources/Brand/WordmarkStacked.pdf": "6e6b714ee66e0b2fc29e52716ed156cbd451c038d1622075edce8e45665c2d07",
+    "Sources/MacFanControl/SensorCatalog.swift": "cc56f4afb4c92d5dcb9b5b68fd59bee8641b5c1717a993028997ab3b919aeee8",
+    "Sources/MacFanControl/StartupProgressWindow.swift": "044e674fbc93ed5b337c2b8aa1c854d3bbc8108e18f5e17d089f47d07f86c781",
+    "Sources/MacFanControl/SystemSleepMonitor.swift": "c29d46d9a7bcb73caa2e4e56c98f0f6dfcd97003c8ed322ca3cbd4b18b5cb525",
+    "Sources/MacFanControl/UpdateManifest.swift": "398dbc4c7c841c8ca3c8ccba58f9a761f21468ca37e0393597f0e87299ce38cd",
+    "Sources/MacFanControl/UpdatePackageDownloader.swift": "a17b6c5465311ad4a3a87490c57e1c5a67ce89e1e335b404e023258c93b0ee8f",
+    "Sources/MacFanControl/UpdatePreferences.swift": "dc2ca7248821b63b8062b2dbb3749b42f897f5c53e22ee1ed8c1defa3d6027f3",
+    "Sources/MacFanControl/UpdateProgressWindow.swift": "25bb00e169fb369524118ec5146ecd2ac21eb0cd4169237a531ea57b9e9af501",
+    "Sources/MacFanControl/main.swift": "04c93f23d65f1c6ad9400e3826f59978e9323c547ce6c26fef0a55d6ea7800bd",
+    "icon.png": "b460e15c3834479a771bcc200a7a7622c53a5fd84dd62392bb179cc646b52324",
+    "packaging/app/Info.plist": "05ed2b499f325a9377113a48993f8d37c7531581ae5f7a60a4d25050c3d3b0a0",
+    "packaging/pkg/build.py": "3b8de30bcb554d5ccd54352295991f57d96589dca42aa2da926ede4e7fc8555d",
+    "packaging/pkg/native_test_bridge.py": "47b09e2ad9504943f0a8bbe924e66866c57efe21faf460a4bb6940fd17158563",
+    "packaging/pkg/render_open_hint.swift": "77de307946bbbfb608d0d26fedcf94d074271599b8df47aac4419995c3d3d912",
+    "packaging/pkg/render_welcome.swift": "825fdbc16546363db5e0f912b59b35948ee1b3e26ee17e4ec42f930d20e39198",
+    "packaging/pkg/resources/Welcome.json": "ea4b524e0a57a62a28cb5ca374b5d847ba2ed49ac6af38a694fe5f4f3bd725bc",
+    "packaging/pkg/scripts/postinstall": "d254053b6341f7fce5b24816462ba92611cf7bd40ec18b4a019e64cb64934bfa",
+    "packaging/pkg/scripts/preinstall": "40b9a82c8f6d015a47d30616567f71ee920da5ff52ad92ffb2a8fb8d502b31aa",
+    "packaging/pkg/test_menu_speed.py": "399451e81d01eea62f17d3ff64d0a947177485f1fba52be645df3644dc94391a",
+    "packaging/pkg/test_menu_speed.swift": "66d080fa8e835a8bb6b17498acfcdcaea9d1ffffbf49beb8a6f414c4d5f61f2d",
+    "packaging/pkg/test_packaged_brand.py": "efdb2dcbad83c03d63c866fc6c13fe7b307749e51d4b3ab1f802c01ef0495d05",
+    "scripts/build_app.py": "236d228ecac55e2872ad6a9ddf9c79f80e5f065a8bfd6aa5c97eeaf31ad02f35"
+  },
+  "changes": [
+    "Use the already sampled PDTR (DC In) reading for menu-bar power and its tooltip instead of CPU/GPU/ANE/DRAM sum.",
+    "Missing, stale or invalid DC readings remain unavailable; retain one decimal and valid zero."
+  ],
+  "boundaries": [
+    "Power reader, power details, thermal anomaly input, fan logic, language and installer behavior unchanged.",
+    "Beta only; stable89, frozen legacy52 and previous installers preserved."
+  ],
+  "verification": [
+    "Native release build with actual linked SDK validation and ad-hoc signature.",
+    "Extracted real display method checks DC/component distinction, missing/stale/unsupported/invalid/zero/formatting cases; actual MiniStatusView light/dark offscreen renders inspected.",
+    "PKG payload metadata, executable hash, signature, scripts, resource loading, config exclusion and Installer preflight.",
+    "Both public origins checked with real updater parser/SHA256 and stable/legacy/runtime preservation."
+  ],
+  "provenance": "Reviewed isolated worktree from Beta92; no App installation by assistant. Release tag records exact source inputs; executable does not embed Git commit."
+}
