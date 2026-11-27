@@ -1,0 +1,120 @@
+{
+  "version": "3.0.3",
+  "build": 94,
+  "release_channel": "beta",
+  "stable_build": 89,
+  "legacy_build": 52,
+  "package_sha256": "d1fb0f610b74baa7d774c32cbabbb5bf1d37ef4baeb1d05668f2589b40a5b6f0",
+  "deployment": "6e382ed2-cc28-4f4e-8e34-55f7a7dba2af",
+  "deployed_at": "2026-11-27T11:45:45.690118Z",
+  "previous_site_deployment": "9d08f105-ae77-46bd-9bea-d7e382b87a77",
+  "beta_only": true,
+  "unchanged_assets": 104,
+  "runtime_preserved": true,
+  "stable_restore": {
+    "latest_version": "3.0.3",
+    "latest_build": 89,
+    "release_channel": "stable",
+    "published_at": "2026-11-19T16:05:00.388986+00:00",
+    "stable_package_sha256": "9e3b33481fc956c6a6ff5fa95ff88c89090ea344cd53c169598badab8778458d",
+    "assets": {
+      "macos_arm64_pkg_url": "https://ifan-59w.pages.dev/iFanControl-stable-restore-3.0.3-89-9e3b33481fc9.pkg",
+      "pkg_sha256": "0acea8decd84b1cdaf3d1fe76f1cb917432b1d888059e671a83841f88a000a80"
+    }
+  },
+  "installer_preflight_passed": true,
+  "stable_restore_assets_unchanged": true,
+  "agent_installed_app": false,
+  "actual_downgrade_tested": false,
+  "origins": [
+    {
+      "origin": "https://ifan-59w.pages.dev",
+      "stable_build": 89,
+      "beta_build": 94,
+      "sha256": "d1fb0f610b74baa7d774c32cbabbb5bf1d37ef4baeb1d05668f2589b40a5b6f0",
+      "legacy_protection_verified": true
+    },
+    {
+      "origin": "https://ifancontrol.puremilkchun.top",
+      "stable_build": 89,
+      "beta_build": 94,
+      "sha256": "d1fb0f610b74baa7d774c32cbabbb5bf1d37ef4baeb1d05668f2589b40a5b6f0",
+      "legacy_protection_verified": true
+    }
+  ],
+  "source_commit": "58bb673343426e9aac911e152a5f68b9f622d9ac",
+  "source_branch": "codex/beta-94",
+  "source_tag": "v3.0.3-beta.94",
+  "source_path": "/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/packaging/pkg/output/beta-94/source",
+  "beta_base_commit": "80a09eb",
+  "changed_app_sources": [],
+  "app_build": {
+    "source_commit": "58bb673343426e9aac911e152a5f68b9f622d9ac",
+    "source_dirty": false,
+    "version": "3.0.3",
+    "build": 94,
+    "channel": "beta",
+    "build_system": "native",
+    "sdk_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+    "sdk_version": "27.0",
+    "macho_build_version": {
+      "minimum_os": "13.0",
+      "sdk": "27.0"
+    },
+    "app": "build/beta-94/iFanControl.app",
+    "executable_sha256": "b5bc7ab9bdcf3697d6ef3d3237d863eba3deb3fbeddaa1c4fffc629e04ecfcb5",
+    "info_plist_sha256": "55dc2bad83d1796533750fde100d0aaa1ee4bec63f0437d10d1b407bd82a05ff",
+    "icon_sha256": "b460e15c3834479a771bcc200a7a7622c53a5fd84dd62392bb179cc646b52324",
+    "brand_assets_sha256": {
+      "WordmarkHorizontal.pdf": "1e358b9915b70279bdc851821632a36ac214a49963b8213514f4d584955ad197",
+      "WordmarkStacked.pdf": "6e6b714ee66e0b2fc29e52716ed156cbd451c038d1622075edce8e45665c2d07"
+    },
+    "compiled_source_commit": "d3e59a553b0124049ccde1fc73ebf397182d6921",
+    "build_method": "Repackage verified Beta93 App; update CFBundleVersion and re-sign; no recompilation"
+  },
+  "repack_equivalence": {
+    "baseline_build": 93,
+    "new_build": 94,
+    "recompiled": false,
+    "changed_bundle_files": [
+      "Contents/Info.plist",
+      "Contents/MacOS/iFanControl"
+    ],
+    "unsigned_executable_sha256": "3309e961729905c65fadcdb471f31b054ea1b3b480699f984b82e1a46ca2ed26",
+    "unsigned_executable_identical": true,
+    "resources_identical": true,
+    "metadata_diff_only_CFBundleVersion": true,
+    "cancelled_switch_excluded": true
+  },
+  "package_equivalence": {
+    "changed_payload_files": [
+      "Applications/iFanControl.app/Contents/Info.plist",
+      "Applications/iFanControl.app/Contents/MacOS/iFanControl"
+    ],
+    "tool_and_sudoers_identical": true,
+    "all_resources_identical": true,
+    "unsigned_executable_identical": true
+  },
+  "final_payload": {
+    "package_sha256": "d1fb0f610b74baa7d774c32cbabbb5bf1d37ef4baeb1d05668f2589b40a5b6f0",
+    "build": 94,
+    "channel": "beta",
+    "bundle_minimum_os": "15.0",
+    "macho": {
+      "minimum_os": "13.0",
+      "sdk": "27.0"
+    },
+    "executable_sha256": "b5bc7ab9bdcf3697d6ef3d3237d863eba3deb3fbeddaa1c4fffc629e04ecfcb5",
+    "payload_matches_built_app": true,
+    "signature_valid": true,
+    "packaged_brand_without_development_fallback": true
+  },
+  "source_inputs_verified": true,
+  "downloaded_packages_match_verified_local_payload": true,
+  "build_number_only": true,
+  "cancelled_mode_switch_excluded": true,
+  "limitations": [
+    "No application installation by assistant.",
+    "Metadata-only repack of verified Beta93; no recompilation or new UI."
+  ]
+}
