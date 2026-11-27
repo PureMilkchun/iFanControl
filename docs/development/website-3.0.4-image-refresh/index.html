@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>iFanControl | Apple Silicon Mac 风扇控制工具</title>
+    <meta
+      name="description"
+      content="iFanControl 是一款 Apple Silicon Mac 风扇控制工具。开发者仅在自己的 Mac mini M4 上长期实测，已稳定运行数月；其他带风扇的 M 系列 Mac 理论上可用，实际兼容性需试用确认。"
+    />
+    <link rel="icon" type="image/png" href="./assets/app-icon.png" />
+    <link rel="stylesheet" href="./styles.20261104a.css" />
+    <link rel="stylesheet" href="./styles.20261105-sidebar.css" />
+  </head>
+  <body>
+    <section class="landing-screen">
+      <section class="hero-section">
+        <svg class="fan-container" viewBox="-100 -100 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="blade-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="var(--bg-mono-light)"></stop>
+              <stop offset="50%" stop-color="var(--bg-mono-mid)"></stop>
+              <stop offset="100%" stop-color="var(--bg-mono-dark)"></stop>
+            </linearGradient>
+
+            <path
+              id="single-blade"
+              class="blade"
+              d="M 10,-10 C 40,-30 70,-80 85,-90 C 95,-70 70,-20 30,10 Z"
+            ></path>
+          </defs>
+
+          <g id="rotor">
+            <circle cx="0" cy="0" r="14" class="hub"></circle>
+            <circle cx="0" cy="0" r="6" class="hub-core"></circle>
+
+            <use href="#single-blade" transform="rotate(0)"></use>
+            <use href="#single-blade" transform="rotate(51.42)"></use>
+            <use href="#single-blade" transform="rotate(102.85)"></use>
+            <use href="#single-blade" transform="rotate(154.28)"></use>
+            <use href="#single-blade" transform="rotate(205.71)"></use>
+            <use href="#single-blade" transform="rotate(257.14)"></use>
+            <use href="#single-blade" transform="rotate(308.57)"></use>
+          </g>
+        </svg>
+
+        <div class="hero-branding">
+          <h1><span class="tour-sr-only">iFanControl</span><img class="brand-signature" src="./assets/brand/wordmark-stacked-white.svg" alt="" width="559" height="256" /></h1>
+        </div>
+
+      </section>
+
+      <aside class="control-panel" aria-labelledby="overview-title">
+        <header class="panel-topbar">
+          <div class="panel-brand" aria-label="iFanControl">
+            <img class="panel-app-icon" src="./assets/brand/app-icon.webp" alt="" width="32" height="32" />
+            <img class="panel-wordmark" src="./assets/brand/wordmark-horizontal-ink.svg" alt="iFanControl" width="160" height="25" />
+          </div>
+          <div class="lang-switch" data-lang-switch>
+            <button class="lang-btn" type="button" data-lang="zh">中文</button>
+            <button class="lang-btn" type="button" data-lang="en">EN</button>
+          </div>
+        </header>
+
+        <div class="panel-main">
+          <section class="product-overview" aria-labelledby="overview-title">
+            <h2 id="overview-title" data-i18n="overview_title">风扇控制，
+就在菜单栏。</h2>
+          </section>
+
+          <ul class="capability-list" aria-labelledby="overview-title">
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5a2 2 0 0 1 4 0v9a4 4 0 1 1-4 0Z"/><path d="M12 10v8"/></svg><strong data-i18n="cap_monitor">实时温度与转速</strong></li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg><strong data-i18n="cap_control">自动 / 手动切换</strong></li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16h16M7 16l4-3 3-5 5-3"/><circle cx="11" cy="13" r="1"/><circle cx="14" cy="8" r="1"/></svg><strong data-i18n="cap_curve">5 点自定义曲线</strong></li>
+          </ul>
+
+          <section class="download-section">
+            <p class="platform-note">Apple Silicon <span aria-hidden="true">·</span> macOS 15+</p>
+            <div class="cta-group">
+              <a class="cta-button primary" href="./download" data-i18n="cta_download">下载应用</a>
+              <a class="cta-button secondary" href="https://github.com/PureMilkchun/iFanControl" target="_blank" rel="noopener noreferrer">GitHub</a>
+            </div>
+            <p class="free-note"><span data-i18n="free_note">免费开源</span><span class="sidebar-meta-dot" aria-hidden="true">·</span><span class="sidebar-version">v<span data-latest-version>—</span></span></p>
+          </section>
+        </div>
+
+        <footer class="panel-bottom">
+          <details class="compatibility-details">
+            <summary><span class="compatibility-status" data-i18n="compat_status">Mac mini M4 实测</span><span class="compatibility-trigger" data-i18n="compat_details">机型兼容</span></summary>
+            <div class="compatibility-content">
+              <p data-i18n="compat_caveat">其他带风扇的 M 系列 Mac，请试用确认。</p>
+              <a href="https://github.com/PureMilkchun/iFanControl/releases/tag/v2.9.8" data-i18n="compat_fallback_download">兼容性问题：下载 2.9.8</a>
+            </div>
+          </details>
+        </footer>
+      </aside>
+    </section>
+
+  <main id="app-tour">
+    <section class="tour-section tour-dark" id="app-menu" aria-labelledby="tour-menu-title">
+      <div class="tour-inner">
+        <div class="menu-focus-intro">
+          <div data-i18n="tour_menu_label" class="tour-kicker">01 / 常驻菜单栏</div>
+          <h2 data-i18n="tour_menu_title" id="tour-menu-title" data-calligraph data-calligraph-variant="text" data-calligraph-from-zh="温度与转速，就在这里。" data-calligraph-from-en="Always in your menu bar.">菜单栏上，一眼看清。</h2>
+          <p data-i18n="tour_menu_body">完整、简洁、迷你，三种样式任选。</p>
+        </div>
+        <div class="bar-gallery">
+          <figure class="bar-style">
+            <div class="bar-desktop" role="img" data-i18n-aria="bar_full_alt" aria-label="完整菜单栏样式示意：65摄氏度，2400转，自动模式">
+              <div class="bar-system-strip"><span class="bar-context" aria-hidden="true">•••</span><span class="bar-reading bar-reading-full">65℃ | 2400 RPM [Auto]</span><svg class="bar-system-icon" aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="4"/><circle cx="8" cy="10" r="1.5"/><path d="M13 10h4M7 14h10"/></svg></div>
+
+            </div>
+            <figcaption data-i18n="bar_full">完整</figcaption>
+          </figure>
+          <figure class="bar-style">
+            <div class="bar-desktop" role="img" data-i18n-aria="bar_compact_alt" aria-label="简洁菜单栏样式示意：65摄氏度，2400转，自动模式">
+              <div class="bar-system-strip"><span class="bar-context" aria-hidden="true">•••</span><span class="bar-reading bar-reading-compact">65｜2400｜A</span><svg class="bar-system-icon" aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="4"/><circle cx="8" cy="10" r="1.5"/><path d="M13 10h4M7 14h10"/></svg></div>
+
+            </div>
+            <figcaption data-i18n="bar_compact">简洁</figcaption>
+          </figure>
+          <figure class="bar-style">
+            <div class="bar-desktop" role="img" data-i18n-aria="bar_mini_alt" aria-label="迷你菜单栏样式示意：65摄氏度，2400转，自动模式">
+              <div class="bar-system-strip"><span class="bar-context" aria-hidden="true">•••</span><span class="bar-reading bar-reading-mini"><span>65℃｜<em>A</em></span><span>2400 RPM</span></span><svg class="bar-system-icon" aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="4"/><circle cx="8" cy="10" r="1.5"/><path d="M13 10h4M7 14h10"/></svg></div>
+
+            </div>
+            <figcaption data-i18n="bar_mini">迷你</figcaption>
+          </figure>
+        </div>
+        <p class="bar-example-note" data-i18n="bar_example">菜单栏样式示意 · 示例数据，A 为自动模式</p>
+        <div class="menu-annotated" style="--origin-y: .80">
+        <figure class="tour-figure tour-figure-menu">
+          <div class="menu-image-wrap">
+            <svg class="menu-feedback-connector" viewBox="0 0 112 100" preserveAspectRatio="none" aria-hidden="true">
+              <defs><marker id="feedback-arrow" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L6 3 L0 6" fill="none" stroke="#8c8477" stroke-width="1" /></marker></defs>
+              <path d="M0 100 H28 L82 0 H112" fill="none" stroke="#8c8477" stroke-width="1" vector-effect="non-scaling-stroke" marker-end="url(#feedback-arrow)" />
+            </svg>
+          <img src="./assets/tour-3-0/menu-3.0.4-zh.webp" data-tour-image="menu" data-i18n-alt="tour_menu_alt" alt="iFanControl 主菜单，包含自动与手动切换、转速滑块、档位调节和反馈邀请框" width="560" height="934" loading="lazy" decoding="async" />
+          </div>
+          <figcaption>
+            <span data-i18n="tour_menu_caption">主菜单 · 保留直接、醒目的反馈邀请</span> · <a data-tour-fullimage="menu" href="./assets/tour-3-0/menu-3.0.4-zh.webp" target="_blank" rel="noopener" data-i18n="tour_open_image">查看大图</a>
+          </figcaption>
+        </figure>
+          <div class="tour-feedback">
+            <h3 data-i18n="tour_feedback_title">反馈，就在菜单里。</h3>
+            <p data-i18n="tour_feedback_body">点「告诉开发者」，直接联系作者。</p>
+            <p class="tour-sr-only" id="tour-feedback-cases" data-i18n="tour_feedback_cases">用户建议带来的改进</p>
+            <div class="voices-carousel" data-voices-carousel role="region" aria-labelledby="tour-feedback-cases">
+              <div class="voices-card-track" data-voices-track></div>
+              <div class="voices-carousel-nav"><div class="voices-carousel-dots" data-voices-dots></div><button class="tour-carousel-pause" type="button" data-voices-pause data-i18n="tour_case_pause">暂停轮播</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="tour-section tour-paper" id="fan-curves" aria-labelledby="tour-curve-title">
+      <div class="tour-inner">
+        <div class="tour-wide-intro">
+          <div>
+            <div data-i18n="tour_curve_label" class="tour-kicker">02 / 曲线与控制</div>
+            <h2 data-i18n="tour_curve_title" id="tour-curve-title" data-calligraph data-calligraph-variant="text" data-calligraph-from-zh="从温度，到曲线。" data-calligraph-from-en="From a temperature to a curve.">温度与转速，按你的习惯。</h2>
+          </div>
+          <p data-i18n="tour_curve_body" >五个点，自定温度与转速。自动跟随曲线，手动固定转速。</p>
+        </div>
+        <figure class="tour-figure tour-figure-curve">
+          <img src="./assets/tour-3-0/curve-zh.webp" data-tour-image="curve" data-i18n-alt="tour_curve_alt" alt="五点风扇曲线编辑器，包含三套预设与坐标方向切换" width="1440" height="964" loading="lazy" decoding="async" />
+          <figcaption>
+            <span data-i18n="tour_curve_caption">曲线编辑 · 控制点、预设与坐标方向</span> · <a data-tour-fullimage="curve" href="./assets/tour-3-0/curve-zh.webp" target="_blank" rel="noopener" data-i18n="tour_open_image">查看大图</a>
+          </figcaption>
+        </figure>
+        <p class="tour-curve-summary" data-i18n="tour_presets_body">三套预设，按场景切换。支持数值编辑与 Y 轴正反向显示。</p>
+      </div>
+    </section>
+    <section class="tour-section tour-dark" id="menu-display" aria-labelledby="tour-display-title">
+      <div class="tour-inner tour-split">
+        <div class="tour-copy">
+          <div data-i18n="tour_display_label" class="tour-kicker">03 / 日常查看</div>
+          <h2 data-i18n="tour_display_title" id="tour-display-title" data-calligraph data-calligraph-variant="text" data-calligraph-from-zh="回到菜单栏，按习惯安排。" data-calligraph-from-en="Back to your familiar menu bar.">想看的信息，抬眼就看到。</h2>
+          <p data-i18n="tour_display_body" >温度、转速、功率，选择想看的内容；预览即时生效。</p>
+          <p data-i18n="tour_display_note" class="tour-aside">功率为估算值，视设备支持。</p>
+        </div>
+        <figure class="tour-figure tour-figure-display">
+          <img src="./assets/tour-3-0/display-zh.webp" data-tour-image="display" data-i18n-alt="tour_display_alt" alt="信息栏展示设置，包含迷你样式预览和上下行内容选择" width="1080" height="800" loading="lazy" decoding="async" />
+          <figcaption>
+            <span data-i18n="tour_display_caption">信息栏展示 · 预览与设置同步</span> · <a data-tour-fullimage="display" href="./assets/tour-3-0/display-zh.webp" target="_blank" rel="noopener" data-i18n="tour_open_image">查看大图</a>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+    <section class="tour-section tour-paper" id="daily-use" aria-labelledby="tour-safety-title">
+      <div class="tour-inner">
+        <div class="tour-split">
+          <div class="tour-copy">
+            <div data-i18n="tour_safety_label" class="tour-kicker">04 / 日常常驻</div>
+            <h2 data-i18n="tour_safety_title" id="tour-safety-title" data-calligraph data-calligraph-variant="text" data-calligraph-from-zh="日常常驻，安心使用。" data-calligraph-from-en="Prepared for everyday use.">高温有兜底，异常有提示。</h2>
+            <p data-i18n="tour_safety_body" >临界高温时托底；必要硬件信息异常时，提示并兜底或交还系统。</p>
+          </div>
+          <figure class="tour-figure tour-figure-safety">
+            <img src="./assets/tour-3-0/safety-3.0.4-zh.webp" data-tour-image="safety" data-i18n-alt="tour_safety_alt" alt="安全兜底转速设置窗口" width="800" height="540" loading="lazy" decoding="async" />
+            <figcaption>
+              <span data-i18n="tour_safety_caption">安全兜底转速 · 临界高温时的最低转速</span> · <a data-tour-fullimage="safety" href="./assets/tour-3-0/safety-3.0.4-zh.webp" target="_blank" rel="noopener" data-i18n="tour_open_image">查看大图</a>
+            </figcaption>
+          </figure>
+        </div>
+        <div class="tour-adoption" data-calligraph-trigger>
+          <div class="tour-metric">
+            <span class="tour-metric-value" data-monthly-active-users data-calligraph data-calligraph-from="00">—</span>
+            <span class="tour-active-label"><span class="tour-activity-dot" aria-hidden="true"></span><span data-i18n="tour_mau_label">近 30 天匿名活跃用户</span></span>
+          </div>
+          <div>
+            <h3 data-i18n="tour_mau_title" data-calligraph data-calligraph-variant="text" data-calligraph-from-zh="日常使用，持续改进。" data-calligraph-from-en="Real use, real feedback.">不是作者一个人自娱自乐，而是有真实的用户在使用。</h3>
+          </div>
+        </div>
+        <p data-i18n="tour_safety_note" class="tour-device-note">开发者在 Mac mini M4 上长期日常使用。其他带风扇的 M 系列 Mac，仍需在你的设备上确认兼容性。</p>
+      </div>
+    </section>
+    <section class="tour-section tour-dark" id="startup-updates" aria-labelledby="tour-update-title">
+      <div class="tour-inner">
+        <div class="tour-split">
+          <div class="tour-copy">
+            <div data-i18n="tour_update_label" class="tour-kicker">05 / 启动与更新</div>
+            <h2 data-i18n="tour_update_title" id="tour-update-title" data-calligraph data-calligraph-variant="text" data-calligraph-from-zh="等待，也应该清清楚楚。" data-calligraph-from-en="Know what you are waiting for.">启动与更新，每一步清晰。</h2>
+            <p data-i18n="tour_update_body" >启动有阶段提示，更新有下载与校验进度。</p>
+          </div>
+          <figure class="tour-figure tour-figure-startup">
+            <img src="./assets/tour-3-0/startup-zh.webp" data-tour-image="startup" data-i18n-alt="tour_startup_alt" alt="正在启动 iFanControl，正在识别温度与风扇" width="760" height="312" loading="lazy" decoding="async" />
+            <figcaption>
+              <span data-i18n="tour_startup_caption">启动提示 · 对应实际准备阶段</span> · <a data-tour-fullimage="startup" href="./assets/tour-3-0/startup-zh.webp" target="_blank" rel="noopener" data-i18n="tour_open_image">查看大图</a>
+            </figcaption>
+          </figure>
+        </div>
+        <ol class="tour-steps">
+          <li>
+            <span aria-hidden="true">01</span>
+            <div>
+              <h3 data-i18n="tour_step_check" >检查更新</h3>
+            </div>
+          </li>
+          <li>
+            <span aria-hidden="true">02</span>
+            <div>
+              <h3 data-i18n="tour_step_verify" >下载与校验</h3>
+            </div>
+          </li>
+          <li>
+            <span aria-hidden="true">03</span>
+            <div>
+              <h3 data-i18n="tour_step_install" >系统引导安装</h3>
+            </div>
+          </li>
+        </ol>
+        <p data-i18n="tour_sample" class="tour-sample">界面为示意。安装完成后，从「应用程序」打开。</p>
+      </div>
+    </section>
+    <section class="timeline-section" aria-labelledby="timeline-title">
+      <div class="timeline-header">
+        <div class="label-micro muted" data-i18n="timeline_label">更新日志</div>
+        <h2 id="timeline-title" data-i18n="tour_recent">持续改进，有迹可循。</h2>
+      </div>
+      <div class="timeline-track" data-timeline-track>
+      </div>
+      <div class="timeline-expand-wrap">
+        <button class="timeline-expand-btn" type="button" data-timeline-expand data-i18n="timeline_expand">展开完整时间线</button>
+      </div>
+    </section>
+  </main>
+  <footer class="tour-section tour-paper tour-close">
+    <div class="tour-inner">
+      <div class="tour-kicker">iFanControl</div>
+      <h2 data-i18n="tour_close_title" >从你的菜单栏，开始。</h2>
+      <p data-i18n="tour_close_body" >免费开源，无订阅或内购。macOS 15+，适用于带风扇的 Apple Silicon Mac。</p>
+      <div class="tour-close-actions">
+        <a class="tour-download" href="./download" data-i18n="cta_download">下载应用</a>
+        <a class="tour-source" href="https://github.com/PureMilkchun/iFanControl" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </div>
+      <p class="tour-release">
+        <span data-i18n="tour_version">当前版本</span>
+        <span data-latest-version>—</span> · <span data-latest-build>build —</span>
+      </p>
+    </div>
+  </footer>
+
+    <script>
+      (function () {
+        var STORAGE_KEY = "ifc_lang";
+        function setNodeText(node, value) {
+          if (!node) return;
+          value = value == null ? "" : String(value);
+          if (node.hasAttribute("data-calligraph")) {
+            node.setAttribute("data-calligraph-target", value);
+            node.setAttribute("aria-label", value);
+            if (!window.__ifcCalligraphReady) {
+              var lang = document.documentElement.lang && document.documentElement.lang.indexOf("en") === 0 ? "en" : "zh";
+              var startValue = node.getAttribute("data-calligraph-from-" + lang) || node.getAttribute("data-calligraph-from");
+              node.textContent = value;
+            }
+            return;
+          }
+          node.textContent = value;
+        }
+
+        var texts = {
+          zh: {
+
+
+
+
+            bar_mini_alt: "迷你菜单栏样式示意：上行65℃｜A，下行2400 RPM",
+            bar_compact_alt: "简洁菜单栏样式示意：65｜2400｜A",
+            bar_full_alt: "完整菜单栏样式示意：65℃ | 2400 RPM [Auto]",
+
+            bar_example: "菜单栏样式示意 · 示例数据，A 为自动模式",
+            bar_mini: "迷你",
+            bar_compact: "简洁",
+            bar_full: "完整",
+            tour_open_image: "查看大图",
+            tour_menu_label: "01 / 常驻菜单栏",
+            tour_menu_title: "菜单栏上，一眼看清。",
+            tour_menu_body: "完整、简洁、迷你，三种样式任选。",
+            tour_feedback_title: "反馈，就在菜单里。",
+            tour_feedback_body: "点「告诉开发者」，直接联系作者。",
+            tour_feedback_cases: "用户建议带来的改进",
+            tour_case_pause: "暂停轮播",
+            tour_case_play: "继续轮播",
+            tour_curve_label: "02 / 曲线与控制",
+            tour_curve_title: "温度与转速，按你的习惯。",
+            tour_curve_body: "五个点，自定温度与转速。自动跟随曲线，手动固定转速。",
+
+            tour_presets_body: "三套预设，按场景切换。支持数值编辑与 Y 轴正反向显示。",
+
+            tour_display_label: "03 / 日常查看",
+            tour_display_title: "想看的信息，抬眼就看到。",
+            tour_display_body: "温度、转速、功率，选择想看的内容；预览即时生效。",
+            tour_display_note: "功率为估算值，视设备支持。",
+            tour_safety_label: "04 / 日常常驻",
+            tour_safety_title: "高温有兜底，异常有提示。",
+            tour_safety_body: "临界高温时托底；必要硬件信息异常时，提示并兜底或交还系统。",
+            tour_safety_note: "开发者在 Mac mini M4 上长期日常使用。其他带风扇的 M 系列 Mac，仍需在你的设备上确认兼容性。",
+            tour_mau_label: "近 30 天匿名活跃用户",
+            tour_mau_title: "不是作者一个人自娱自乐，而是有真实的用户在使用。",
+
+            tour_update_label: "05 / 启动与更新",
+            tour_update_title: "启动与更新，每一步清晰。",
+            tour_update_body: "启动有阶段提示，更新有下载与校验进度。",
+            tour_step_check: "检查更新",
+
+            tour_step_verify: "下载与校验",
+
+            tour_step_install: "系统引导安装",
+
+            tour_sample: "界面为示意。安装完成后，从「应用程序」打开。",
+            tour_menu_caption: "展开菜单 · 快捷控制与反馈",
+            tour_curve_caption: "五点曲线与三套预设",
+            tour_display_caption: "自定菜单栏内容",
+            tour_safety_caption: "安全兜底转速",
+            tour_startup_caption: "启动阶段提示",
+            tour_menu_alt: "iFanControl 主菜单，包含自动与手动切换、转速滑块、档位调节和反馈邀请框",
+            tour_curve_alt: "五点风扇曲线编辑器，包含三套预设与坐标方向切换",
+            tour_display_alt: "信息栏展示设置，包含迷你样式预览和上下行内容选择",
+            tour_safety_alt: "安全兜底转速设置窗口",
+            tour_startup_alt: "正在启动 iFanControl，正在识别温度与风扇",
+            tour_close_title: "从你的菜单栏，开始。",
+            tour_close_body: "免费开源，无订阅或内购。macOS 15+，适用于带风扇的 Apple Silicon Mac。",
+            tour_version: "当前版本",
+            tour_recent: "持续改进，有迹可循。",
+
+            hero_micro: "Apple Silicon Mac",
+            hero_tagline: "简洁的风扇控制工具。",
+            overview_title: "风扇控制，\n就在菜单栏。",
+            overview_body: "实时温度、转速与风扇曲线，集中在熟悉的菜单栏。",
+            cap_monitor: "实时温度与转速",
+            cap_monitor_detail: "CPU / GPU 温度与风扇转速。",
+            cap_control: "自动 / 手动切换",
+            cap_control_detail: "按曲线自动调速，也可手动设定。",
+            cap_curve: "5 点自定义曲线",
+            cap_curve_detail: "自定义温度与转速，平滑过渡。",
+            free_note: "免费开源",
+            compat_status: "Mac mini M4 实测",
+            compat_caveat: "其他带风扇的 M 系列 Mac，请试用确认。",
+            compat_details: "机型兼容",
+            compat_context: "开发者目前仅有一台 Mac mini M4，已在日常使用中稳定运行数月。",
+            compat_fallback_download: "兼容性问题：下载 2.9.8",
+            cta_download: "下载应用",
+
+
+
+
+
+            timeline_label: "更新日志",
+            timeline_title: "项目时间线",
+            timeline_expand: "展开完整时间线",
+            timeline_collapse: "收起",
+          },
+          en: {
+
+
+
+
+            bar_mini_alt: "Mini menu bar example: 65 degrees Celsius and A above 2400 RPM",
+            bar_compact_alt: "Compact menu bar example: 65, 2400, A",
+            bar_full_alt: "Full menu bar example: 65 degrees Celsius, 2400 RPM, Auto",
+
+            bar_example: "Menu bar illustrations · sample values; A means Auto",
+            bar_mini: "Mini",
+            bar_compact: "Compact",
+            bar_full: "Full",
+            tour_open_image: "View full size",
+            tour_menu_label: "01 / IN YOUR MENU BAR",
+            tour_menu_title: "A glance is all it takes.",
+            tour_menu_body: "Full, Compact or Mini. Choose your view.",
+            tour_feedback_title: "Feedback is right in the menu.",
+            tour_feedback_body: "Select “Talk to Dev” to contact the developer.",
+            tour_feedback_cases: "Improvements from user suggestions",
+            tour_case_pause: "Pause stories",
+            tour_case_play: "Resume stories",
+            tour_curve_label: "02 / FAN CURVES",
+            tour_curve_title: "Fan speed that follows your routine.",
+            tour_curve_body: "Five points set temperature and RPM. Auto follows the curve; Manual holds your target speed.",
+
+            tour_presets_body: "Three presets for different situations. Edit exact values and switch the Y-axis direction.",
+
+            tour_display_label: "03 / AT A GLANCE",
+            tour_display_title: "The details you need, right in sight.",
+            tour_display_body: "Choose temperature, RPM and power. See changes in the preview immediately.",
+            tour_display_note: "Power is estimated and depends on device support.",
+            tour_safety_label: "04 / DAILY USE",
+            tour_safety_title: "Control for the routine. Clarity when it changes.",
+            tour_safety_body: "A speed floor at critical heat. If essential readings fail, the app reports it and falls back or returns control to macOS.",
+            tour_safety_note: "Used daily by the developer on a Mac mini M4. Other fan-equipped M-series Macs still need compatibility testing on your device.",
+            tour_mau_label: "anonymous active users · last 30 days",
+            tour_mau_title: "More than a personal project. Real people use iFanControl.",
+
+            tour_update_label: "05 / STARTUP & UPDATES",
+            tour_update_title: "Clear progress, from startup to updates.",
+            tour_update_body: "Preparation status at startup. Download and verification progress during updates.",
+            tour_step_check: "Check for updates",
+
+            tour_step_verify: "Download and verify",
+
+            tour_step_install: "Follow the macOS installer",
+
+            tour_sample: "Interface previews. Open the app from Applications after installation.",
+            tour_menu_caption: "Expanded menu · control and feedback",
+            tour_curve_caption: "Five points. Three presets.",
+            tour_display_caption: "Choose your menu bar content",
+            tour_safety_caption: "Safety Floor RPM",
+            tour_startup_caption: "Startup status",
+            tour_menu_alt: "iFanControl menu with Auto and Manual modes, speed slider, stepped adjustment and the Talk to Dev feedback invitation",
+            tour_curve_alt: "Five-point fan curve editor with three presets and axis direction controls",
+            tour_display_alt: "Display settings with a Mini preview and top and bottom line choices",
+            tour_safety_alt: "Safety Floor RPM settings window",
+            tour_startup_alt: "Starting iFanControl, detecting temperatures and fans",
+            tour_close_title: "Start with your menu bar.",
+            tour_close_body: "Free and open source. No subscriptions or in-app purchases. macOS 15+ on fan-equipped Apple Silicon Macs.",
+            tour_version: "Current version",
+            tour_recent: "An ongoing record of improvements.",
+
+            hero_micro: "Apple Silicon Mac",
+            hero_tagline: "A restrained fan control utility.",
+            overview_title: "Fan control.\nIn your menu bar.",
+            overview_body: "Live temperature, RPM and fan curves in one familiar place.",
+            cap_monitor: "Live temperature & RPM",
+            cap_monitor_detail: "CPU / GPU temperatures and fan speed.",
+            cap_control: "Auto or manual control",
+            cap_control_detail: "Follow a fan curve or set the speed manually.",
+            cap_curve: "Custom 5-point curves",
+            cap_curve_detail: "Set temperature and RPM, with smooth transitions.",
+            free_note: "Free & open source",
+            compat_status: "Mac mini M4 tested",
+            compat_caveat: "Other fan-equipped M-series Macs need testing on your device.",
+            compat_details: "Compatibility",
+            compat_context: "The developer owns only a Mac mini M4, used reliably for several months in daily work.",
+            compat_fallback_download: "Compatibility issues: download 2.9.8",
+            cta_download: "Download",
+
+
+
+
+
+            timeline_label: "Changelog",
+            timeline_title: "Project Timeline",
+            timeline_expand: "View Full Timeline",
+            timeline_collapse: "Collapse",
+          },
+        };
+
+        function resolveLang() {
+          var saved = localStorage.getItem(STORAGE_KEY);
+          if (saved === "zh" || saved === "en") return saved;
+          var raw = (navigator.languages && navigator.languages[0]) || navigator.language || "zh";
+          return /^zh/i.test(raw) ? "zh" : "en";
+        }
+
+        function applyLang(lang) {
+          var dict = texts[lang] || texts.zh;
+          var nodes = document.querySelectorAll("[data-i18n]");
+          for (var i = 0; i < nodes.length; i++) {
+            var key = nodes[i].getAttribute("data-i18n");
+            if (!dict[key]) continue;
+            setNodeText(nodes[i], dict[key]);
+          }
+          document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+          var buttons = document.querySelectorAll("[data-lang]");
+          for (var j = 0; j < buttons.length; j++) {
+            var active = buttons[j].getAttribute("data-lang") === lang;
+            buttons[j].classList.toggle("active", active);
+            buttons[j].setAttribute("aria-pressed", active ? "true" : "false");
+          }
+          var illustratedViews = document.querySelectorAll("[data-i18n-aria]");
+          for (var v = 0; v < illustratedViews.length; v++) illustratedViews[v].setAttribute("aria-label", dict[illustratedViews[v].getAttribute("data-i18n-aria")]);
+          var images = document.querySelectorAll("[data-tour-image]");
+          for (var n = 0; n < images.length; n++) {
+            var imageName = images[n].getAttribute("data-tour-image");
+            var imageVersion = imageName === "menu" || imageName === "safety" ? "-3.0.4" : "";
+            images[n].src = "./assets/tour-3-0/" + imageName + imageVersion + "-" + lang + ".webp";
+            images[n].alt = dict[images[n].getAttribute("data-i18n-alt")] || "";
+            // Localized captures may have different proportions; preserve their natural ratio.
+            images[n].removeAttribute("height");
+            var fullImage = document.querySelector('[data-tour-fullimage="' + images[n].getAttribute("data-tour-image") + '"]');
+            if (fullImage) {
+              fullImage.href = images[n].src;
+              fullImage.setAttribute("aria-label", dict["tour_" + images[n].getAttribute("data-tour-image") + "_caption"] + " · " + dict.tour_open_image);
+            }
+          }
+          renderTimeline();
+        }
+
+        var initial = resolveLang();
+        applyLang(initial);
+
+        var switcher = document.querySelector("[data-lang-switch]");
+        if (!switcher) return;
+        switcher.addEventListener("click", function (event) {
+          var target = event.target;
+          if (!target || !target.matches("[data-lang]")) return;
+          var lang = target.getAttribute("data-lang");
+          if (lang !== "zh" && lang !== "en") return;
+          localStorage.setItem(STORAGE_KEY, lang);
+          applyLang(lang);
+        });
+
+        function applyManifest(meta) {
+          if (!meta) return;
+          var versionNodes = document.querySelectorAll("[data-latest-version]");
+          for (var i = 0; i < versionNodes.length; i++) {
+            setNodeText(versionNodes[i], meta.latest_version || "--");
+          }
+
+          var buildValue = meta.latest_build != null ? String(meta.latest_build) : "--";
+          var buildNumberNodes = document.querySelectorAll("[data-latest-build-number]");
+          for (var j = 0; j < buildNumberNodes.length; j++) {
+            setNodeText(buildNumberNodes[j], buildValue);
+          }
+
+          var buildTagNodes = document.querySelectorAll("[data-latest-build]");
+          for (var k = 0; k < buildTagNodes.length; k++) {
+            setNodeText(buildTagNodes[k], "build " + buildValue);
+          }
+        }
+
+        fetch("./update-manifest-pkg.json", { cache: "no-store" })
+          .then(function (response) {
+            if (!response.ok) throw new Error("manifest_unavailable");
+            return response.json();
+          })
+          .then(applyManifest)
+          .catch(function () {});
+
+        function applyPublicStats(stats) {
+          if (!stats) return;
+          var value = stats.monthly_active_users != null ? String(stats.monthly_active_users) : "--";
+          var nodes = document.querySelectorAll("[data-monthly-active-users]");
+          for (var i = 0; i < nodes.length; i++) {
+            setNodeText(nodes[i], value);
+          }
+        }
+
+        fetch("./api/public-stats", { cache: "no-store" })
+          .then(function (response) {
+            if (!response.ok) throw new Error("stats_unavailable");
+            return response.json();
+          })
+          .then(applyPublicStats)
+          .catch(function () {});
+
+        /* ── Timeline ── */
+        var TIMELINE_RECENT_DAYS = 1;
+        var timelineData = null;
+        var timelineTrack = document.querySelector("[data-timeline-track]");
+        var timelineExpandBtn = document.querySelector("[data-timeline-expand]");
+
+        function formatDateHeading(dateStr, lang) {
+          var parts = dateStr.split("-");
+          var y = parts[0], m = parseInt(parts[1], 10), d = parseInt(parts[2], 10);
+          if (lang === "zh") {
+            return y + " 年 " + m + " 月 " + d + " 日";
+          }
+          var months = ["January","February","March","April","May","June",
+                        "July","August","September","October","November","December"];
+          return months[m - 1] + " " + d + ", " + y;
+        }
+
+        function renderTimeline(forceExpand) {
+          if (!timelineTrack || !timelineData) return;
+          var lang = (function () {
+            var saved = localStorage.getItem(STORAGE_KEY);
+            if (saved === "zh" || saved === "en") return saved;
+            var raw = (navigator.languages && navigator.languages[0]) || navigator.language || "zh";
+            return /^zh/i.test(raw) ? "zh" : "en";
+          })();
+          var dict = texts[lang] || texts.zh;
+          var isExpanded = timelineTrack.classList.contains("is-expanded");
+          if (typeof forceExpand === "boolean") isExpanded = forceExpand;
+
+          var visibleGroups = isExpanded ? timelineData : timelineData.slice(0, TIMELINE_RECENT_DAYS);
+
+          var html = "";
+          for (var g = 0; g < visibleGroups.length; g++) {
+            var group = visibleGroups[g];
+            html += '<div class="timeline-date-group">';
+            html += '<div class="timeline-date-header">';
+            html += '<div class="timeline-date-dot" aria-hidden="true"></div>';
+            html += '<span class="timeline-date-text">' + formatDateHeading(group.date, lang) + '</span>';
+            html += '</div>';
+            for (var e = 0; e < group.entries.length; e++) {
+              var entry = group.entries[e];
+              html += '<div class="timeline-entry">';
+              html += '<div class="timeline-entry-dot" aria-hidden="true"></div>';
+              html += '<div class="timeline-entry-content">';
+              html += '<span class="timeline-entry-time">' + entry.time + '</span>';
+              html += '<div class="timeline-entry-body">';
+              if (entry.version) {
+                html += '<span class="timeline-entry-version">' + entry.version + '</span>';
+              }
+              html += '<span class="timeline-entry-desc">' + entry.desc[lang] + '</span>';
+              html += '</div></div></div>';
+            }
+            html += '</div>';
+          }
+          timelineTrack.innerHTML = html;
+
+          if (isExpanded) {
+            timelineTrack.classList.add("is-expanded");
+          } else {
+            timelineTrack.classList.remove("is-expanded");
+          }
+
+          if (timelineExpandBtn) {
+            if (isExpanded) {
+              timelineExpandBtn.textContent = dict.timeline_collapse;
+            } else {
+              timelineExpandBtn.textContent = dict.timeline_expand;
+            }
+            timelineExpandBtn.style.display = timelineData.length <= TIMELINE_RECENT_DAYS ? "none" : "";
+          }
+        }
+
+        if (timelineExpandBtn) {
+          timelineExpandBtn.setAttribute("aria-expanded", "false");
+          timelineExpandBtn.addEventListener("click", function () {
+            var isCurrentlyExpanded = timelineTrack.classList.contains("is-expanded");
+            renderTimeline(!isCurrentlyExpanded);
+            timelineExpandBtn.setAttribute("aria-expanded", !isCurrentlyExpanded ? "true" : "false");
+          });
+        }
+
+        fetch("./timeline.json", { cache: "no-store" })
+          .then(function (response) {
+            if (!response.ok) throw new Error("timeline_unavailable");
+            return response.json();
+          })
+          .then(function (data) {
+            timelineData = data;
+            renderTimeline(false);
+          })
+          .catch(function () {});
+
+        /* Keep the invitation leader attached when content or locale changes. */
+        (function () {
+          var layout = document.querySelector(".menu-annotated");
+          var image = layout.querySelector(".menu-image-wrap");
+          var feedback = layout.querySelector(".tour-feedback");
+          var connector = layout.querySelector(".menu-feedback-connector");
+          var path = connector.querySelector(":scope > path");
+          var frame;
+          function positionLeader() {
+            frame = null;
+            if (getComputedStyle(connector).display === "none") return;
+            var from = image.getBoundingClientRect();
+            var card = feedback.querySelector(".voices-carousel");
+            connector.style.visibility = card.hidden ? "hidden" : "visible";
+            var to = card.getBoundingClientRect();
+            var x = from.width * .92;
+            var y = from.height * parseFloat(getComputedStyle(layout).getPropertyValue("--origin-y"));
+            var width = to.left - from.left - x;
+            var endY = to.top + 26 - from.top;
+            var top = Math.min(y, endY);
+            var height = Math.max(1, Math.abs(endY - y));
+            connector.style.insetInlineStart = x + "px";
+            connector.style.insetBlockStart = top + "px";
+            connector.style.width = width + "px";
+            connector.style.height = height + "px";
+            connector.setAttribute("viewBox", "0 0 " + width + " " + height);
+            path.setAttribute("d", "M0 " + (y - top) + " H" + width * .25 + " L" + width * .75 + " " + (endY - top) + " H" + width);
+          }
+          function schedule() { if (!frame) frame = requestAnimationFrame(positionLeader); }
+          var observer = new ResizeObserver(schedule);
+          observer.observe(image);
+          observer.observe(feedback);
+          window.addEventListener("resize", schedule);
+          schedule();
+        })();
+
+        /* ── Voices Carousel ── */
+        (function () {
+          var DATA = [];
+          var track, dots, carousel;
+          var index = 0, timer = null, userPaused = false, hovered = false, focused = false;
+          var motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+          var pauseButton;
+          var INTERVAL = 6000;
+
+          function fmtDate(d, lang) {
+            var p = d.split("-"), m = parseInt(p[1], 10);
+            if (lang === "zh") return p[0] + "/" + m + "/" + parseInt(p[2], 10);
+            return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m-1] + " " + parseInt(p[2], 10) + ", " + p[0];
+          }
+
+          function resolveLang() {
+            var s = localStorage.getItem("ifc_lang");
+            if (s === "zh" || s === "en") return s;
+            var r = (navigator.languages && navigator.languages[0]) || navigator.language || "zh";
+            return /^zh/i.test(r) ? "zh" : "en";
+          }
+
+          function goTo(i) {
+            if (!track) return;
+            index = i < 0 ? DATA.length - 1 : i >= DATA.length ? 0 : i;
+            track.style.transform = "translateX(-" + (index * 100) + "%)";
+            var ds = dots.querySelectorAll("[data-vd]");
+            for (var d = 0; d < ds.length; d++) {
+              var selected = parseInt(ds[d].getAttribute("data-vd"), 10) === index;
+              ds[d].classList.toggle("is-active", selected);
+              ds[d].setAttribute("aria-current", selected ? "true" : "false");
+            }
+            var cards = track.querySelectorAll(".voices-feedback-card");
+            for (var c = 0; c < cards.length; c++) {
+              cards[c].setAttribute("aria-hidden", c === index ? "false" : "true");
+            }
+          }
+
+          function render(lang) {
+            if (!track) return;
+            var h = "", lang = lang || resolveLang();
+            for (var i = 0; i < DATA.length; i++) {
+              var it = DATA[i];
+              h += '<div class="voices-feedback-card">';
+              h += '<div class="voices-card-section voices-card-quote">';
+              h += '<div class="label-micro voices-card-label">' + it.quote_label[lang] + '</div>';
+              h += '<p>' + it.quote[lang] + '</p>';
+              h += '</div>';
+              h += '<div class="voices-card-section voices-card-built">';
+              h += '<div class="label-micro voices-card-label">' + it.built_label[lang] + '</div>';
+              h += '<p>' + it.built[lang] + '</p>';
+              h += '</div>';
+              h += '<div class="voices-card-meta">';
+              h += '<span class="voices-card-date">' + fmtDate(it.feedback_at, lang) + '</span>';
+              h += '<span class="voices-card-arrow">&rarr;</span>';
+              h += '<span class="voices-card-date">' + fmtDate(it.released_at, lang) + '</span>';
+              h += '<span class="voices-card-version">' + it.version + '</span>';
+              h += '</div></div>';
+            }
+            track.innerHTML = h;
+            var dh = "";
+            for (var j = 0; j < DATA.length; j++) {
+              dh += '<button class="voices-carousel-dot" type="button" data-vd="' + j + '" aria-label="' + (lang === "zh" ? "查看反馈案例 " : "Show feedback story ") + (j + 1) + '"></button>';
+            }
+            dots.innerHTML = dh;
+            goTo(Math.min(2, DATA.length - 1));
+          }
+
+          function next() { goTo(index + 1); }
+          function startT() {
+            stopT();
+            if (!userPaused && !hovered && !focused && !motionQuery.matches && !document.hidden && DATA.length > 1) timer = setInterval(next, INTERVAL);
+          }
+          function stopT() { if (timer) { clearInterval(timer); timer = null; } }
+
+          function init() {
+            track = document.querySelector("[data-voices-track]");
+            dots = document.querySelector("[data-voices-dots]");
+            carousel = document.querySelector("[data-voices-carousel]");
+            if (!track || !dots) return;
+
+            fetch("./voices.json", { cache: "no-store" })
+              .then(function (r) { return r.ok ? r.json() : Promise.reject("voices_unavailable"); })
+              .then(function (json) {
+                if (!Array.isArray(json) || !json.length) throw new Error("voices_unavailable");
+                DATA = json;
+                render(resolveLang());
+                startT();
+              })
+              .catch(function () {
+                carousel.hidden = true;
+                document.getElementById("tour-feedback-cases").hidden = true;
+              });
+
+            if (dots) dots.addEventListener("click", function (e) {
+              var d = e.target;
+              if (d && d.matches("[data-vd]")) { goTo(parseInt(d.getAttribute("data-vd"), 10)); startT(); }
+            });
+            if (carousel) {
+              carousel.addEventListener("mouseenter", function () { hovered = true; stopT(); });
+              carousel.addEventListener("mouseleave", function () { hovered = false; startT(); });
+              carousel.addEventListener("focusin", function () { focused = true; stopT(); });
+              carousel.addEventListener("focusout", function (e) { if (!carousel.contains(e.relatedTarget)) { focused = false; startT(); } });
+              pauseButton = carousel.querySelector("[data-voices-pause]");
+              if (pauseButton) pauseButton.addEventListener("click", function () {
+                userPaused = !userPaused;
+                pauseButton.setAttribute("data-i18n", userPaused ? "tour_case_play" : "tour_case_pause");
+                pauseButton.textContent = texts[resolveLang()][userPaused ? "tour_case_play" : "tour_case_pause"];
+                startT();
+              });
+              motionQuery.addEventListener("change", startT);
+              document.addEventListener("visibilitychange", startT);
+            }
+
+            var sw = document.querySelector("[data-lang-switch]");
+            if (sw) {
+              sw.addEventListener("click", function () {
+                setTimeout(function () { render(resolveLang()); startT(); }, 10);
+              });
+            }
+          }
+
+          /* wait for DOM to settle, then init */
+          setTimeout(init, 0);
+        })();
+
+      })();
+    </script>
+    <script type="module" src="./assets/hero-fan-guard.mjs"></script>
+    <script type="module" src="./assets/calligraph-islands.20261026.mjs"></script>
+  </body>
+</html>

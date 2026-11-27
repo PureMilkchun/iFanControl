@@ -1,0 +1,115 @@
+{
+  "images": {
+    "menu-3.0.4-zh.webp": {
+      "origin": "/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/packaging/pkg/output/accent-menu-research-20261127/beta92-preview/zh-dark-stepped-confirmed.png",
+      "pixel_size": [
+        560,
+        934
+      ],
+      "sha256": "4bcf42d6b82dc3e571793f9cd1f8c6a8d62c809cabc473d1ed1f49754f11dd35",
+      "kind": "Existing real native menu capture; rendered UI source verified identical to95"
+    },
+    "safety-3.0.4-zh.webp": {
+      "origin": "/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/packaging/pkg/output/stable-95/web-captures/safety-zh-rendered.png",
+      "pixel_size": [
+        800,
+        540
+      ],
+      "sha256": "a9e8ae1f7191ee24e89b5c228eecf0621b5261d1ade525a73b31553e41fdc9e8",
+      "kind": "Current SafetyFloorWindowController and NativeInterface exported as a native view; no window shown, actions not run"
+    },
+    "menu-3.0.4-en.webp": {
+      "origin": "/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/packaging/pkg/output/accent-menu-research-20261127/beta92-preview/en-dark-stepped-confirmed.png",
+      "pixel_size": [
+        560,
+        934
+      ],
+      "sha256": "61e0ba6716ab6da0e5dcd90cd326cb407a511cf13b39929683da88292ba83b56",
+      "kind": "Existing real native menu capture; rendered UI source verified identical to95"
+    },
+    "safety-3.0.4-en.webp": {
+      "origin": "/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/packaging/pkg/output/stable-95/web-captures/safety-en-rendered.png",
+      "pixel_size": [
+        800,
+        540
+      ],
+      "sha256": "b9e1474d00d1ca52cf0734c43b879971c907e868d12d93ebf13adb9d3fd0b78f",
+      "kind": "Current SafetyFloorWindowController and NativeInterface exported as a native view; no window shown, actions not run"
+    }
+  },
+  "safety_renderer_macho": {
+    "minimum_os": "13.0",
+    "sdk": "27.0"
+  },
+  "menu_source_identity": {
+    "from_tag": "v3.0.3-beta.92",
+    "to_tag": "v3.0.4",
+    "identical_rendered_ui_code": {
+      "private func buildMenuOnce()": "3a123f93d41b5636cb6e35bd86992a692ee290aa8876eb83dc1a02ed22aad07e",
+      "func updateDynamicMenuItems()": "d5ada5184a6db8b2c9fec56e2bb6e35b535abfc2d793daa1e807c56eb0c6adf5",
+      "class SafetyFloorWindowController": "a5b442757fed1d87051eb692f0d4896b53e8eca520fee574d62aa48a4af5dba6",
+      "MenuSpeedControl.swift": "bb5b282e9c2335029220c748a87ea6ade407e2d86ac8ea084128aca886a3ac04",
+      "NativeInterface.swift": "03b80d0e66010ee11b942f0a15af4e8dfddc44647efd89359489b42af0b357b5",
+      "MenuActivation.swift": "c549baf0c8dfbeb48dfabe095ed2b514468251ff37e184c029a0e256f14b7894",
+      "SensorCatalog.swift": "cc56f4afb4c92d5dcb9b5b68fd59bee8641b5c1717a993028997ab3b919aeee8"
+    },
+    "same_linked_sdk": "27.0",
+    "same_deployment_target": "13.0",
+    "scope": "Reuse actual verified native dark menu captures; rendering and callbacks unchanged."
+  },
+  "critical_temperature": 110,
+  "palette": "Native system blue via isolated process argument; no system preferences changed.",
+  "safety_original_chinese_capture": "Current Chinese real-window content was separately inspected via CUA before lock; final export uses the current native view in both languages.",
+  "no_new_native_capture_needed": true,
+  "user_authorized_publication": true,
+  "app_package_unchanged": "f5f23ed1df409289f65840b53c261e7839586f34f1e57fd78caef749bb69445a",
+  "website_scope": {
+    "staged_at": "2026-11-27T13:56:20.661Z",
+    "previous_deployment": "6e382ed2-cc28-4f4e-8e34-55f7a7dba2af",
+    "stable_build": 95,
+    "beta_feed_build": 95,
+    "legacy_build": 52,
+    "changed_existing_assets": [
+      "/update-manifest-pkg.json",
+      "/iFanControl-macOS.pkg",
+      "/update-manifest-beta.json",
+      "/update-manifest-stable-restore.json",
+      "/timeline.json",
+      "/index.html"
+    ],
+    "added_assets": [
+      "/iFanControl-3.0.4-95.pkg",
+      "/iFanControl-stable-restore-3.0.4-95-f5f23ed1df40.pkg",
+      "/assets/tour-3-0/menu-3.0.4-zh.webp",
+      "/assets/tour-3-0/menu-3.0.4-en.webp",
+      "/assets/tour-3-0/safety-3.0.4-zh.webp",
+      "/assets/tour-3-0/safety-3.0.4-en.webp"
+    ],
+    "preserved_existing_assets": 100,
+    "package_sha256": "f5f23ed1df409289f65840b53c261e7839586f34f1e57fd78caef749bb69445a",
+    "restore_manifest": {
+      "latest_version": "3.0.4",
+      "latest_build": 95,
+      "release_channel": "stable",
+      "published_at": "2026-11-27T13:56:21.123598+00:00",
+      "stable_package_sha256": "f5f23ed1df409289f65840b53c261e7839586f34f1e57fd78caef749bb69445a",
+      "assets": {
+        "macos_arm64_pkg_url": "https://ifan-59w.pages.dev/iFanControl-stable-restore-3.0.4-95-f5f23ed1df40.pkg",
+        "pkg_sha256": "394ff366423c5f823f7a01a4b03058d2866dde335f54dff4df6b3e679156275e"
+      }
+    },
+    "refreshed_website_images": [
+      "/assets/tour-3-0/menu-3.0.4-zh.webp",
+      "/assets/tour-3-0/menu-3.0.4-en.webp",
+      "/assets/tour-3-0/safety-3.0.4-zh.webp",
+      "/assets/tour-3-0/safety-3.0.4-en.webp"
+    ],
+    "worker_change": "Only the /download redirect target changes from build 89 to build 95"
+  },
+  "visual_review": {
+    "all_four_final_image_files_viewed": true,
+    "new_full_page_composite_reviewed": false,
+    "reason": "CUA IAB browser connection repeatedly timed out after native capture was interrupted by Mac lock. No alternative UI automation used.",
+    "previous_layout_review": "Existing unchanged website layout and candidate release timeline had been reviewed on desktop and390px mobile; image URL/ratio/annotation changes reviewed from source and final image files."
+  }
+}
