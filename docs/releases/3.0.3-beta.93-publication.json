@@ -1,0 +1,105 @@
+{
+  "version": "3.0.3",
+  "build": 93,
+  "release_channel": "beta",
+  "stable_build": 89,
+  "legacy_build": 52,
+  "package_sha256": "13d172e4bb14404c222615fe4aeb234e05f33c92352ba6a4f407c183ea424837",
+  "deployment": "9d08f105-ae77-46bd-9bea-d7e382b87a77",
+  "deployed_at": "2026-11-27T10:03:12.710852Z",
+  "previous_site_deployment": "0cc9e788-e96b-448c-8494-8609d8851be6",
+  "beta_only": true,
+  "unchanged_assets": 103,
+  "runtime_preserved": true,
+  "stable_restore": {
+    "latest_version": "3.0.3",
+    "latest_build": 89,
+    "release_channel": "stable",
+    "published_at": "2026-11-19T16:05:00.388986+00:00",
+    "stable_package_sha256": "9e3b33481fc956c6a6ff5fa95ff88c89090ea344cd53c169598badab8778458d",
+    "assets": {
+      "macos_arm64_pkg_url": "https://ifan-59w.pages.dev/iFanControl-stable-restore-3.0.3-89-9e3b33481fc9.pkg",
+      "pkg_sha256": "0acea8decd84b1cdaf3d1fe76f1cb917432b1d888059e671a83841f88a000a80"
+    }
+  },
+  "installer_preflight_passed": true,
+  "stable_restore_assets_unchanged": true,
+  "agent_installed_app": false,
+  "actual_downgrade_tested": false,
+  "origins": [
+    {
+      "origin": "https://ifan-59w.pages.dev",
+      "stable_build": 89,
+      "beta_build": 93,
+      "sha256": "13d172e4bb14404c222615fe4aeb234e05f33c92352ba6a4f407c183ea424837",
+      "legacy_protection_verified": true
+    },
+    {
+      "origin": "https://ifancontrol.puremilkchun.top",
+      "stable_build": 89,
+      "beta_build": 93,
+      "sha256": "13d172e4bb14404c222615fe4aeb234e05f33c92352ba6a4f407c183ea424837",
+      "legacy_protection_verified": true
+    }
+  ],
+  "source_commit": "d3e59a553b0124049ccde1fc73ebf397182d6921",
+  "source_branch": "codex/beta-93",
+  "source_tag": "v3.0.3-beta.93",
+  "source_path": "/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/packaging/pkg/output/power-dc-20261127/source",
+  "beta_base_commit": "ae36088",
+  "changed_app_sources": [
+    "Sources/MacFanControl/main.swift"
+  ],
+  "app_build": {
+    "source_commit": "d3e59a553b0124049ccde1fc73ebf397182d6921",
+    "source_dirty": false,
+    "version": "3.0.3",
+    "build": 93,
+    "channel": "beta",
+    "build_system": "native",
+    "sdk_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+    "sdk_version": "27.0",
+    "macho_build_version": {
+      "minimum_os": "13.0",
+      "sdk": "27.0"
+    },
+    "app": "build/beta-93/iFanControl.app",
+    "executable_sha256": "cbfaa8113409500bc3dc7883cd7e7a9605a43d6cb4e215ec9a538dc49661cd7a",
+    "info_plist_sha256": "05ed2b499f325a9377113a48993f8d37c7531581ae5f7a60a4d25050c3d3b0a0",
+    "icon_sha256": "b460e15c3834479a771bcc200a7a7622c53a5fd84dd62392bb179cc646b52324",
+    "brand_assets_sha256": {
+      "WordmarkHorizontal.pdf": "1e358b9915b70279bdc851821632a36ac214a49963b8213514f4d584955ad197",
+      "WordmarkStacked.pdf": "6e6b714ee66e0b2fc29e52716ed156cbd451c038d1622075edce8e45665c2d07"
+    }
+  },
+  "final_payload": {
+    "package_sha256": "13d172e4bb14404c222615fe4aeb234e05f33c92352ba6a4f407c183ea424837",
+    "build": 93,
+    "channel": "beta",
+    "bundle_minimum_os": "15.0",
+    "macho": {
+      "minimum_os": "13.0",
+      "sdk": "27.0"
+    },
+    "executable_sha256": "cbfaa8113409500bc3dc7883cd7e7a9605a43d6cb4e215ec9a538dc49661cd7a",
+    "payload_matches_built_app": true,
+    "signature_valid": true,
+    "packaged_brand_without_development_fallback": true
+  },
+  "downloaded_payload_matches_verified_local_package": true,
+  "power_display_validation": [
+    "Native release build succeeded (existing unrelated unused-height and build-engine deprecation warnings).",
+    "Compiled extracted production display method: distinct DC vs component numbers, component change independence, missing/stale/uninitialized/unsupported/negative/non-finite readings, zero/rounding, four styles and combined sources.",
+    "Actual MiniStatusView rendered offscreen; light/dark, available/unavailable/stale images visually inspected.",
+    "Read-only local hardware sample: PDTR (DC In) = f32(10.394795)."
+  ],
+  "preview_sha256": {
+    "power-light.png": "76a1c9f8db5e807266b873cc535810be14721c218edf57ef9ecd410fa742845e",
+    "power-dark.png": "278205fc01739679bc71785b88d4f45abda361d926ff1953061ebf9e03070a8e"
+  },
+  "source_inputs_verified": true,
+  "limitations": [
+    "No installation or fan hardware writes by assistant.",
+    "Display states rendered offscreen from the actual production view and display method; no end-to-end installed session."
+  ]
+}
