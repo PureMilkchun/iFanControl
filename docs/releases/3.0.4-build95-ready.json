@@ -1,0 +1,144 @@
+{
+  "source_commit": "54ad632ae07de5716ac9e518f55a0607d6d06169",
+  "source_branch": "codex/stable-95",
+  "source_tag": "v3.0.4",
+  "source_path": "/Users/puremilk/Documents/mac fancontrol/macfan-control-v2/packaging/pkg/output/stable-95/source",
+  "beta_base_commit": "fb0d938",
+  "changed_app_sources": [],
+  "app_build": {
+    "source_commit": "54ad632ae07de5716ac9e518f55a0607d6d06169",
+    "source_dirty": false,
+    "version": "3.0.4",
+    "build": 95,
+    "channel": "stable",
+    "build_system": "native",
+    "sdk_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+    "sdk_version": "27.0",
+    "macho_build_version": {
+      "minimum_os": "13.0",
+      "sdk": "27.0"
+    },
+    "app": "build/stable-95/iFanControl.app",
+    "executable_sha256": "46601caa54f913e0d6a48ac94a2c02ad7d0eedb834a8e15a4cd524fd6631e32e",
+    "info_plist_sha256": "78d72a12d76286fbc1ef5f64b2ff9712ab69546e7fbbee85e7f04588906b62b4",
+    "icon_sha256": "b460e15c3834479a771bcc200a7a7622c53a5fd84dd62392bb179cc646b52324",
+    "brand_assets_sha256": {
+      "WordmarkHorizontal.pdf": "1e358b9915b70279bdc851821632a36ac214a49963b8213514f4d584955ad197",
+      "WordmarkStacked.pdf": "6e6b714ee66e0b2fc29e52716ed156cbd451c038d1622075edce8e45665c2d07"
+    },
+    "compiled_source_commit": "d3e59a553b0124049ccde1fc73ebf397182d6921",
+    "build_method": "Promote verified Beta94 App; update stable version/build/channel metadata and re-sign; no recompilation"
+  },
+  "version": "3.0.4",
+  "build": 95,
+  "status": "ready_for_user_publish_instruction",
+  "published": false,
+  "package_sha256": "f5f23ed1df409289f65840b53c261e7839586f34f1e57fd78caef749bb69445a",
+  "promotion_equivalence": {
+    "baseline_build": 94,
+    "new_build": 95,
+    "recompiled": false,
+    "changed_bundle_files": [
+      "Contents/Info.plist",
+      "Contents/MacOS/iFanControl"
+    ],
+    "unsigned_executable_sha256": "3309e961729905c65fadcdb471f31b054ea1b3b480699f984b82e1a46ca2ed26",
+    "unsigned_executable_identical": true,
+    "resources_identical": true,
+    "metadata_diff_only_version_build_and_channel": true,
+    "cancelled_switch_excluded": true
+  },
+  "payload_verification": {
+    "package_sha256": "f5f23ed1df409289f65840b53c261e7839586f34f1e57fd78caef749bb69445a",
+    "build": 95,
+    "channel": "stable",
+    "bundle_minimum_os": "15.0",
+    "macho": {
+      "minimum_os": "13.0",
+      "sdk": "27.0"
+    },
+    "executable_sha256": "46601caa54f913e0d6a48ac94a2c02ad7d0eedb834a8e15a4cd524fd6631e32e",
+    "payload_matches_built_app": true,
+    "signature_valid": true,
+    "packaged_brand_without_development_fallback": true
+  },
+  "staging": {
+    "staged_at": "2026-11-27T13:18:59.707Z",
+    "previous_deployment": "6e382ed2-cc28-4f4e-8e34-55f7a7dba2af",
+    "stable_build": 95,
+    "beta_feed_build": 95,
+    "legacy_build": 52,
+    "changed_existing_assets": [
+      "/update-manifest-pkg.json",
+      "/iFanControl-macOS.pkg",
+      "/update-manifest-beta.json",
+      "/update-manifest-stable-restore.json",
+      "/timeline.json"
+    ],
+    "added_assets": [
+      "/iFanControl-3.0.4-95.pkg",
+      "/iFanControl-stable-restore-3.0.4-95-f5f23ed1df40.pkg"
+    ],
+    "preserved_existing_assets": 101,
+    "package_sha256": "f5f23ed1df409289f65840b53c261e7839586f34f1e57fd78caef749bb69445a",
+    "restore_manifest": {
+      "latest_version": "3.0.4",
+      "latest_build": 95,
+      "release_channel": "stable",
+      "published_at": "2026-11-27T13:19:00.158793+00:00",
+      "stable_package_sha256": "f5f23ed1df409289f65840b53c261e7839586f34f1e57fd78caef749bb69445a",
+      "assets": {
+        "macos_arm64_pkg_url": "https://ifan-59w.pages.dev/iFanControl-stable-restore-3.0.4-95-f5f23ed1df40.pkg",
+        "pkg_sha256": "75a4598e37de078fe5e15d00e09cb2a3a0cbfb983191ecf9b80736315e129f1d"
+      }
+    },
+    "worker_change": "Only the /download redirect target changes from build 89 to build 95"
+  },
+  "github_draft": {
+    "url": "https://github.com/PureMilkchun/iFanControl/releases/tag/untagged-dca0f81382aea29e1abf",
+    "tag": "v3.0.4",
+    "is_draft": true,
+    "assets_match_candidate": true
+  },
+  "website_preview": {
+    "local_preview": "http://127.0.0.1:57539/",
+    "version": "3.0.4",
+    "build": 95,
+    "desktop_chinese_timeline_visually_reviewed": true,
+    "mobile_chinese_and_english_timeline_visually_reviewed": true,
+    "mobile_viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "mobile_page_width": 390,
+    "mobile_timeline_width": 358,
+    "horizontal_overflow_observed": false,
+    "viewport_reset": true,
+    "homepage_html_css_unchanged": true,
+    "notes": "Review performed with CUA in-app browser on the local candidate. This is not a live production deployment or native installer run."
+  },
+  "live_state_unchanged": {
+    "canonical": "6e382ed2-cc28-4f4e-8e34-55f7a7dba2af",
+    "live_feeds": {
+      "update-manifest-pkg.json": 89,
+      "update-manifest-beta.json": 94
+    },
+    "github_latest": "v3.0.3",
+    "github_draft_assets_match_candidate": true,
+    "candidate_not_deployed": true
+  },
+  "checks": [
+    "35 exact source input hashes match v3.0.4; only Info.plist differs from Beta94.",
+    "Unsigned executable, resources and runtime behavior inherited unchanged from verified Beta94.",
+    "Final PKG metadata/signature/SDK/resource/config and Installer preflight pass.",
+    "Stable restore package built from exact candidate; production parser accepts normal/restore feeds and full package hashes.",
+    "Manifest/channel/updater regressions pass with UI, Installer and network effects stubbed.",
+    "Frozen legacy52 hashes, staging asset map and worker download-only patch verified.",
+    "GitHub draft assets downloaded and compared to local candidate.",
+    "Actual candidate website timeline reviewed through CUA at desktop and mobile widths in Chinese and English."
+  ],
+  "limitations": [
+    "No actual installation or new macOS15/26hardware test.",
+    "No production deployment, GitHub public release or main-branch promotion yet."
+  ]
+}
