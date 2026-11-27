@@ -13,4 +13,4 @@ python3 scripts/build_app.py --output build/accent-preview/iFanControl.app
 python3 packaging/pkg/test_menu_speed.py --output ../preview --built-app build/accent-preview/iFanControl.app --inactive --accent 4
 ```
 
-This is a local fix on codex/menu-accent-active. Published Beta91 artifacts and language/fan behavior remain unchanged. No new build number or deployment was made.
+Published as 3.0.3 Beta/build92 on codex/beta-92, tagged v3.0.3-beta.92. The final App and package passed four initially-inactive language/theme cases and both live origins verify the same PKG. Language/fan behavior, prior Beta packages, stable89and legacy52are preserved. See ../releases/3.0.3-beta.92-publication.json for source, SDK, hash and deployment evidence.
